@@ -1,0 +1,97 @@
+// 화면 표기 도구 (숫자·시각). 시각은 모두 한국 시간 기준
+
+const KST_MS = 9 * 3600 * 1000;
+const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+const pad = (n) => String(n).padStart(2, '0');
+
+/** Date → 한국 시간의 연·월·일·시·분 (브라우저 시간대와 상관없이) */
+function kstParts(date) {
+  const d = new Date(date.getTime() + KST_MS);
+  return {
+    y: d.getUTCFullYear(),
+    m: d.getUTCMonth() + 1,
+    d: d.getUTCDate(),
+    h: d.getUTCHours(),
+    min: d.getUTCMinutes(),
+    w: d.getUTCDay(),
+  };
+}
+
+/** 오늘 날짜 "11월 11일 (수)" */
+export function todayLabel(now = new Date()) {
+  const p = kstParts(now);
+  return `${p.m}월 ${p.d}일 (${WEEK[p.w]})`;
+}
+
+const sameKstDay = (a, b) => {
+  const x = kstParts(a);
+  const y = kstParts(b);
+  return x.y === y.y && x.m === y.m && x.d === y.d;
+};
+
+/** 글 시각: 오늘이면 "14:32", 올해면 "11월 9일 14:32", 그 전이면 "2025. 10. 3." */
+export function shortTime(iso, now = new Date()) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const p = kstParts(date);
+  if (sameKstDay(date, now)) return `${pad(p.h)}:${pad(p.min)}`;
+  if (p.y === kstParts(now).y) return `${p.m}월 ${p.d}일 ${pad(p.h)}:${pad(p.min)}`;
+  return `${p.y}. ${p.m}. ${p.d}.`;
+}
+
+/** 자세한 시각 "2026년 11월 11일 (수) 14:32" */
+export function fullTime(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const p = kstParts(date);
+  return `${p.y}년 ${p.m}월 ${p.d}일 (${WEEK[p.w]}) ${pad(p.h)}:${pad(p.min)}`;
+}
+
+/** 얼마 전: "방금", "3분 전", "2시간 전", 하루가 넘으면 shortTime */
+export function relativeTime(iso, now = new Date()) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  const diff = (now.getTime() - date.getTime()) / 1000;
+  if (Number.isNaN(diff)) return '';
+  if (diff < 60) return '방금';
+  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
+  if (diff < 86400 && sameKstDay(date, now)) return `${Math.floor(diff / 3600)}시간 전`;
+  return shortTime(iso, now);
+}
+
+/** 가격 205000 → "205,000" */
+export function fmtPrice(n) {
+  if (n == null || Number.isNaN(Number(n))) return '–';
+  return Math.round(Number(n)).toLocaleString('ko-KR');
+}
+
+/** 거래량 큰 수 → "1,526만" */
+export function fmtVolume(n) {
+  if (n == null) return '–';
+  if (n >= 1e8) return `${(n / 1e8).toFixed(1)}억`;
+  if (n >= 1e4) return `${Math.round(n / 1e4).toLocaleString('ko-KR')}만`;
+  return Math.round(n).toLocaleString('ko-KR');
+}
+
+/** 등락률 3.07 → "+3.07%", -1.2 → "-1.20%" */
+export function fmtRate(rate) {
+  if (rate == null || Number.isNaN(Number(rate))) return '–';
+  const r = Number(rate);
+  const sign = r > 0 ? '+' : r < 0 ? '-' : '';
+  return `${sign}${Math.abs(r).toFixed(2)}%`;
+}
+
+/** 등락 금액 6100 → "+6,100" */
+export function fmtAmount(n) {
+  if (n == null) return '';
+  const sign = n > 0 ? '+' : n < 0 ? '-' : '';
+  return `${sign}${Math.abs(Math.round(n)).toLocaleString('ko-KR')}`;
+}
+
+/** 등락 방향 → 글자색 클래스 (up 빨강 · down 파랑 · flat) */
+export function dirClass(rate) {
+  if (rate == null) return 'flat';
+  return rate > 0 ? 'up' : rate < 0 ? 'down' : 'flat';
+}

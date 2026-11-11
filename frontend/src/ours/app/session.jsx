@@ -1,0 +1,141 @@
+// 로그인 상태 · 관심 종목 · 알림(토스트)을 화면 전체가 같이 씀
+// - 토큰은 api/client.js 의 tokenStore (localStorage). 401 이면 client 가 토큰을 지움 → 여기서도 로그아웃 상태로
+// - 로그인이 필요한 동작은 requireLogin(이유) 로 로그인 창을 엶
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { authApi, tokenStore, watchlistApi } from '../../api';
+import { errorText } from '../lib/errors';
+
+const SessionContext = createContext(null);
+
+export function SessionProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(() => Boolean(tokenStore.get()));
+  const [authModal, setAuthModal] = useState(null); // { mode: 'login'|'signup', reason }
+  const [watchlist, setWatchlist] = useState({ items: [], loaded: false, error: null });
+  const [toasts, setToasts] = useState([]);
+  const toastId = useRef(0);
+
+  const toast = useCallback((message, tone = 'info') => {
+    toastId.current += 1;
+    const id = toastId.current;
+    setToasts((list) => [...list.slice(-2), { id, message, tone }]);
+    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), tone === 'error' ? 5000 : 3000);
+  }, []);
+
+  const loadWatchlist = useCallback(async () => {
+    try {
+      const res = await watchlistApi.list();
+      setWatchlist({ items: res?.items || [], loaded: true, error: null });
+    } catch (err) {
+      setWatchlist((prev) => ({ ...prev, loaded: true, error: err }));
+      if (err?.status === 401) setUser(null);
+    }
+  }, []);
+
+  // 처음 열 때 저장된 토큰이 살아 있는지 확인
+  useEffect(() => {
+    if (!tokenStore.get()) return;
+    const controller = new AbortController();
+    authApi
+      .me({ signal: controller.signal })
+      .then((me) => setUser(me))
+      .catch(() => setUser(null))
+      .finally(() => setChecking(false));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (user) loadWatchlist();
+    else setWatchlist({ items: [], loaded: false, error: null });
+  }, [user, loadWatchlist]);
+
+  const login = useCallback(async (loginId, password) => {
+    await authApi.login(loginId, password);
+    const me = await authApi.me();
+    setUser(me);
+    return me;
+  }, []);
+
+  const signup = useCallback(
+    async (loginId, password) => {
+      await authApi.signup(loginId, password);
+      return login(loginId, password);
+    },
+    [login]
+  );
+
+  const logout = useCallback(() => {
+    authApi.logout();
+    setUser(null);
+    toast('로그아웃했어요.');
+  }, [toast]);
+
+  const requireLogin = useCallback((reason) => {
+    setAuthModal({ mode: 'login', reason });
+  }, []);
+
+  /** 로그인이 필요한 API 를 부르다 401 이 나면 로그아웃 상태로 돌리고 로그인 창 */
+  const handleAuthError = useCallback(
+    (err, reason) => {
+      if (err?.status === 401) {
+        setUser(null);
+        setAuthModal({ mode: 'login', reason: reason || '로그인이 끝났어요. 다시 로그인해 주세요.' });
+        return true;
+      }
+      return false;
+    },
+    []
+  );
+
+  const watchCodes = useMemo(() => new Set(watchlist.items.map((w) => w.stockCode)), [watchlist.items]);
+
+  const toggleWatch = useCallback(
+    async (stockCode, stockName) => {
+      if (!user) {
+        requireLogin('관심 종목은 로그인하면 저장돼요.');
+        return;
+      }
+      const has = watchCodes.has(stockCode);
+      try {
+        if (has) await watchlistApi.remove(stockCode);
+        else await watchlistApi.add(stockCode);
+        await loadWatchlist();
+        toast(has ? `관심 종목에서 뺐어요 · ${stockName || stockCode}` : `관심 종목에 담았어요 · ${stockName || stockCode}`);
+      } catch (err) {
+        if (!handleAuthError(err)) toast(errorText(err), 'error');
+      }
+    },
+    [user, watchCodes, loadWatchlist, toast, requireLogin, handleAuthError]
+  );
+
+  const value = useMemo(
+    () => ({
+      user,
+      checking,
+      login,
+      signup,
+      logout,
+      authModal,
+      openAuth: (mode = 'login', reason) => setAuthModal({ mode, reason }),
+      closeAuth: () => setAuthModal(null),
+      requireLogin,
+      handleAuthError,
+      watchlist,
+      watchCodes,
+      reloadWatchlist: loadWatchlist,
+      toggleWatch,
+      toast,
+      toasts,
+    }),
+    [user, checking, login, signup, logout, authModal, requireLogin, handleAuthError, watchlist, watchCodes, loadWatchlist, toggleWatch, toast, toasts]
+  );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useSession() {
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error('SessionProvider 안에서만 쓸 수 있어요');
+  return ctx;
+}

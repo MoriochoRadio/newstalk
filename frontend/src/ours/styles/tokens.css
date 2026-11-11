@@ -1,0 +1,178 @@
+/* 우리 안(태경 안) 디자인 토큰 — 색·글자·모양은 전부 여기서만 정함
+   바탕: test/fe-ui-redesign 목업의 "토스풍" 프리셋 (theme=toss card=soft radius=round fx=lift)
+   - 라이트/다크: <html data-theme="light|dark">. 속성이 없으면 운영체제 설정(prefers-color-scheme)을 따름
+   - 글자색은 바탕 대비 4.5:1 이상 (본문·보조 모두). 채움색(--accent 등)은 아이콘·막대·포커스용
+   - 상승 빨강 · 하락 파랑 (국내 증권 앱 관례) */
+
+:root {
+  color-scheme: light;
+
+  /* 글자 크기 7단계 (본문 14) */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 30px;
+  --lh-tight: 1.3;
+  --lh: 1.6;
+
+  /* 바탕·면 */
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --surface-3: #f2f4f6;
+  --surface-hover: #f4f6f8;
+  --line: #e5e8eb;
+  --line-strong: #d1d6db;
+
+  /* 글자 (흰 바탕 기준 대비: text 16.1 · text-2 7.3 · text-3 5.1) */
+  --text: #191f28;
+  --text-2: #4e5968;
+  --text-3: #636e7b;
+  --text-on-accent: #ffffff;
+
+  /* 강조 (토스 파랑). accent-strong 은 흰 글자를 올려도 5.4:1 */
+  --accent: #3182f6;
+  --accent-strong: #1b64da;
+  --accent-soft: #e8f3ff;
+  --accent-text: #1b64da;
+
+  /* 등락 (글자용은 4.5:1 이상, 차트용은 채움색) */
+  --up: #c8202f;
+  --up-soft: #fdecee;
+  --up-chart: #f04452;
+  --down: #2563eb;
+  --down-soft: #e8f0fe;
+  --down-chart: #3182f6;
+  --flat: #636e7b;
+
+  /* 상태색 */
+  --warn: #9a5b00;
+  --warn-soft: #fff4e0;
+  --ok: #0f7a55;
+  --ok-soft: #e6f6ef;
+  --danger: #c4222f;
+  --danger-soft: #fdecee;
+  --danger-solid: #c4222f;
+  --star: #d97706;
+
+  /* 차트 이동평균 선 */
+  --ma5: #e8a317;
+  --ma20: #8b5cf6;
+  --ma60: #0ea5a4;
+
+  /* 모양 (radius=round) */
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* 그림자 (card=soft: 선 없이 부드러운 그림자) */
+  --shadow-card: 0 2px 12px rgba(25, 31, 40, 0.06), 0 1px 2px rgba(25, 31, 40, 0.04);
+  --shadow-hover: 0 6px 20px rgba(25, 31, 40, 0.1);
+  --shadow-pop: 0 16px 40px rgba(25, 31, 40, 0.18);
+
+  /* 크기 */
+  --control-h: 40px;
+  --control-h-sm: 32px;
+  --nav-w: 232px;
+  --content-max: 1180px;
+  --gutter: 24px;
+
+  --skeleton-a: #eceef1;
+  --skeleton-b: #f6f7f9;
+  --overlay: rgba(0, 0, 0, 0.45);
+}
+
+/* 다크 값 (두 곳에서 같은 값을 씀: 운영체제 다크 + 직접 고른 다크) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #101115;
+    --surface: #1b1c22;
+    --surface-2: #202128;
+    --surface-3: #26272f;
+    --surface-hover: #24252c;
+    --line: #2c2e36;
+    --line-strong: #3a3d47;
+    --text: #eceef1;
+    --text-2: #c1c7cf;
+    --text-3: #9ea6b1;
+    --text-on-accent: #ffffff;
+    --accent: #4a90f7;
+    --accent-strong: #2f6fdb;
+    --accent-soft: rgba(74, 144, 247, 0.16);
+    --accent-text: #79acff;
+    --up: #ff6b76;
+    --up-soft: rgba(255, 107, 118, 0.14);
+    --up-chart: #ff5c68;
+    --down: #6ea8ff;
+    --down-soft: rgba(110, 168, 255, 0.14);
+    --down-chart: #4a90f7;
+    --flat: #9ea6b1;
+    --warn: #f3b552;
+    --warn-soft: rgba(243, 181, 82, 0.14);
+    --ok: #4cc795;
+    --ok-soft: rgba(76, 199, 149, 0.14);
+    --danger: #ff7b85;
+    --danger-soft: rgba(255, 123, 133, 0.14);
+    --danger-solid: #c9303c;
+    --star: #f5b547;
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.35);
+    --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --skeleton-a: #24252c;
+    --skeleton-b: #2c2d35;
+    --overlay: rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #101115;
+  --surface: #1b1c22;
+  --surface-2: #202128;
+  --surface-3: #26272f;
+  --surface-hover: #24252c;
+  --line: #2c2e36;
+  --line-strong: #3a3d47;
+  --text: #eceef1;
+  --text-2: #c1c7cf;
+  --text-3: #9ea6b1;
+  --text-on-accent: #ffffff;
+  --accent: #4a90f7;
+  --accent-strong: #2f6fdb;
+  --accent-soft: rgba(74, 144, 247, 0.16);
+  --accent-text: #79acff;
+  --up: #ff6b76;
+  --up-soft: rgba(255, 107, 118, 0.14);
+  --up-chart: #ff5c68;
+  --down: #6ea8ff;
+  --down-soft: rgba(110, 168, 255, 0.14);
+  --down-chart: #4a90f7;
+  --flat: #9ea6b1;
+  --warn: #f3b552;
+  --warn-soft: rgba(243, 181, 82, 0.14);
+  --ok: #4cc795;
+  --ok-soft: rgba(76, 199, 149, 0.14);
+  --danger: #ff7b85;
+  --danger-soft: rgba(255, 123, 133, 0.14);
+  --danger-solid: #c9303c;
+  --star: #f5b547;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --skeleton-a: #24252c;
+  --skeleton-b: #2c2d35;
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --gutter: 16px;
+    --fs-2xl: 22px;
+    --fs-3xl: 26px;
+  }
+}
