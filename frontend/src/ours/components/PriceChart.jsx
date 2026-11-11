@@ -1,9 +1,12 @@
 // 종목 주가 차트: TradingView Lightweight Charts 5.2.1 (Apache-2.0)로 캔들 + 거래량 + 이동평균
 // 바탕: test/fe-ui-redesign 의 StockPriceChart.jsx (커밋 20af518 → 1886a40 이어 받기 → 2fc2813 한국식 시각 → 0bba50e 휠 양보)
 // 더한 것: 이동평균 5·20·60 (일·주·월봉), 십자선 값 줄(시·고·저·종·전봉 대비·거래량·이평), 화면 테마(토큰) 색 따라가기
+// v2: 기사 나온 때 표시(마커). 일봉 = 최근 30일 날마다 기사 수(언급량 API), 분봉 = 최근 기사 100건의 작성 시각 + 그날 첫 기사.
+//     주가 움직임과 나란히 보여 줄 뿐 "때문에"라고 하지 않음
 // 데이터는 우리 백엔드 GET /api/quotes/{code}/chart (원래 KIS). TradingView 서버·데이터는 쓰지 않음
 import { useEffect, useRef, useState } from 'react';
-import { CandlestickSeries, HistogramSeries, LineSeries, createChart } from 'lightweight-charts';
+import { Link } from 'react-router-dom';
+import { CandlestickSeries, HistogramSeries, LineSeries, createChart, createSeriesMarkers } from 'lightweight-charts';
 import { quoteApi } from '../../api';
 import { errorText } from '../lib/errors';
 import { Segmented } from './ui';
@@ -72,6 +75,7 @@ const readColors = () => {
   const css = getComputedStyle(document.documentElement);
   const pick = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
   return {
+    news: pick('--buzz-solid', '#6d28d9'),
     up: pick('--up-chart', '#f04452'),
     down: pick('--down-chart', '#3182f6'),
     text: pick('--text-3', '#636e7b'),
@@ -106,7 +110,65 @@ function movingAverage(rows, n) {
 
 const EMPTY = { key: null, items: [], error: null, more: false, cursor: null, tried: 0 };
 
-export default function PriceChart({ stockCode, stockName }) {
+/**
+ * 봉마다 기사 묶기. 일봉: dayCounts[{ date, count }] 를 그날(주말·휴일이면 다음 거래일) 봉에. 분봉: 기사 시각이 들어가는 봉에
+ * 돌려주는 값: Map(봉 시각 → { count, items: [기사], first })
+ */
+function newsByBar(rows, unit, dayCounts, articles) {
+  const out = new Map();
+  if (!rows.length) return out;
+  const add = (t, n, a, first = false) => {
+    const cur = out.get(t) || { count: 0, items: [], first: false };
+    cur.count += n;
+    if (a) cur.items.push(a);
+    cur.first = cur.first || first;
+    out.set(t, cur);
+  };
+  if (unit === 'day') {
+    const dates = rows.map((r) => r.t);
+    const barOf = (ymd) => dates.find((d) => d >= ymd);
+    (dayCounts || []).forEach((d) => {
+      if (!d.count) return;
+      const t = barOf(d.date);
+      if (t) add(t, d.count, null);
+    });
+    (articles || []).forEach((a) => {
+      const t = barOf(kstDate(a.publishedAtIso));
+      if (t && out.has(t)) out.get(t).items.push(a);
+    });
+  } else if (isIntraday(unit)) {
+    const times = rows.map((r) => r.t);
+    const firstOfDay = new Map();
+    [...(articles || [])].reverse().forEach((a) => {
+      const day = kstDate(a.publishedAtIso);
+      if (!firstOfDay.has(day)) firstOfDay.set(day, a.id);
+    });
+    // 같은 날 봉에만 붙임: 장 시작 전 기사는 그날 첫 봉에, 장 마감 뒤 기사는 표시하지 않음
+    const step = (parseInt(unit, 10) || 1) * 60;
+    const byDay = new Map();
+    times.forEach((t) => {
+      const day = new Date(t * 1000).toISOString().slice(0, 10);
+      if (!byDay.has(day)) byDay.set(day, []);
+      byDay.get(day).push(t);
+    });
+    (articles || []).forEach((a) => {
+      const sec = Math.floor(new Date(a.publishedAtIso).getTime() / 1000) + KST_OFFSET_SEC;
+      const bars = byDay.get(kstDate(a.publishedAtIso));
+      if (!bars || sec >= bars[bars.length - 1] + step) return;
+      let t = bars[0];
+      for (const x of bars) {
+        if (x <= sec) t = x;
+        else break;
+      }
+      add(t, 1, a, firstOfDay.get(kstDate(a.publishedAtIso)) === a.id);
+    });
+  }
+  return out;
+}
+
+const kstDate = (iso) => new Date(new Date(iso).getTime() + KST_OFFSET_SEC * 1000).toISOString().slice(0, 10);
+
+export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null }) {
   const [unit, setUnit] = useState('day');
   const [data, setData] = useState(EMPTY);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -183,7 +245,8 @@ export default function PriceChart({ stockCode, stockName }) {
     };
     box.addEventListener('wheel', onWheel, { passive: false });
 
-    chartRef.current = { chart, candles, volume, maSeries, colors: c };
+    const markers = createSeriesMarkers(candles, []);
+    chartRef.current = { chart, candles, volume, maSeries, markers, colors: c };
 
     // 라이트/다크가 바뀌면(<html data-theme> 또는 운영체제 설정) 차트 색도 따라감
     const recolor = () => {
@@ -191,6 +254,7 @@ export default function PriceChart({ stockCode, stockName }) {
       chart.applyOptions({ layout: { textColor: n.text }, grid: { vertLines: { color: n.grid }, horzLines: { color: n.grid } } });
       candles.applyOptions({ upColor: n.up, downColor: n.down, borderUpColor: n.up, borderDownColor: n.down, wickUpColor: n.up, wickDownColor: n.down });
       MA.forEach((m) => maSeries[m.n].applyOptions({ color: n.ma[m.n] }));
+      markers.setMarkers(markers.markers().map((m) => ({ ...m, color: n.news })));
       if (chartRef.current) chartRef.current.colors = n;
     };
     const observer = new MutationObserver(recolor);
@@ -311,6 +375,28 @@ export default function PriceChart({ stockCode, stockName }) {
     }
   }, [data, key, unit]);
 
+  // 기사 표시: 데이터나 기사 목록이 바뀌면 다시 찍음
+  const marks = newsByBar(rows, unit, dayCounts, articles);
+  const marksKey = `${key}:${rows.length}:${[...marks.entries()].map(([t, m]) => `${t}=${m.count}`).join(',')}`;
+  const marksRef = useRef(marks);
+  marksRef.current = marks;
+  useEffect(() => {
+    const ref = chartRef.current;
+    if (!ref) return;
+    const list = [...marksRef.current.entries()]
+      .sort((x, y) => (x[0] > y[0] ? 1 : -1))
+      .map(([t, m]) => ({
+        time: t,
+        position: 'belowBar',
+        shape: m.first ? 'arrowUp' : 'circle',
+        color: ref.colors.news,
+        // 점 크기 = 기사 수 (1~3건 · 4~9건 · 10건 이상). 숫자는 값 줄에서 보여 줌 (점 아래 숫자는 겹쳐서 뺌)
+        size: m.count >= 10 ? 2 : m.count >= 4 ? 1.5 : 1,
+        text: m.first ? '첫 기사' : '',
+      }));
+    ref.markers.setMarkers(list);
+  }, [marksKey, unit]);
+
   const loading = data.key !== key;
   // 값 줄: 십자선이 가리키는 봉(없으면 마지막 봉)과 그 앞 봉
   let idx = rows.length - 1;
@@ -347,6 +433,8 @@ export default function PriceChart({ stockCode, stockName }) {
     else if (!data.more && unit === 'day') moreStatus = '상장 이후 전부';
   }
   const colors = chartRef.current?.colors || null;
+  const barNews = bar ? marks.get(bar.t) : null;
+  const showMarks = unit === 'day' || isIntraday(unit);
 
   return (
     <section className="card" aria-labelledby="chart-title">
@@ -392,14 +480,21 @@ export default function PriceChart({ stockCode, stockName }) {
           <span>&nbsp;</span>
         )}
       </div>
-      {hasMa(unit) && bar && !message && (
+      {bar && !message && (hasMa(unit) || showMarks) && (
         <div className="chart-legend num">
-          {MA.map((m) => (
-            <span key={m.n}>
-              <i style={{ background: colors?.ma[m.n] || MA_FALLBACK[m.color] }} />
-              이동평균 {m.n} {maAt(m.n) != null ? fmt(maAt(m.n)) : '–'}
+          {hasMa(unit) &&
+            MA.map((m) => (
+              <span key={m.n}>
+                <i style={{ background: colors?.ma[m.n] || MA_FALLBACK[m.color] }} />
+                이동평균 {m.n} {maAt(m.n) != null ? fmt(maAt(m.n)) : '–'}
+              </span>
+            ))}
+          {showMarks && (dayCounts || articles) && (
+            <span>
+              <i className="news-dot" />
+              {unit === 'day' ? '기사 나온 날 (점이 클수록 많음, 최근 30일)' : '기사 나온 때 (최근 기사 100건)'}
             </span>
-          ))}
+          )}
         </div>
       )}
 
@@ -414,8 +509,30 @@ export default function PriceChart({ stockCode, stockName }) {
         )}
         {message && <div className="chart-overlay">{message}</div>}
       </div>
+      {showMarks && bar && !message && (
+        <div className="chart-news" aria-live="off">
+          {barNews ? (
+            <>
+              <span className="badge badge-outline num">
+                {unit === 'day' ? `이날 기사 ${barNews.count}건` : `이 봉 기사 ${barNews.count}건`}
+              </span>
+              {barNews.items[0] && <Link to={`/news/${barNews.items[0].id}`}>{barNews.items[0].title}</Link>}
+            </>
+          ) : (
+            <span className="muted">{hover != null ? '이 봉에는 연결된 기사가 없어요' : ''}</span>
+          )}
+        </div>
+      )}
       <div className="chart-foot">
-        <span>{hasMa(unit) ? '이동평균은 종가 기준' : ''}</span>
+        <span>
+          {unit === 'day'
+            ? '주말·휴일 기사는 다음 거래일에 표시 · 이동평균은 종가 기준'
+            : isIntraday(unit)
+              ? '장 시작 전 기사는 그날 첫 봉에 표시'
+              : hasMa(unit)
+                ? '이동평균은 종가 기준'
+                : ''}
+        </span>
         <span aria-live="polite">{moreStatus}</span>
       </div>
     </section>

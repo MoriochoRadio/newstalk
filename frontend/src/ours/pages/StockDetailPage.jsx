@@ -10,7 +10,7 @@ import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { dirClass, fmtAmount, fmtPrice, fmtRate, relativeTime, shortTime } from '../lib/format';
 import { errorText } from '../lib/errors';
-import ArticleRow from '../components/ArticleRow';
+import { StoryFeed } from '../components/ArticleRow';
 import PriceChart from '../components/PriceChart';
 import MentionChart from '../components/MentionChart';
 import Board from '../components/Board';
@@ -229,11 +229,7 @@ function RelatedNews({ code, name }) {
       {list.error && <ErrorBox error={list.error} onRetry={list.reload} />}
       {list.data && items.length === 0 && <Empty title="이 종목과 연결된 글이 아직 없어요" />}
       {items.length > 0 && (
-        <div className="feed" style={{ opacity: list.loading ? 0.5 : 1 }}>
-          {items.map((a) => (
-            <ArticleRow key={a.id} article={a} focusCode={code} />
-          ))}
-        </div>
+        <StoryFeed articles={items} focusCode={code} style={{ opacity: list.loading ? 0.5 : 1 }} />
       )}
       {list.data && (
         <Pager
@@ -256,10 +252,40 @@ export default function StockDetailPage() {
   return <StockDetail key={code} code={code} />;
 }
 
+/** 관심 종목 빠른 전환 (V7 장점): 담은 종목을 칩으로, 지금 종목은 진하게. 로그인·담은 종목이 없으면 안 보임 */
+function QuickSwitch({ code }) {
+  const { user, watchlist } = useSession();
+  const items = user ? watchlist.items.slice(0, 10) : [];
+  const { quotes } = useQuotes(items.map((w) => w.stockCode));
+  if (items.length === 0) return null;
+  return (
+    <nav className="quick" aria-label="관심 종목 바로 가기">
+      <span className="quick-label">
+        <Star className="icon-sm" aria-hidden="true" />
+        관심
+      </span>
+      {items.map((w) => {
+        const q = quotes[w.stockCode];
+        return (
+          <Link key={w.stockCode} to={`/stocks/${w.stockCode}`} aria-current={w.stockCode === code ? 'page' : undefined}>
+            {w.stockName}
+            {q && <span className={`change ${dirClass(q.changeRate)}`}>{fmtRate(q.changeRate)}</span>}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function StockDetail({ code }) {
   const back = useBack('/stocks');
   const info = useApi((signal) => stockApi.get(code, { signal }), [code]);
   const summary = useApi((signal) => stockApi.summary(code, {}, { signal }), [code]);
+  // 차트 위 기사 표시 재료: 최근 30일 날마다 기사 수(서버 집계) + 최근 기사 100건(제목·시각)
+  const days = useApi((signal) => stockApi.mentions(code, '30d', { signal }), [code]);
+  const recent = useApi((signal) => articleApi.list({ stockCode: code, size: 100 }, { signal }), [code]);
+  const dayCounts = days.data ? (days.data.items || []).map((p) => ({ date: String(p.time).slice(0, 10), count: p.totalCount })) : null;
+  const recentArticles = recent.data ? (recent.data.items || []).map(toUiArticle) : null;
   const { quotes, loading, disabled } = useQuotes([code], { live: true });
   const stock = info.data?.stockCode === code ? info.data : null;
   useTitle(stock?.stockName || code);
@@ -284,9 +310,10 @@ function StockDetail({ code }) {
         <ArrowLeft className="icon" aria-hidden="true" />
         뒤로
       </button>
+      <QuickSwitch code={code} />
       {info.error && <ErrorBox error={info.error} onRetry={info.reload} />}
       <StockHeader code={code} info={stock} quote={quotes[code]} quoteState={{ loading, disabled }} />
-      <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} />
+      <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} />
       <div className="grid-2" style={{ marginTop: 16 }}>
         <div className="stack">
           <SummaryCard code={code} summary={summary} />

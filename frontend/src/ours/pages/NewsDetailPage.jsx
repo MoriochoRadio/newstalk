@@ -2,7 +2,7 @@
 // 부품 출처: V7 ArticleDetail (연결 이유·근거 원문·사실 종류 배지, "기사 때문에 움직였다는 뜻 아님" 안내, 같은 소식)
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ExternalLink, Info, Quote } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Info, Quote } from 'lucide-react';
 import { articleApi } from '../../api';
 import { SENTIMENT_LABEL, toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
@@ -48,39 +48,67 @@ async function loadSameNews(a, signal) {
     .sort((x, y) => (x.publishedAtIso > y.publishedAtIso ? 1 : -1));
 }
 
-function LinkedStock({ s }) {
+/** 연결 지도의 종목 카드: 주인공은 크게(이유·근거 다 보임), 함께 언급은 작게, 간접 연결은 점선 + "AI 추정" */
+function LinkCard({ s, quote, priceOff }) {
+  const indirect = s.matchType === 'INDIRECT';
+  const cls = s.role === 'MAIN' ? 'is-main' : 'is-mentioned';
   return (
-    <div className="link-card">
-      <div className="link-card-head">
-        <Link to={`/stocks/${s.code}`} className="link-card-name">
+    <div className={`lmap-card ${cls} ${indirect ? 'is-indirect' : ''}`}>
+      <div className="lmap-head">
+        <Link to={`/stocks/${s.code}`} className="lmap-name">
           {s.name}
         </Link>
-        <span className="muted num" style={{ fontSize: 'var(--fs-xs)' }}>
-          {s.code}
-        </span>
         <span className={`badge ${s.role === 'MAIN' ? 'badge-accent' : ''}`}>{s.roleLabel}</span>
-        {s.matchType === 'INDIRECT' && <span className="badge badge-warn">간접 연결 · AI 추정</span>}
+        {indirect && <span className="badge badge-warn">간접 연결 · AI 추정</span>}
+        {!priceOff && quote && (
+          <span className="lmap-quote num">
+            {fmtPrice(quote.price)} <span className={`change ${dirClass(quote.changeRate)}`}>{fmtRate(quote.changeRate)}</span>
+          </span>
+        )}
       </div>
-      {s.reason && (
-        <>
-          <h4 className="link-label">연결 이유</h4>
-          <p className="link-reason">{s.reason}</p>
-        </>
-      )}
+      {s.reason && <p className="lmap-reason">{s.reason}</p>}
       {s.evidence && (
-        <>
-          <h4 className="link-label">근거 원문</h4>
-          <blockquote className="evidence">
-            {s.factTypeLabel && (
-              <span className="evidence-head">
-                <span className={`badge ${FACT_BADGE[s.factType] || ''}`}>{s.factTypeLabel}</span>
-              </span>
-            )}
-            <Quote className="icon-sm" aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: -2, color: 'var(--text-3)' }} />
-            {s.evidence}
-          </blockquote>
-        </>
+        <blockquote className="lmap-evidence">
+          {s.factTypeLabel && <span className={`badge ${FACT_BADGE[s.factType] || ''}`}>{s.factTypeLabel}</span>}
+          <Quote className="icon-sm" aria-label="근거 원문" style={{ display: 'inline', marginRight: 4, verticalAlign: -2, color: 'var(--text-3)' }} />
+          {s.evidence}
+        </blockquote>
       )}
+      {!s.reason && !s.evidence && <p className="lmap-reason sub">기사 제목에서 회사 이름으로 연결했어요.</p>}
+    </div>
+  );
+}
+
+/**
+ * 연결 지도: 왼쪽(휴대폰은 위) 기사 → 선 → 오른쪽 종목 카드. 주인공 먼저 크게, 함께 언급은 두 줄 격자로 작게
+ * 연결 이유·근거 원문·사실 종류(일어난 일·회사 계획·전망·소문)는 V7 의 "잘 된 점"을 그대로 살림
+ */
+function LinkMap({ a, quotes, priceOff }) {
+  const mains = a.relatedStocks.filter((s) => s.role === 'MAIN');
+  const others = a.relatedStocks.filter((s) => s.role !== 'MAIN');
+  return (
+    <div className="lmap">
+      <div className="lmap-node">
+        <p className="lmap-node-kicker">{a.isDisclosure ? '이 공시' : '이 기사'}</p>
+        <p className="lmap-node-title">{a.title}</p>
+        <p className="lmap-node-meta num">
+          {sourceText(a)} · {shortTime(a.publishedAtIso)}
+        </p>
+      </div>
+      <div className="lmap-branch">
+        {mains.length > 0 && <p className="lmap-group">주인공 {mains.length}</p>}
+        {mains.map((s) => (
+          <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} />
+        ))}
+        {others.length > 0 && <p className="lmap-group">함께 언급 {others.length}</p>}
+        {others.length > 0 && (
+          <div className="lmap-grid">
+            {others.map((s) => (
+              <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -98,8 +126,8 @@ function NewsDetail({ id }) {
   useTitle(a?.title || '뉴스');
 
   const same = useApi((signal) => (a ? loadSameNews(a, signal) : Promise.resolve([])), [a?.id], { enabled: Boolean(a) });
-  const codes = (a?.relatedStocks || []).map((s) => s.code).slice(0, 5);
-  const { quotes, loading: quoteLoading, disabled } = useQuotes(codes, { live: true });
+  const codes = (a?.relatedStocks || []).map((s) => s.code).slice(0, 10);
+  const { quotes, disabled } = useQuotes(codes, { live: true });
 
   if (detail.loading && !a) {
     return (
@@ -133,8 +161,6 @@ function NewsDetail({ id }) {
   }
   if (!a) return null;
 
-  const mains = a.relatedStocks.filter((s) => s.role === 'MAIN');
-  const others = a.relatedStocks.filter((s) => s.role !== 'MAIN');
   const raw = detail.data;
   const summaryIsTitle = a.isDisclosure || (a.summary.length === 1 && a.summary[0] === a.title);
 
@@ -199,27 +225,16 @@ function NewsDetail({ id }) {
       <section className="card" aria-labelledby="link-title">
         <div className="card-head">
           <h2 className="card-title" id="link-title">
-            연결된 종목 <span className="count num">{a.relatedStocks.length}</span>
+            연결 지도 <span className="count num">종목 {a.relatedStocks.length}</span>
           </h2>
         </div>
-        {a.relatedStocks.length === 0 && <p className="sub">이 글과 연결된 종목이 없어요.</p>}
-        {mains.map((s) => (
-          <LinkedStock key={s.code} s={s} />
-        ))}
-        {others.length > 0 &&
-          (mains.length === 0 ? (
-            others.map((s) => <LinkedStock key={s.code} s={s} />)
-          ) : (
-            <details className="disclosure">
-              <summary>
-                함께 언급된 종목 {others.length}개
-                <ChevronDown className="icon-sm chev" aria-hidden="true" />
-              </summary>
-              {others.map((s) => (
-                <LinkedStock key={s.code} s={s} />
-              ))}
-            </details>
-          ))}
+        {a.relatedStocks.length === 0 ? <p className="sub">이 글과 연결된 종목이 없어요.</p> : <LinkMap a={a} quotes={quotes} priceOff={disabled} />}
+        {a.relatedStocks.length > 0 && !disabled && (
+          <p className="note lmap-foot" style={{ marginTop: 14 }}>
+            <Info className="icon-sm" aria-hidden="true" />
+            시세는 어제 종가와 비교한 지금 값이에요. 기사 때문에 움직였다는 뜻이 아니에요.
+          </p>
+        )}
       </section>
 
       {a.sameNewsCount >= 2 && (
@@ -249,51 +264,6 @@ function NewsDetail({ id }) {
           )}
           {same.data && same.data.length === 0 && <p className="sub">다른 기사는 목록에서 찾지 못했어요.</p>}
           <p className="card-note">{SAME_NEWS_TIP}</p>
-        </section>
-      )}
-
-      {codes.length > 0 && !disabled && (
-        <section className="card" aria-labelledby="quote-title">
-          <div className="card-head">
-            <h2 className="card-title" id="quote-title">
-              연결 종목 지금 시세
-            </h2>
-          </div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">종목</th>
-                  <th scope="col" className="r">
-                    현재가
-                  </th>
-                  <th scope="col" className="r">
-                    어제보다
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {a.relatedStocks.slice(0, 5).map((s) => {
-                  const q = quotes[s.code];
-                  return (
-                    <tr key={s.code}>
-                      <td>
-                        <Link to={`/stocks/${s.code}`} style={{ fontWeight: 600 }}>
-                          {s.name}
-                        </Link>
-                      </td>
-                      <td className="r">{q ? `${fmtPrice(q.price)}원` : quoteLoading ? <span className="skeleton" style={{ display: 'inline-block', width: 70, height: 14 }} /> : '–'}</td>
-                      <td className={`r change ${dirClass(q?.changeRate)}`}>{q ? fmtRate(q.changeRate) : ''}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="note" style={{ marginTop: 12 }}>
-            <Info className="icon-sm" aria-hidden="true" />
-            어제 종가와 비교한 지금 값이에요. 기사 때문에 움직였다는 뜻이 아니에요.
-          </p>
         </section>
       )}
 
