@@ -1,8 +1,10 @@
 // 글 한 줄: 제목 → 언론사·시각 → "무슨 일인가" 태그(공시 유형·정정·같은 소식) → 종목 칩
 // 감성(긍정·부정)은 목록에 넣지 않음 (상세에서 설명과 함께). 판단 낱말(호재·악재)도 쓰지 않음
 // 부품 출처: V7 adapters.toUiArticle + ArticleInfoBadges·sourceLabelOf (main frontend/src/pages/DashboardPageV7.jsx)
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
+import { groupStories } from '../lib/stories';
 import { relativeTime } from '../lib/format';
 
 export const SAME_NEWS_TIP = '같은 종목·24시간 안·제목이 비슷한 기사를 같은 소식으로 묶은 수예요. 묶음은 틀릴 수 있어요.';
@@ -71,38 +73,53 @@ export function ArticleTags({ article: a, detail = false }) {
   return tags;
 }
 
-/** 종목 칩: 주인공 먼저, 함께 언급은 "+n". focusCode(지금 보는 종목)는 역할과 상관없이 늘 보여 줌 */
+/**
+ * 종목 칩 + 역할 배지 (V7 장점: 주인공·함께 언급). 주인공은 진한 배지, 함께 언급은 회색 배지, 간접 연결은 점선 테두리 + "AI 추정"
+ * 주인공을 먼저, 남는 자리에 함께 언급. 넘치면 "함께 언급 외 n" (이름은 마우스를 올리면). focusCode(지금 보는 종목)는 늘 맨 앞
+ */
 export function StockChips({ stocks, focusCode, max = 3 }) {
   if (!stocks?.length) return null;
   const focus = focusCode ? stocks.find((s) => s.code === focusCode) : null;
-  const mains = stocks.filter((s) => s.role === 'MAIN' && s.code !== focusCode);
-  const shown = [...(focus ? [focus] : []), ...mains].slice(0, max);
-  const rest = stocks.length - shown.length;
+  const rest0 = stocks.filter((s) => s.code !== focusCode);
+  const ordered = [...(focus ? [focus] : []), ...rest0.filter((s) => s.role === 'MAIN'), ...rest0.filter((s) => s.role !== 'MAIN')];
+  const shown = ordered.slice(0, max);
+  const hidden = ordered.slice(max);
   return (
     <>
-      {shown.map((s) => (
-        <Link
-          key={s.code}
-          to={`/stocks/${s.code}`}
-          className={`chip ${s.code === focusCode ? 'focus' : ''}`}
-          aria-label={`${s.name} ${s.roleLabel} 종목 보기`}
-        >
-          {s.name}
-          {(s.code === focusCode || s.role !== 'MAIN') && <span className="role">{s.roleLabel}</span>}
-        </Link>
-      ))}
-      {rest > 0 && <span className="chip-more">외 {rest}종목</span>}
+      {shown.map((s) => {
+        const indirect = s.matchType === 'INDIRECT';
+        return (
+          <Link
+            key={s.code}
+            to={`/stocks/${s.code}`}
+            className={`chip ${s.code === focusCode ? 'focus' : ''} ${s.role === 'MAIN' ? 'chip-main' : 'chip-mentioned'} ${indirect ? 'chip-indirect' : ''}`}
+            aria-label={`${s.name} ${indirect ? 'AI 추정' : s.roleLabel} 종목 보기`}
+          >
+            {s.name}
+            <span className="role">{indirect ? 'AI 추정' : s.roleLabel}</span>
+          </Link>
+        );
+      })}
+      {hidden.length > 0 && (
+        <span className="chip-more" title={hidden.map((s) => s.name).join(', ')}>
+          외 {hidden.length}종목
+        </span>
+      )}
     </>
   );
 }
 
-export default function ArticleRow({ article: a, focusCode, compact = false, showSummary = true }) {
+/**
+ * 글 한 줄. others 가 있으면(같은 소식 묶음) "같은 소식 다른 기사 n건" 을 눌러 펼침 — 목록은 소식 단위로 짧게
+ */
+export default function ArticleRow({ article: a, others = [], focusCode, compact = false, showSummary = true }) {
+  const [open, setOpen] = useState(false);
   const sns = a.sourceType === 'SNS';
   // 공시는 요약이 제목과 같음 → 요약 줄 생략
   const summary = showSummary && a.hasSummary && !a.isDisclosure ? a.summary.join(' ') : '';
   const tags = ArticleTags({ article: a });
   return (
-    <article className="feed-row">
+    <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''}`}>
       {sns ? (
         <a className="feed-title" href={a.url} target="_blank" rel="noreferrer">
           {a.title}
@@ -122,10 +139,42 @@ export default function ArticleRow({ article: a, focusCode, compact = false, sho
       </div>
       {(tags.length > 0 || a.relatedStocks.length > 0) && (
         <div className="tags feed-tags">
-          {tags}
           <StockChips stocks={a.relatedStocks} focusCode={focusCode} max={compact ? 2 : 3} />
+          {tags}
+        </div>
+      )}
+      {others.length > 0 && (
+        <div className="story-more">
+          <button type="button" className="story-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            같은 소식 다른 기사 {others.length}건
+            <ChevronDown className="icon-sm chev" aria-hidden="true" />
+          </button>
+          {open && (
+            <ul className="story-list">
+              {others.map((o) => (
+                <li key={o.id}>
+                  <Link to={`/news/${o.id}`}>{o.title}</Link>
+                  <span className="muted num">
+                    {o.press} · {relativeTime(o.publishedAtIso)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </article>
+  );
+}
+
+/** 글 목록을 소식 단위로 (같은 소식은 첫 보도 한 줄 + 펼치기) */
+export function StoryFeed({ articles, focusCode, compact = false, className = 'feed', style }) {
+  const stories = groupStories(articles);
+  return (
+    <div className={className} style={style}>
+      {stories.map((st) => (
+        <ArticleRow key={st.lead.id} article={st.lead} others={st.others} focusCode={focusCode} compact={compact} />
+      ))}
+    </div>
   );
 }

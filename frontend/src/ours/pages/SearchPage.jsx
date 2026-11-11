@@ -6,7 +6,7 @@ import { articleApi, searchApi, stockApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
 import { useTitle } from '../lib/hooks';
-import ArticleRow from '../components/ArticleRow';
+import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 
 const SIZE = 10;
@@ -96,11 +96,7 @@ export default function SearchPage() {
           </div>
           {linked.loading && !linked.data && <SkeletonRows rows={3} />}
           {linked.data && (
-            <div className="feed">
-              {(linked.data.items || []).map(toUiArticle).map((a) => (
-                <ArticleRow key={a.id} article={a} focusCode={exact.stockCode} />
-              ))}
-            </div>
+            <StoryFeed articles={(linked.data.items || []).map(toUiArticle)} focusCode={exact.stockCode} />
           )}
         </section>
       )}
@@ -116,11 +112,7 @@ export default function SearchPage() {
         {res.error && <ErrorBox error={res.error} onRetry={res.reload} />}
         {res.data && articles.length === 0 && <p className="sub">제목·요약·키워드에 ‘{q}’가 들어간 글이 없어요.</p>}
         {articles.length > 0 && (
-          <div className="feed" style={{ opacity: res.loading ? 0.5 : 1 }}>
-            {articles.map((a) => (
-              <ArticleRow key={a.id} article={a} />
-            ))}
-          </div>
+          <StoryFeed articles={articles} style={{ opacity: res.loading ? 0.5 : 1 }} />
         )}
         {res.data && <Pager page={page} size={SIZE} total={articleTotal} onChange={(n) => set({ page: n > 1 ? String(n) : '' })} />}
       </section>

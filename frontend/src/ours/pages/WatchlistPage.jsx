@@ -10,7 +10,7 @@ import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { dirClass, fmtPrice, fmtRate, relativeTime } from '../lib/format';
 import SearchBox from '../components/SearchBox';
-import ArticleRow from '../components/ArticleRow';
+import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, SkeletonRows } from '../components/ui';
 
 const NEWS_SIZE = 10;
@@ -30,11 +30,7 @@ function WatchNews({ count }) {
       {list.error && <ErrorBox error={list.error} onRetry={list.reload} />}
       {list.data && items.length === 0 && <Empty title="관심 종목과 연결된 글이 아직 없어요" />}
       {items.length > 0 && (
-        <div className="feed" style={{ opacity: list.loading ? 0.5 : 1 }}>
-          {items.map((a) => (
-            <ArticleRow key={a.id} article={a} />
-          ))}
-        </div>
+        <StoryFeed articles={items} style={{ opacity: list.loading ? 0.5 : 1 }} />
       )}
       {list.data && (
         <Pager

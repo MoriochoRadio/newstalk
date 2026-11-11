@@ -9,7 +9,7 @@ import { articleApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
 import { useTitle } from '../lib/hooks';
-import ArticleRow from '../components/ArticleRow';
+import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 
 const PAGE_SIZE = 20;
@@ -184,11 +184,7 @@ export default function NewsPage() {
           />
         )}
         {items.length > 0 && (
-          <div className="feed" style={{ opacity: isAll && all.loading ? 0.5 : 1 }}>
-            {items.map((a) => (
-              <ArticleRow key={a.id} article={a} />
-            ))}
-          </div>
+          <StoryFeed articles={items} style={{ opacity: isAll && all.loading ? 0.5 : 1 }} />
         )}
 
         {isAll && all.data && (
