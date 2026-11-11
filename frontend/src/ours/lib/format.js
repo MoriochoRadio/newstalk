@@ -95,3 +95,18 @@ export function dirClass(rate) {
   if (rate == null) return 'flat';
   return rate > 0 ? 'up' : rate < 0 ? 'down' : 'flat';
 }
+
+/**
+ * 받침이 있나 (조사 고르기: 삼성전자"예요" / NHN"이에요"). 한글이면 받침으로, 영문·숫자면 읽는 소리로 대충 가름
+ */
+export function hasBatchim(word) {
+  const ch = String(word || '').trim().slice(-1);
+  if (!ch) return false;
+  const code = ch.charCodeAt(0);
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0;
+  if (/[0-9]/.test(ch)) return '013678'.includes(ch);
+  return /[lmnrLMNR]/.test(ch);
+}
+
+/** "삼성전자예요" · "NHN이에요" */
+export const iyeyo = (word) => `${word}${hasBatchim(word) ? '이에요' : '예요'}`;

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, Search, Star, Sun, User, X } from 'lucide-react';
 import { useSession } from './session';
+import LivePill from '../components/LivePill';
 import SearchBox from '../components/SearchBox';
 import AuthModal from '../components/AuthModal';
 
@@ -170,6 +171,7 @@ export default function Shell() {
           </Link>
           <SearchBox className="desktop-search" />
           <div className="topbar-right">
+            <LivePill className="desktop-only" />
             <button type="button" className="icon-btn mobile-only" aria-label="검색" onClick={() => setMobileSearch(true)}>
               <Search className="icon" aria-hidden="true" />
             </button>

@@ -84,6 +84,27 @@
   --skeleton-a: #eceef1;
   --skeleton-b: #f6f7f9;
   --overlay: rgba(0, 0, 0, 0.45);
+
+  /* v2: 시장 지도 칸 색 (등락 세기 3단계). 진한 칸만 흰 글자, 나머지는 --heat-ink (대비 4.5:1 이상) */
+  --heat-up-3: #c8202f;
+  --heat-up-2: #f6bcc2;
+  --heat-up-1: #fde6e9;
+  --heat-down-3: #1d4ed8;
+  --heat-down-2: #bcd1fb;
+  --heat-down-1: #e4edfd;
+  --heat-flat: #e9ecef;
+  --heat-none: #eef0f3;
+  --heat-ink: #191f28;
+  --heat-ink-strong: #ffffff;
+
+  /* v2: 평소 대비 보도량 강조 (등락 빨강·파랑과 헷갈리지 않게 보라) */
+  --buzz: #6d28d9;
+  --buzz-soft: #f1e8ff;
+  --buzz-solid: #6d28d9;
+
+  /* v2: 시간대별 보도량 */
+  --bar-news: #3182f6;
+  --bar-disclosure: #9aa4b2;
 }
 
 /* 다크 값 (두 곳에서 같은 값을 씀: 운영체제 다크 + 직접 고른 다크) */
@@ -126,6 +147,22 @@
     --skeleton-a: #24252c;
     --skeleton-b: #2c2d35;
     --overlay: rgba(0, 0, 0, 0.6);
+
+    --heat-up-3: #b8232f;
+    --heat-up-2: #6b2a31;
+    --heat-up-1: #3b2529;
+    --heat-down-3: #2453c2;
+    --heat-down-2: #263f78;
+    --heat-down-1: #1f2a43;
+    --heat-flat: #2a2c33;
+    --heat-none: #24252c;
+    --heat-ink: #eceef1;
+    --heat-ink-strong: #ffffff;
+    --buzz: #c9b2ff;
+    --buzz-soft: rgba(167, 139, 250, 0.16);
+    --buzz-solid: #7c3aed;
+    --bar-news: #4a90f7;
+    --bar-disclosure: #6b7380;
   }
 }
 
@@ -167,6 +204,22 @@
   --skeleton-a: #24252c;
   --skeleton-b: #2c2d35;
   --overlay: rgba(0, 0, 0, 0.6);
+
+  --heat-up-3: #b8232f;
+  --heat-up-2: #6b2a31;
+  --heat-up-1: #3b2529;
+  --heat-down-3: #2453c2;
+  --heat-down-2: #263f78;
+  --heat-down-1: #1f2a43;
+  --heat-flat: #2a2c33;
+  --heat-none: #24252c;
+  --heat-ink: #eceef1;
+  --heat-ink-strong: #ffffff;
+  --buzz: #c9b2ff;
+  --buzz-soft: rgba(167, 139, 250, 0.16);
+  --buzz-solid: #7c3aed;
+  --bar-news: #4a90f7;
+  --bar-disclosure: #6b7380;
 }
 
 @media (max-width: 768px) {

@@ -1,240 +1,388 @@
-// 홈: 오늘 시장 한눈에 — 오늘의 이슈 종목(왜 한 줄) → 주요 뉴스 → 관심 종목 소식 → 데이터 갱신 시각
-// 숫자는 화면에서 세지 않고 서버 집계(이슈 순위·totalCount·상태 API)를 그대로 씀
-// 지수·환율 API 가 없어 "시장 지표" 칸은 두지 않음 (빈 "연동 전" 막대 대신 생략)
+// 홈 = 오늘의 종목 브리핑. "기사 목록"이 아니라 "우리가 읽어서 정리한 결론"을 먼저 보여 줌 (README 10절)
+// 1) 맨 위 한 문장 + 이슈 종목 상위 4개 브리핑 카드(AI 종합 요약·소식 종류·기사/언론 수·평소 대비 보도량·첫 기사 시각)
+// 2) 로그인 사용자: 내 관심 종목 오늘 브리핑 (없으면 생략)
+// 3) 오늘 시장 지도(이슈 12종목: 크기 = 기사 수, 색 = 등락률) · 시간대별 보도량 · 이슈 순위(추세선) · 오늘 많이 보도된 소식(소식 단위)
+// 숫자는 서버 집계(이슈 순위·totalCount·언급량)나 "오늘 글 전부"를 받아서 셈 (100건만 받아 세던 V7 H2 를 되풀이하지 않음)
+// 말은 조심스럽게: 호재·악재·예측·"때문에" 금지. 등락률은 어제 종가 대비 값
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Clock, LogIn, Newspaper, Star, TrendingUp } from 'lucide-react';
-import { articleApi, statusApi, stockApi, watchlistApi } from '../../api';
-import { toUiArticle } from '../../api/adapters';
+import { BarChart3, ChevronRight, LayoutGrid, LogIn, Newspaper, Star, TrendingUp } from 'lucide-react';
+import { stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { relativeTime, shortTime, todayLabel } from '../lib/format';
-import ArticleRow from '../components/ArticleRow';
-import Movers from '../components/Movers';
-import { Empty, ErrorBox, PriceCell, SkeletonRows } from '../components/ui';
+import { dirClass, fmtPrice, fmtRate, hasBatchim, todayLabel } from '../lib/format';
+import { hourlyCounts, loadTodayFeed, pickWhy } from '../lib/todayFeed';
+import { stockDigest } from '../lib/digest';
+import { buzzOf } from '../lib/buzz';
+import { groupStories } from '../lib/stories';
+import { StoryFeed } from '../components/ArticleRow';
+import BriefCard from '../components/BriefCard';
+import MarketMap, { MapLegend } from '../components/MarketMap';
+import HourStrip from '../components/HourStrip';
+import LivePill from '../components/LivePill';
+import Sparkline from '../components/Sparkline';
+import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
 
-const ISSUE_LIMIT = 7;
+const MAP_LIMIT = 12; // 시장 지도·이슈 순위 종목 수 (시세 요청 10개씩 2번)
+const BRIEF_N = 4; // 브리핑 카드 (요약·언급량 요청 각 4번)
+const WATCH_N = 4; // 관심 종목 브리핑 (요약 최대 4번 더 → 요약은 홈에서 최대 8번)
 
 /**
- * 이슈 종목마다 "왜" 한 줄 = 그 종목이 주인공인 오늘 최신 기사 제목
- * (종목마다 GET /api/articles?stockCode=&period=today&size=10 한 번. 주인공 글이 없으면 첫 글)
+ * 종목 여러 개에 같은 API 를 한 번씩. 결과 map: code → 값 | null(실패). 아직이면 키가 없음(undefined)
+ * 이미 받은 종목은 다시 부르지 않음 (관심 종목이 이슈 종목과 겹치면 한 번만)
  */
-async function loadIssues(signal) {
-  const res = await stockApi.issues({ limit: ISSUE_LIMIT }, { signal });
-  const items = res?.items || [];
-  const whys = await Promise.allSettled(
-    items.map((it) => articleApi.list({ stockCode: it.stockCode, period: 'today', size: 10 }, { signal }))
-  );
-  return items.map((it, i) => {
-    const list = whys[i].status === 'fulfilled' ? (whys[i].value?.items || []).map(toUiArticle) : [];
-    const pick =
-      list.find((a) => !a.isDisclosure && a.relatedStocks.some((s) => s.code === it.stockCode && s.role === 'MAIN')) ||
-      list.find((a) => !a.isDisclosure) ||
-      list[0];
-    return { ...it, why: pick ? { id: pick.id, title: pick.title } : null };
-  });
+function usePerStock(codes, fetcher, tag) {
+  const key = codes.join(',');
+  const [map, setMap] = useState({});
+  useEffect(() => {
+    if (!key) return undefined;
+    const controller = new AbortController();
+    key.split(',').forEach((code) => {
+      fetcher(code, controller.signal)
+        .then((v) => setMap((m) => ({ ...m, [code]: v })))
+        .catch((err) => {
+          if (err.name !== 'AbortError') setMap((m) => ({ ...m, [code]: null }));
+        });
+    });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, tag]);
+  return map;
 }
 
-/**
- * 주요 뉴스 = 오늘 많이 보도된 소식: 오늘 뉴스 100건(최신순)을 같은 소식 묶음으로 합치고 묶음 크기 순.
- * 묶음마다 첫 보도 기사를 대표로 (없으면 가장 먼저 받은 글). 관련도순은 작은 종목 기사가 앞에 와서 쓰지 않음
- */
-async function loadKeyNews(signal) {
-  const res = await articleApi.list({ period: 'today', source: 'NEWS', size: 100 }, { signal });
-  const groups = new Map();
-  for (const a of (res?.items || []).map(toUiArticle)) {
-    if (a.isDisclosure) continue;
-    const main = a.relatedStocks.find((s) => s.role === 'MAIN');
-    // 같은 종목·같은 묶음(크기·첫 보도 언론사가 같음)은 하나로
-    const key = main && a.sameNewsCount >= 2 ? `${main.code}:${a.sameNewsCount}:${a.firstReportPress}` : `id:${a.id}`;
-    const prev = groups.get(key);
-    if (!prev || (a.firstReport && !prev.firstReport)) groups.set(key, a);
+/** 맨 위 한 문장 (데이터로 만든 문장, LLM 아님) */
+function headline(issues, quotes) {
+  if (!issues.length) return '';
+  const top = issues[0];
+  const q = quotes[top.stockCode];
+  const tail = hasBatchim(top.stockName) ? '이에요' : '예요';
+  const first = `오늘 뉴스가 가장 많이 나온 종목은 ${top.stockName}(${top.articleCount}건${q ? `, ${fmtRate(q.changeRate)}` : ''})${tail}.`;
+  const rated = issues.map((i) => quotes[i.stockCode]).filter((x) => x && x.changeRate != null);
+  if (rated.length < issues.length) return first;
+  const up = rated.filter((x) => x.changeRate > 0).length;
+  const down = rated.filter((x) => x.changeRate < 0).length;
+  return `${first} 이슈 종목 ${issues.length}개 중 ${up}개가 오르고 ${down}개가 내렸어요.`;
+}
+
+function BriefSection({ issues, quotes, quoteLoading, priceOff, summaries, buzz, feed }) {
+  if (issues.loading && !issues.data) {
+    return (
+      <div className="brief-grid">
+        {Array.from({ length: BRIEF_N }, (_, i) => (
+          <div key={i} className="brief">
+            <SkeletonRows rows={2} compact />
+          </div>
+        ))}
+      </div>
+    );
   }
-  const items = [...groups.values()]
-    .sort((x, y) => (y.sameNewsCount || 1) - (x.sameNewsCount || 1) || (y.publishedAtIso > x.publishedAtIso ? 1 : -1))
-    .slice(0, 5);
-  return { items, totalToday: res?.totalCount ?? 0 };
-}
-
-function IssueList({ issues, quotes, quoteLoading, disabled }) {
-  return (
-    <section className="card" aria-labelledby="home-issues">
-      <div className="card-head">
-        <h2 className="card-title" id="home-issues">
-          <TrendingUp className="icon" aria-hidden="true" />
-          오늘의 이슈 종목
-        </h2>
-        <Link to="/stocks" className="link">
-          전체 순위 <ChevronRight className="icon-sm" aria-hidden="true" />
-        </Link>
-      </div>
-      {issues.loading && !issues.data && <SkeletonRows rows={5} compact />}
-      {issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}
-      {issues.data && issues.data.length === 0 && (
+  if (issues.error) return <ErrorBox error={issues.error} onRetry={issues.reload} />;
+  const items = (issues.data?.items || []).slice(0, BRIEF_N);
+  if (items.length === 0) {
+    return (
+      <div className="card">
         <Empty title="오늘 기사에 나온 종목이 아직 없어요" desc="자정이 막 지났다면 첫 기사가 모이는 중이에요." />
-      )}
-      {issues.data && issues.data.length > 0 && (
-        <ol className="stock-rows">
-          {issues.data.map((it) => (
-            <li key={it.stockCode}>
-              <Link to={`/stocks/${it.stockCode}`} className="stock-row">
-                <span className="rank">{it.rank}</span>
-                <span style={{ minWidth: 0 }}>
-                  <span className="stock-row-name">
-                    {it.stockName}
-                    {it.disclosureCount > 0 && <span className="badge badge-accent">공시 {it.disclosureCount}</span>}
-                  </span>
-                  {it.why && <span className="stock-row-why" style={{ display: 'block' }}>{it.why.title}</span>}
-                  <span className="stock-row-meta num" style={{ display: 'block' }}>
-                    기사 {it.articleCount}건{it.eventCount && it.eventCount !== it.articleCount ? ` · 소식 ${it.eventCount}건` : ''}
-                    {it.lastPublishedAt ? ` · 최근 ${shortTime(it.lastPublishedAt)}` : ''}
-                  </span>
-                </span>
-                {quoteLoading && !quotes[it.stockCode] ? (
-                  <span className="skeleton" style={{ width: 64, height: 32 }} />
-                ) : disabled ? null : (
-                  <PriceCell quote={quotes[it.stockCode]} />
-                )}
-              </Link>
-            </li>
-          ))}
-        </ol>
-      )}
-      {issues.data && issues.data.length > 0 && (
-        <p className="card-note">오늘 0시부터 나온 뉴스 기사 수 순서예요. 등락률은 어제 종가와 비교한 지금 값이에요.</p>
-      )}
-    </section>
+      </div>
+    );
+  }
+  const feedItems = feed.data?.items || [];
+  return (
+    <div className="brief-grid">
+      {items.map((it) => {
+        const digest = feed.data ? stockDigest(feedItems, it.stockCode) : null;
+        const first = feedItems.filter((a) => a.relatedStocks.some((s) => s.code === it.stockCode)).at(-1);
+        return (
+          <BriefCard
+            key={it.stockCode}
+            rank={it.rank}
+            code={it.stockCode}
+            name={it.stockName}
+            quote={quotes[it.stockCode]}
+            quoteLoading={quoteLoading}
+            priceOff={priceOff}
+            summary={summaries[it.stockCode] === undefined ? undefined : summaries[it.stockCode]}
+            digest={digest}
+            buzz={buzz[it.stockCode] ? buzzOf(buzz[it.stockCode]) : null}
+            firstAt={feed.data?.complete ? first?.publishedAtIso : null}
+            articleCount={it.articleCount}
+          />
+        );
+      })}
+    </div>
   );
 }
 
-function KeyNews() {
-  const news = useApi((signal) => loadKeyNews(signal), []);
+function WatchBrief({ quotes, quoteLoading, priceOff, summaries, feed }) {
+  const { user, watchlist } = useSession();
+  if (!user || !watchlist.loaded || watchlist.items.length === 0) return null;
+  const list = watchlist.items.slice(0, WATCH_N);
+  const more = watchlist.items.length - list.length;
   return (
-    <section className="card" aria-labelledby="home-news">
-      <div className="card-head">
-        <h2 className="card-title" id="home-news">
-          <Newspaper className="icon" aria-hidden="true" />
-          오늘 많이 보도된 소식
+    <section className="home-section" aria-labelledby="watch-brief">
+      <div className="section-head">
+        <h2 className="section-title" id="watch-brief">
+          <Star className="icon" aria-hidden="true" />
+          내 관심 종목 오늘
         </h2>
-        <Link to="/news?period=today" className="link">
-          오늘 뉴스·공시 {news.data ? `${news.data.totalToday.toLocaleString('ko-KR')}건` : '전체'} <ChevronRight className="icon-sm" aria-hidden="true" />
+        <Link to="/watchlist" className="link">
+          {more > 0 ? `${more}개 더 보기` : '관리'} <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>
       </div>
-      {news.loading && !news.data && <SkeletonRows rows={4} />}
-      {news.error && <ErrorBox error={news.error} onRetry={news.reload} />}
-      {news.data && news.data.items.length === 0 && <Empty title="오늘 분석을 마친 뉴스가 아직 없어요" />}
-      {news.data && news.data.items.length > 0 && (
-        <div className="feed">
-          {news.data.items.map((a) => (
-            <ArticleRow key={a.id} article={a} />
-          ))}
-        </div>
-      )}
+      <div className="brief-grid brief-grid-compact">
+        {list.map((w) => (
+          <BriefCard
+            key={w.stockCode}
+            code={w.stockCode}
+            name={w.stockName}
+            quote={quotes[w.stockCode]}
+            quoteLoading={quoteLoading}
+            priceOff={priceOff}
+            summary={summaries[w.stockCode] === undefined ? undefined : summaries[w.stockCode]}
+            digest={feed.data ? stockDigest(feed.data.items, w.stockCode) : null}
+            articleCount={w.todayArticleCount}
+            compact
+          />
+        ))}
+      </div>
     </section>
   );
 }
 
-function WatchNews() {
-  const { user, checking, openAuth, watchlist } = useSession();
-  const enabled = Boolean(user);
-  const news = useApi((signal) => watchlistApi.articles({ period: '7d', size: 5 }, { signal }), [user?.loginId, watchlist.items.length], {
-    enabled,
-  });
-  const items = (news.data?.items || []).map(toUiArticle);
-
+function MapCard({ issues, quotes, quoteLoading, priceOff, feed }) {
+  const items = issues.data?.items || [];
+  const tiles = items.map((it) => ({
+    code: it.stockCode,
+    name: it.stockName,
+    articleCount: it.articleCount,
+    eventCount: it.eventCount,
+    disclosureCount: it.disclosureCount,
+    rate: quotes[it.stockCode]?.changeRate ?? null,
+    why: feed.data ? pickWhy(feed.data.items, it.stockCode) : null,
+  }));
   return (
-    <section className="card" aria-labelledby="home-watch">
+    <section className="card" aria-labelledby="map-title">
       <div className="card-head">
-        <h2 className="card-title" id="home-watch">
-          <Star className="icon" aria-hidden="true" />
-          관심 종목 소식
+        <h2 className="card-title" id="map-title">
+          <LayoutGrid className="icon" aria-hidden="true" />
+          오늘 시장 지도
         </h2>
-        {user && (
-          <Link to="/watchlist" className="link">
-            관리 <ChevronRight className="icon-sm" aria-hidden="true" />
-          </Link>
-        )}
+        <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>
+          기사 많은 {items.length || MAP_LIMIT}종목
+        </span>
       </div>
-      {checking && <SkeletonRows rows={2} compact />}
-      {!checking && !user && (
-        <Empty
-          icon={Star}
-          title="관심 종목 소식을 한곳에서"
-          desc="로그인하고 종목을 담으면 그 종목 기사만 모아 보여 드려요."
-          action={
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => openAuth('login')}>
-              <LogIn className="icon-sm" aria-hidden="true" />
-              로그인
-            </button>
-          }
-        />
-      )}
-      {user && watchlist.loaded && watchlist.items.length === 0 && (
-        <Empty icon={Star} title="담은 종목이 없어요" desc="종목 화면의 별 버튼으로 담을 수 있어요." action={<Link to="/stocks" className="btn btn-secondary btn-sm">종목 둘러보기</Link>} />
-      )}
-      {user && watchlist.items.length > 0 && (
+      {issues.loading && !issues.data && <div className="skeleton" style={{ height: 300 }} />}
+      {items.length > 0 && <MarketMap tiles={tiles} priceReady={!priceOff && !quoteLoading} height={300} />}
+      {items.length > 0 && <MapLegend priceReady={!priceOff} />}
+    </section>
+  );
+}
+
+function HourCard({ feed }) {
+  const d = feed.data;
+  const rows = useMemo(() => (d ? hourlyCounts(d.items) : []), [d]);
+  const news = d ? d.items.filter((a) => !a.isDisclosure).length : 0;
+  return (
+    <section className="card" aria-labelledby="hour-title">
+      <div className="card-head">
+        <h2 className="card-title" id="hour-title">
+          <BarChart3 className="icon" aria-hidden="true" />
+          오늘 보도량
+        </h2>
+      </div>
+      {feed.loading && !d && <div className="skeleton" style={{ height: 150 }} />}
+      {feed.error && <ErrorBox error={feed.error} onRetry={feed.reload} />}
+      {d && (
         <>
-          {news.loading && !news.data && <SkeletonRows rows={3} compact />}
-          {news.error && <ErrorBox error={news.error} onRetry={news.reload} />}
-          {news.data && items.length === 0 && <Empty title="최근 7일 동안 관심 종목 기사가 없어요" />}
-          {items.length > 0 && (
-            <div className="feed feed-compact">
-              {items.map((a) => (
-                <ArticleRow key={a.id} article={a} compact />
-              ))}
-            </div>
-          )}
+          <div className="kpis">
+            <Link to="/news?period=today" className="kpi kpi-accent">
+              <span className="kpi-label">종목과 연결된 글</span>
+              <span className="kpi-value num">
+                {d.total.toLocaleString('ko-KR')}
+                <small>건</small>
+              </span>
+            </Link>
+            {d.complete && (
+              <>
+                <Link to="/news?tab=news&period=today" className="kpi">
+                  <span className="kpi-label">뉴스</span>
+                  <span className="kpi-value num">
+                    {news.toLocaleString('ko-KR')}
+                    <small>건</small>
+                  </span>
+                </Link>
+                <Link to="/news?tab=disclosure&period=today" className="kpi">
+                  <span className="kpi-label">공시</span>
+                  <span className="kpi-value num">
+                    {(d.items.length - news).toLocaleString('ko-KR')}
+                    <small>건</small>
+                  </span>
+                </Link>
+              </>
+            )}
+          </div>
+          <HourStrip rows={rows} complete={d.complete} total={d.total} />
         </>
       )}
     </section>
   );
 }
 
-function DataStatus() {
-  const status = useApi((signal) => statusApi.get({ signal }), [], { refreshMs: 60_000 });
-  const s = status.data;
-  if (status.error) return <p className="status-line">갱신 시각을 받지 못했어요.</p>;
-  if (!s) return <div className="skeleton sk-line" style={{ width: 240 }} />;
-  const failed = s.lastRun?.status === 'FAILED';
+const RANK_TABS = [
+  { key: 'count', label: '기사 많은' },
+  { key: 'up', label: '많이 오른' },
+  { key: 'down', label: '많이 내린' },
+];
+
+function IssueRank({ issues, quotes, quoteLoading, priceOff }) {
+  const [tab, setTab] = useState('count');
+  const items = issues.data?.items || [];
+  const maxCount = Math.max(1, ...items.map((i) => i.articleCount));
+  // 부호를 그대로 씀: 오른 탭은 +만, 내린 탭은 -만 (V7 '급하락'에 +5.36% 가 섞이던 문제)
+  let rows = items;
+  if (tab === 'up') rows = items.filter((i) => quotes[i.stockCode]?.changeRate > 0).sort((a, b) => quotes[b.stockCode].changeRate - quotes[a.stockCode].changeRate);
+  if (tab === 'down') rows = items.filter((i) => quotes[i.stockCode]?.changeRate < 0).sort((a, b) => quotes[a.stockCode].changeRate - quotes[b.stockCode].changeRate);
   return (
-    <p className="status-line" aria-label="데이터 갱신 시각">
-      <span>
-        <Clock className="icon-sm" aria-hidden="true" />
-        뉴스 수집 {s.newsCollectedAt ? relativeTime(s.newsCollectedAt) : '아직 없음'}
-      </span>
-      <span>종목 요약 {s.summaryGeneratedAt ? relativeTime(s.summaryGeneratedAt) : '아직 없음'}</span>
-      {failed && <span style={{ color: 'var(--danger)' }}>마지막 수집이 실패했어요</span>}
-    </p>
+    <section className="card" aria-labelledby="rank-title">
+      <div className="card-head">
+        <h2 className="card-title" id="rank-title">
+          <TrendingUp className="icon" aria-hidden="true" />
+          이슈 종목
+        </h2>
+        <Link to="/stocks" className="link">
+          전체 <ChevronRight className="icon-sm" aria-hidden="true" />
+        </Link>
+      </div>
+      {!priceOff && <Segmented label="줄 세우기" size="sm" options={RANK_TABS} value={tab} onChange={setTab} />}
+      {issues.loading && !issues.data && <SkeletonRows rows={5} compact />}
+      {items.length > 0 && rows.length === 0 && (
+        <p className="sub" style={{ padding: '16px 4px' }}>
+          {quoteLoading ? '시세를 받는 중이에요.' : tab === 'up' ? '이슈 종목 중 오른 종목이 없어요.' : '이슈 종목 중 내린 종목이 없어요.'}
+        </p>
+      )}
+      <ol className="rank-rows">
+        {rows.map((it) => {
+          const q = quotes[it.stockCode];
+          return (
+            <li key={it.stockCode}>
+              <Link to={`/stocks/${it.stockCode}`} className="rank-row">
+                <span className="rank num">{it.rank}</span>
+                <span className="rank-main">
+                  <span className="rank-name">
+                    {it.stockName}
+                    {it.disclosureCount > 0 && <span className="badge badge-accent">공시 {it.disclosureCount}</span>}
+                  </span>
+                  <span className="count-bar" aria-hidden="true">
+                    <span style={{ width: `${(it.articleCount / maxCount) * 100}%` }} />
+                  </span>
+                  <span className="rank-meta num">기사 {it.articleCount}건{it.eventCount && it.eventCount !== it.articleCount ? ` · 소식 ${it.eventCount}건` : ''}</span>
+                </span>
+                <Sparkline code={it.stockCode} name={it.stockName} disabled={priceOff} />
+                <span className="rank-price num">
+                  {q ? (
+                    <>
+                      <span className="p">{fmtPrice(q.price)}</span>
+                      <span className={`r ${dirClass(q.changeRate)}`}>{fmtRate(q.changeRate)}</span>
+                    </>
+                  ) : quoteLoading && !priceOff ? (
+                    <span className="skeleton" style={{ display: 'inline-block', width: 60, height: 30 }} />
+                  ) : null}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function KeyNews({ feed }) {
+  // 오늘 많이 보도된 소식: 오늘 뉴스 전부를 소식으로 묶고 묶음 크기 순 5개 (관련도순은 작은 종목 기사가 앞에 와서 쓰지 않음)
+  const stories = useMemo(() => {
+    if (!feed.data) return [];
+    return groupStories(feed.data.items.filter((a) => !a.isDisclosure))
+      .sort((x, y) => (y.size || 1) - (x.size || 1) || (y.lead.publishedAtIso > x.lead.publishedAtIso ? 1 : -1))
+      .slice(0, 5);
+  }, [feed.data]);
+  return (
+    <section className="card" aria-labelledby="news-title">
+      <div className="card-head">
+        <h2 className="card-title" id="news-title">
+          <Newspaper className="icon" aria-hidden="true" />
+          오늘 많이 보도된 소식
+        </h2>
+        <Link to="/news?period=today" className="link">
+          오늘 글 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
+        </Link>
+      </div>
+      {feed.loading && !feed.data && <SkeletonRows rows={4} />}
+      {feed.error && <ErrorBox error={feed.error} onRetry={feed.reload} />}
+      {feed.data && stories.length === 0 && <Empty title="오늘 분석을 마친 뉴스가 아직 없어요" />}
+      {stories.length > 0 && <StoryFeed articles={stories.flatMap((s) => [s.lead, ...s.others])} />}
+    </section>
+  );
+}
+
+function LoginNudge() {
+  const { user, checking, openAuth } = useSession();
+  if (checking || user) return null;
+  return (
+    <section className="card nudge">
+      <Star className="icon" aria-hidden="true" />
+      <p>
+        <b>관심 종목 브리핑</b>
+        <span className="sub">로그인하고 종목을 담으면 맨 위에 그 종목 소식부터 정리해 드려요.</span>
+      </p>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openAuth('login')}>
+        <LogIn className="icon-sm" aria-hidden="true" />
+        로그인
+      </button>
+    </section>
   );
 }
 
 export default function HomePage() {
   useTitle('');
-  const issues = useApi((signal) => loadIssues(signal), []);
-  const codes = (issues.data || []).map((i) => i.stockCode);
-  const { quotes, loading: quoteLoading, disabled } = useQuotes(codes);
+  const { user, watchlist } = useSession();
+  const issues = useApi((signal) => stockApi.issues({ limit: MAP_LIMIT }, { signal }), []);
+  const feed = useApi((signal) => loadTodayFeed(signal), []);
+  const issueItems = issues.data?.items || [];
+  const briefCodes = issueItems.slice(0, BRIEF_N).map((i) => i.stockCode);
+  const watchCodes = user ? watchlist.items.slice(0, WATCH_N).map((w) => w.stockCode) : [];
+  const { quotes, loading: quoteLoading, disabled: priceOff } = useQuotes([...issueItems.map((i) => i.stockCode), ...watchCodes]);
+  const summaryCodes = [...new Set([...briefCodes, ...watchCodes])];
+  const summaries = usePerStock(summaryCodes, (code, signal) => stockApi.summary(code, {}, { signal }), 'summary');
+  const buzz = usePerStock(briefCodes, (code, signal) => stockApi.mentions(code, '7d', { signal }), 'mentions');
+  const lead = headline(issueItems, quotes);
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">오늘 시장 한눈에</h1>
-          <p className="page-sub num">{todayLabel()} · 어떤 종목이 왜 뉴스에 나왔는지 모았어요</p>
+      <div className="page-head home-head">
+        <div style={{ minWidth: 0 }}>
+          <p className="eyebrow num">{todayLabel()}</p>
+          <h1 className="page-title">오늘의 종목 브리핑</h1>
+          {lead ? <p className="lead">{lead}</p> : issues.loading ? <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} /> : null}
         </div>
-        <DataStatus />
+        <LivePill className="mobile-pill" />
       </div>
-      <div className="grid-2">
+
+      <BriefSection issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} buzz={buzz} feed={feed} />
+      <WatchBrief quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} feed={feed} />
+
+      <div className="grid-2 home-grid">
         <div className="stack">
-          <IssueList issues={issues} quotes={quotes} quoteLoading={quoteLoading} disabled={disabled} />
-          <KeyNews />
+          <MapCard issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} feed={feed} />
+          <KeyNews feed={feed} />
         </div>
         <div className="stack">
-          <WatchNews />
-          {issues.data && issues.data.length > 0 && (
-            <Movers issues={issues.data} quotes={quotes} disabled={disabled} loading={quoteLoading} />
-          )}
+          <LoginNudge />
+          <HourCard feed={feed} />
+          <IssueRank issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} />
         </div>
       </div>
+      <p className="home-foot">AI 요약과 소식 종류는 기사 글을 정리한 것이에요. 등락률은 어제 종가와 비교한 지금 값이고, 기사와 주가의 관계를 뜻하지 않아요.</p>
     </>
   );
 }

@@ -1,4 +1,5 @@
 // 종목 메인: 종목 찾기 → 오늘의 이슈 순위(서버 집계) → 이슈 종목 중 많이 오른·내린 → 관심 종목
+// v2: 종목마다 최근 20거래일 추세선(보일 때만, 한 번에 2개씩 부름)과 기사 수 막대
 // 시장 필터는 넣지 않음: 이슈 순위 API 에 시장 칸이 없어 V7 처럼 거르면 틀린 결과(KOSDAQ 0건)가 나옴
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, LogIn, Star } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useTitle } from '../lib/hooks';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import SearchBox from '../components/SearchBox';
 import Movers from '../components/Movers';
+import Sparkline from '../components/Sparkline';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 
 const LIMIT = 30;
@@ -67,6 +69,7 @@ export default function StocksPage() {
   const issues = useApi((signal) => stockApi.issues({ limit: LIMIT }, { signal }), []);
   const items = issues.data?.items || [];
   const { quotes, loading: quoteLoading, disabled } = useQuotes(items.map((i) => i.stockCode));
+  const maxCount = Math.max(1, ...items.map((i) => i.articleCount));
 
   return (
     <>
@@ -104,6 +107,11 @@ export default function StocksPage() {
                       순위
                     </th>
                     <th scope="col">종목</th>
+                    {!disabled && (
+                      <th scope="col" className="hide-mobile">
+                        20거래일
+                      </th>
+                    )}
                     <th scope="col" className="r">
                       기사
                     </th>
@@ -142,7 +150,19 @@ export default function StocksPage() {
                             {it.lastPublishedAt ? ` · 최근 ${shortTime(it.lastPublishedAt)}` : ''}
                           </div>
                         </td>
-                        <td className="r">{it.articleCount}</td>
+                        {!disabled && (
+                          <td className="hide-mobile">
+                            <Sparkline code={it.stockCode} name={it.stockName} />
+                          </td>
+                        )}
+                        <td className="r">
+                          <span className="count-cell">
+                            <span className="count-bar" aria-hidden="true">
+                              <span style={{ width: `${(it.articleCount / maxCount) * 100}%` }} />
+                            </span>
+                            {it.articleCount}
+                          </span>
+                        </td>
                         <td className="r hide-mobile">{it.eventCount ?? '–'}</td>
                         {!disabled && <td className="r">{q ? fmtPrice(q.price) : quoteLoading ? '' : '–'}</td>}
                         {!disabled && <td className={`r change ${dirClass(q?.changeRate)}`}>{q ? fmtRate(q.changeRate) : ''}</td>}
