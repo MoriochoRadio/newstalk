@@ -14,9 +14,11 @@ export function buzzOf(mentions) {
     return { today, avg, ratio: null, level: today >= 3 ? 2 : 1, text: '평소엔 거의 없던 보도' };
   }
   const ratio = today / avg;
-  const level = ratio >= 3 ? 3 : ratio >= 1.5 ? 2 : ratio >= 0.7 ? 1 : 0;
-  const text = ratio >= 1.5 ? `평소의 ${ratio.toFixed(1)}배` : ratio >= 0.7 ? '평소 수준' : '평소보다 적음';
-  return { today, avg, ratio, level, text };
+  // 오늘은 하루가 덜 끝났는데 과거는 하루 전체라, 낮을수록 "평소보다 적음"이 잘못 나옴
+  // (11/11 검토: 이슈 1위 삼성전자가 오후에 '평소보다 적음'으로 보임) → 눈에 띄게 많을 때만 보여 주고 나머지는 숨김
+  if (ratio < 1.5) return null;
+  const level = ratio >= 3 ? 3 : 2;
+  return { today, avg, ratio, level, text: `평소의 ${ratio.toFixed(1)}배` };
 }
 
 export const BUZZ_TIP = '오늘 이 종목 기사 수를 최근 6일(오늘 제외) 하루 평균과 비교했어요. 오늘은 지금까지 나온 기사 기준이에요.';
