@@ -157,6 +157,8 @@ export default function PriceChart({ stockCode, stockName }) {
       ])
     );
     const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false }, 1);
+    // 거래량 칸 위쪽에 여백을 둬서 가격 칸 아래 눈금 글자와 겹치지 않게
+    volume.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: 0 } });
     chart.panes()[0].setStretchFactor(3);
     chart.panes()[1].setStretchFactor(1);
 

@@ -133,7 +133,7 @@ function Comments({ postId, onCount }) {
           <p className="comment-body">{c.content}</p>
         </div>
       ))}
-      {user ? (
+      {user || text ? (
         <form className="comment-form" onSubmit={submit}>
           <label className="sr-only" htmlFor={`cmt-${postId}`}>
             댓글
@@ -259,7 +259,8 @@ export default function Board({ stockCode, stockName }) {
           {writing ? '쓰기 닫기' : '글쓰기'}
         </button>
       </div>
-      {writing && user && (
+      {/* 로그인이 풀려도(401) 쓰던 글이 사라지지 않게 user 와 상관없이 둠 */}
+      {writing && (
         <PostForm
           stockCode={stockCode}
           onDone={() => {
