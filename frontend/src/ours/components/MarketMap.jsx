@@ -106,7 +106,7 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
           const level = priceReady ? heatLevel(t.rate) : 'none';
           const w = r.w - GAP;
           const h = r.h - GAP;
-          const big = w >= 200 && h >= 116;
+          const big = w >= 160 && h >= 110;
           const showRate = w >= 64 && h >= 52;
           const showName = w >= 44 && h >= 30;
           const nameSize = Math.round(Math.min(22, Math.max(13, Math.sqrt(w * h) / 9)));
@@ -129,7 +129,7 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
                 {showRate && (
                   <span className="map-rate num" style={{ fontSize: Math.max(12, nameSize - 4) }}>
                     {t.rate != null ? fmtRate(t.rate) : ''}
-                    <span className="map-count"> 기사 {t.articleCount}</span>
+                    {w >= 120 && <span className="map-count"> 기사 {t.articleCount}</span>}
                   </span>
                 )}
                 {big && t.why && <span className="map-why">{t.why.title}</span>}

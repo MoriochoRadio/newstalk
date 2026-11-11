@@ -391,7 +391,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
         shape: m.first ? 'arrowUp' : 'circle',
         color: ref.colors.news,
         // 점 크기 = 기사 수 (1~3건 · 4~9건 · 10건 이상). 숫자는 값 줄에서 보여 줌 (점 아래 숫자는 겹쳐서 뺌)
-        size: m.count >= 10 ? 2 : m.count >= 4 ? 1.5 : 1,
+        size: m.first ? 1 : m.count >= 10 ? 1 : m.count >= 4 ? 0.7 : 0.45,
         text: m.first ? '첫 기사' : '',
       }));
     ref.markers.setMarkers(list);

@@ -140,8 +140,9 @@ function WatchBrief({ quotes, quoteLoading, priceOff, summaries, feed }) {
             quoteLoading={quoteLoading}
             priceOff={priceOff}
             summary={summaries[w.stockCode] === undefined ? undefined : summaries[w.stockCode]}
-            digest={feed.data ? stockDigest(feed.data.items, w.stockCode) : null}
-            articleCount={w.todayArticleCount}
+            digest={feed.data?.complete ? stockDigest(feed.data.items, w.stockCode) : null}
+            // 오늘 글을 전부 받았으면 이슈 카드와 같은 기준(공시 뺀 뉴스 수), 아니면 관심 종목 API 값
+            articleCount={feed.data?.complete ? undefined : w.todayArticleCount}
             compact
           />
         ))}
