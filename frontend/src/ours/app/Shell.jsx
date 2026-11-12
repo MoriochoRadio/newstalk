@@ -7,7 +7,6 @@ import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import SearchBox from '../components/SearchBox';
 import AuthModal from '../components/AuthModal';
-import VariantSwitch from '../components/VariantSwitch';
 import { useFocusTrap } from '../lib/focusTrap';
 
 const NAV = [
@@ -165,7 +164,6 @@ export default function Shell() {
 
   return (
     <div className="shell">
-      <VariantSwitch />
       <a href="#main" className="skip-link">
         본문으로 건너뛰기
       </a>

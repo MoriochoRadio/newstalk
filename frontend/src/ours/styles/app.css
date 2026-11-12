@@ -3601,57 +3601,6 @@ a.topic-example:hover {
 }
 
 /* 시안 비교 버튼 (실험 브랜치 전용) */
-.variant-switch {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  max-width: calc(100vw - 32px);
-  overflow-x: auto;
-  scrollbar-width: none;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
-  font-size: var(--fs-sm);
-}
-
-.variant-switch > span {
-  padding: 0 8px;
-  font-weight: 700;
-  color: var(--text-3);
-}
-
-.variant-switch > * {
-  flex: none;
-  white-space: nowrap;
-}
-
-.variant-switch button {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  color: var(--text-2);
-  font-weight: 600;
-}
-
-.variant-switch button.on {
-  background: var(--accent-strong); /* 흰 글자 대비 (--accent 는 3.7) */
-  color: #fff;
-}
-
-@media (max-width: 768px) {
-  .variant-switch {
-    bottom: 76px;
-    right: 8px;
-    left: 8px;
-    overflow-x: auto;
-  }
-}
-
 /* ===== 시안: 사이드바 색 토큰 (없으면 지금 값) ===== */
 .sidenav {
   background: var(--nav-bg, var(--surface));
@@ -3675,7 +3624,7 @@ a.topic-example:hover {
 }
 
 /* ===== 좋은·나쁜 소식 한눈에 (11/12, components/Tone.jsx) =====
-   label(기본): 제목 위 "○○에 좋은 소식" 작은 알약 / tint: 알약 + 카드 왼쪽 위 아주 옅은 물들임 / off: 안 보임
+   11/12 밤 링으로 고정 (작은 점·물들임·끔 비교는 끝남)
    색은 시세(빨강·파랑)와 겹치지 않게 초록·주황. 제목 속 ↑↓ 에는 색을 입히지 않음 (값이 떨어진 것처럼 읽혀서, 11/12) */
 .feed-kicker-line {
   display: flex;
@@ -3727,17 +3676,6 @@ a.topic-example:hover {
 .story-card .tone {
   margin-bottom: 6px;
 }
-[data-tone='off'] .tone {
-  display: none;
-}
-[data-tone='tint'] .feed-row.tone-row-pos,
-[data-tone='tint'] .story-card.tone-row-pos {
-  background-image: linear-gradient(100deg, var(--good-soft), transparent 45%);
-}
-[data-tone='tint'] .feed-row.tone-row-neg,
-[data-tone='tint'] .story-card.tone-row-neg {
-  background-image: linear-gradient(100deg, var(--bad-soft), transparent 45%);
-}
 /* 움직임: 점이 한 번 '톡' 커짐 (처음 보일 때만). 움직임 줄이기 설정이면 없음 */
 @media (prefers-reduced-motion: no-preference) {
   .tone i {
@@ -3759,11 +3697,6 @@ a.topic-example:hover {
   }
 }
 
-.variant-switch > .vs-sep {
-  margin-left: 6px;
-  padding-left: 10px;
-  border-left: 1px solid var(--line);
-}
 
 /* 종목 화면 섹션 바로 가기 (예전 목업의 종목 탭 → 바로 가기 줄, 11/12). 위 검색 줄(64px) 아래에 붙음 */
 .sec-nav {
@@ -3832,7 +3765,7 @@ a.topic-example:hover {
 }
 
 /* ===== 소식 성격 링 (11/12 밤, 우리 서비스의 '시그니처' — unslop 스킬) =====
-   링 = 좋은(초록)·중립(회색)·나쁜(주황) 판단 비율. 기본(ring)은 링 + 글자, label 은 예전 작은 점 */
+   링 = 좋은(초록)·중립(회색)·나쁜(주황) 판단 비율, 링 + 글자 */
 .ring-pos {
   stroke: var(--good);
 }
@@ -3847,21 +3780,18 @@ a.topic-example:hover {
   display: block;
 }
 .tone .tone-ring {
-  display: none;
-}
-:root:not([data-tone='label']) .tone .tone-ring {
   display: block;
 }
-:root:not([data-tone='label']) .tone > i {
+.tone > i {
   display: none;
 }
-:root:not([data-tone='label']) .tone {
+.tone {
   gap: 6px;
   padding: 3px 10px 3px 5px;
   font-size: var(--fs-sm);
   line-height: 18px;
 }
-:root:not([data-tone='label']) .tone-mixed {
+.tone-mixed {
   background: var(--surface-3);
 }
 .tone-count {
@@ -3914,9 +3844,6 @@ a.topic-example:hover {
   font-size: var(--fs-xs);
   color: var(--text-3);
 }
-[data-tone='off'] .tone-band {
-  display: none;
-}
 
 /* 화제 종목 카드의 판단 줄 */
 .brief-tone {
@@ -3936,169 +3863,6 @@ a.topic-example:hover {
 .brief-tone-mixed b {
   color: var(--text-2);
 }
-[data-tone='off'] .brief-tone,
-[data-tone='label'] .brief-tone .tone-ring {
-  display: none;
-}
-
-/* =====================================================================
-   스킬 시안 (11/12 밤). 둘 다 G(남색 사이드바) 위에 얹음, html[data-style]
-   I = unslop (Damir Sokolovsky, CC BY 4.0) · J = frontend-design (Anthropic, Apache-2.0)
-   ===================================================================== */
-
-/* ---------- I · unslop: 가벼운 정리 모드 ----------
-   방향: 제품 = 오늘 뉴스·공시가 어떤 종목에 왜 닿았는지 근거와 함께 / 성격 = 차분함·정확함·근거 중심
-   세계 = 잉크(차가운 회색) / 순간 = 1면 소식과 캔들 차트 / 시그니처 = 소식 성격 링 하나
-   고친 것(감사 목록): 굵기 700·800 → 600 / 작은 글자 음수 자간 → 0 / 카드 위로 뜨는 호버 → 바탕 한 단계 /
-   모든 카드 같은 둥글기·그림자 → 크기별 둥글기 + 머리카락 선 + 아주 옅은 그림자 / 회색 단계를 잉크 램프로 */
-[data-style='unslop'] {
-  --bg: #f5f7fa;
-  --surface: #ffffff;
-  --surface-2: #f8f9fb;
-  --surface-3: #eceff4;
-  --surface-hover: #f1f3f7;
-  --line: rgba(17, 24, 39, 0.08);
-  --line-strong: rgba(17, 24, 39, 0.16);
-  --text: #111827;
-  --text-2: #4b5565;
-  --text-3: #5f6879;
-  --radius-sm: 10px;
-  --radius: 14px;
-  --radius-lg: 16px;
-  --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.05);
-  --shadow-hover: 0 1px 2px rgba(17, 24, 39, 0.05);
-  --card-border: 1px solid rgba(17, 24, 39, 0.08);
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-style='unslop']:not([data-theme='light']) {
-    --bg: #0b0d14;
-    --surface: #11141c;
-    --surface-2: #151923;
-    --surface-3: #1a1e28;
-    --surface-hover: #181c26;
-    --line: rgba(238, 240, 245, 0.08);
-    --line-strong: rgba(238, 240, 245, 0.16);
-    --text: #eef0f5;
-    --text-2: #a3a9b8;
-    --text-3: #8a91a3;
-    --shadow-card: none;
-    --shadow-hover: none;
-    --card-border: 1px solid rgba(238, 240, 245, 0.08);
-  }
-}
-:root[data-style='unslop'][data-theme='dark'] {
-  --bg: #0b0d14;
-  --surface: #11141c;
-  --surface-2: #151923;
-  --surface-3: #1a1e28;
-  --surface-hover: #181c26;
-  --line: rgba(238, 240, 245, 0.08);
-  --line-strong: rgba(238, 240, 245, 0.16);
-  --text: #eef0f5;
-  --text-2: #a3a9b8;
-  --text-3: #8a91a3;
-  --shadow-card: none;
-  --shadow-hover: none;
-  --card-border: 1px solid rgba(238, 240, 245, 0.08);
-}
-[data-style='unslop'] body {
-  letter-spacing: 0;
-}
-[data-style='unslop'] :is(.mobile-brand, .brand, .brief-name, .brief-rank, .empty-title, .kpi-value, .link-card-name, .lmap-name,
-  .lmap-node-title, .map-name, .page-title, .price-big, .rank-name, .section-title, .stock-row-name, .story-headline, .story-rank,
-  .tone-band-main, h3, .card-title, .article-title, .stock-name) {
-  font-weight: 600;
-}
-[data-style='unslop'] :is(.page-title, .story-headline, .article-title, .stock-name) {
-  letter-spacing: -0.01em;
-}
-[data-style='unslop'] :is(.card-link, .brief):hover {
-  transform: none;
-  background: var(--surface-hover);
-}
-[data-style='unslop'] :is(.chip, .badge, .kw) {
-  border-radius: 6px;
-}
-
-/* ---------- J · frontend-design: '카드 묶음' 대신 위계로 ----------
-   계획: 색 = 기존 토큰 그대로(파랑 강조 하나) / 글꼴 = Pretendard 하나, 크기 차이로 위계 /
-   배치 = 1면 머리기사는 카드 없이 바탕 위에 크게(이 화면의 '대담한 한 곳'), 나머지 소식은 한 판 안의 목록 /
-   원칙 = 똑같은 둥근 카드·같은 그림자 반복(생성 UI 의 흔한 버릇)을 끊고, 정보가 구조를 정함
-   검토: 처음 계획한 '신문 지면(가는 선·모서리 0·빽빽한 단)'은 스킬이 꼽은 흔한 기본값 3번이라 버림 */
-[data-style='fd'] {
-  --radius: 16px;
-  --radius-sm: 10px;
-}
-@media (min-width: 1101px) {
-  [data-style='fd'] .front-page {
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    gap: 32px;
-    align-items: start;
-  }
-}
-[data-style='fd'] .story-card.story-big {
-  /* 11/12: 카드를 아예 없앴더니 회색 바탕 위에서 밋밋 → 흰 판 + 위쪽 강조 띠 + 숫자 띠로 '이 화면의 한 곳'을 만듦 */
-  background: var(--surface);
-  box-shadow: none;
-  border: var(--card-border);
-  border-top: 3px solid var(--accent);
-  border-radius: var(--radius);
-  padding: 28px 32px 24px;
-}
-[data-style='fd'] .story-big .story-headline {
-  font-size: clamp(22px, 2.4vw, 30px);
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-[data-style='fd'] .story-big .story-summary {
-  font-size: 16px;
-  line-height: 1.7;
-  max-width: 40em;
-}
-[data-style='fd'] .story-big .tone-ring {
-  width: 26px;
-  height: 26px;
-}
-[data-style='fd'] .story-big .story-rank {
-  display: none;
-}
-[data-style='fd'] .front-side {
-  gap: 0;
-  padding: 4px 20px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  border: var(--card-border);
-}
-[data-style='fd'] .front-side .story-card {
-  background: transparent;
-  box-shadow: none;
-  border: 0;
-  border-radius: 0;
-  padding: 16px 0 16px 36px;
-}
-[data-style='fd'] .front-side .story-card + .story-card {
-  border-top: 1px solid var(--line);
-}
-[data-style='fd'] .front-side .story-summary {
-  display: none;
-}
-/* 2~4위도 종목 시세·등락률 (11/12 사용자: "타순위는 등락률·시세가 안 보여 아쉽다") */
-[data-style='fd'] .front-side .story-stocks {
-  margin-top: 8px;
-}
-[data-style='fd'] .front-side .story-stock {
-  padding: 2px 8px;
-  font-size: var(--fs-sm);
-}
-[data-style='fd'] .front-side .story-rank {
-  left: 0;
-  top: 16px;
-}
-[data-style='fd'] :is(.card-link, .brief):hover {
-  transform: none;
-}
 
 /* 좁은 칸에서 판단 알약이 넘치지 않게: 줄바꿈 허용 */
 .tone {
@@ -4114,10 +3878,6 @@ a.topic-example:hover {
   gap: 12px;
   margin-top: 4px;
   font-size: var(--fs-lg);
-}
-[data-tone='label'] .ratio-ring-line .tone-ring,
-[data-tone='off'] .ratio-ring-line {
-  display: none;
 }
 
 /* ===== 11/12 코드 점검 (Vercel 지침·fixing-accessibility) ===== */
@@ -4198,75 +3958,4 @@ html {
 :root[data-nav-collapsed] .sidenav .nav-link {
   justify-content: center;
   padding: 0;
-}
-
-/* 머리기사 숫자 띠: J 시안에서만 보임 */
-.story-facts {
-  display: none;
-}
-[data-style='fd'] .story-big .story-facts {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0;
-  margin: 20px 0 4px;
-  padding: 16px 0 0;
-  border-top: 1px solid var(--line);
-}
-[data-style='fd'] .story-big .story-facts .fact {
-  min-width: 0;
-  padding: 0 16px;
-}
-[data-style='fd'] .story-big .story-facts .fact + .fact {
-  border-left: 1px solid var(--line);
-}
-[data-style='fd'] .story-big .story-facts .fact:first-child {
-  padding-left: 0;
-}
-.story-facts .fact-tone {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.story-facts dt {
-  font-size: var(--fs-xs);
-  color: var(--text-3);
-}
-.story-facts dt a:hover {
-  text-decoration: underline;
-}
-.story-facts dd {
-  margin: 2px 0 0;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-.story-facts .fact-sub {
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  color: var(--text-3);
-}
-.story-facts .fact-rate {
-  font-size: 16px;
-}
-/* 숫자 띠에 다 있으니 J 머리기사에서는 위 알약·종목 칩을 뺌 (같은 정보 두 번 X) */
-[data-style='fd'] .story-big > .tone,
-[data-style='fd'] .story-big > .story-stocks {
-  display: none;
-}
-@media (max-width: 768px) {
-  [data-style='fd'] .story-card.story-big {
-    padding: 20px 18px;
-  }
-  [data-style='fd'] .story-big .story-facts {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    row-gap: 14px;
-  }
-  [data-style='fd'] .story-big .story-facts .fact-tone {
-    grid-column: 1 / -1;
-    padding: 0;
-  }
-  [data-style='fd'] .story-big .story-facts .fact-tone + .fact {
-    border-left: 0;
-    padding-left: 0;
-  }
 }
