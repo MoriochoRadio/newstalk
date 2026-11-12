@@ -85,7 +85,7 @@
   /* 크기 */
   --control-h: 40px;
   --control-h-sm: 32px;
-  --nav-w: 232px;
+  --nav-w: 208px; /* 11/12: 232 → 208 (공간을 과하게 차지한다는 피드백), 접으면 64 */
   --content-max: 1180px;
   --gutter: 24px;
 

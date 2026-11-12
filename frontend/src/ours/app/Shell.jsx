@@ -2,7 +2,7 @@
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
-import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, Search, Star, Sun, User, X } from 'lucide-react';
+import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User, X } from 'lucide-react';
 import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import SearchBox from '../components/SearchBox';
@@ -115,12 +115,41 @@ function UserMenu() {
   );
 }
 
+// 왼쪽 메뉴 접기·펼치기 (11/12 사용자: "사이드바가 공간을 과하게 차지, 원래 꺼냈다 닫았다 하는 게 기본")
+// 접으면 아이콘만 남는 좁은 띠(64px). 고른 값은 이 브라우저에 기억, 처음엔 화면이 좁으면(1280 미만) 접힌 채로
+const NAV_KEY = 'snm_nav_collapsed';
+function useNavCollapsed() {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      const v = localStorage.getItem(NAV_KEY);
+      if (v != null) return v === '1';
+    } catch {
+      /* 저장소를 못 쓰면 화면 폭으로 */
+    }
+    return window.innerWidth < 1280;
+  });
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-nav-collapsed', collapsed);
+  }, [collapsed]);
+  const toggleNav = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(NAV_KEY, c ? '0' : '1');
+      } catch {
+        /* 기억 못 해도 지금 화면은 바뀜 */
+      }
+      return !c;
+    });
+  return [collapsed, toggleNav];
+}
+
 export default function Shell() {
   const { dark, toggle } = useTheme();
   const { toasts } = useSession();
   const location = useLocation();
   const navType = useNavigationType();
   const [mobileSearch, setMobileSearch] = useState(false);
+  const [navCollapsed, toggleNav] = useNavCollapsed();
   const mobileSearchRef = useRef(null);
   const closeMobileSearch = useCallback(() => setMobileSearch(false), []);
   useFocusTrap(mobileSearchRef, mobileSearch, closeMobileSearch); // Esc 로 닫기 + Tab 가두기 (11/12 코드 점검)
@@ -141,30 +170,42 @@ export default function Shell() {
         본문으로 건너뛰기
       </a>
       <aside className="sidenav" aria-label="주 메뉴">
-        <Link to="/" className="brand">
-          <Mark />
-          <span>
-            StockNews
-            <span className="brand-sub">뉴스로 보는 종목</span>
-          </span>
-        </Link>
+        <div className="brand-row">
+          <Link to="/" className="brand" aria-label="StockNews 홈">
+            <Mark />
+            <span className="nav-text">
+              StockNews
+              <span className="brand-sub">뉴스로 보는 종목</span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            className="icon-btn nav-toggle"
+            aria-expanded={!navCollapsed}
+            aria-label={navCollapsed ? '메뉴 펼치기' : '메뉴 접기'}
+            title={navCollapsed ? '메뉴 펼치기' : '메뉴 접기'}
+            onClick={toggleNav}
+          >
+            {navCollapsed ? <PanelLeftOpen className="icon" aria-hidden="true" /> : <PanelLeftClose className="icon" aria-hidden="true" />}
+          </button>
+        </div>
         <nav>
           {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink key={to} to={to} end={end} title={navCollapsed ? label : undefined} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <Icon className="icon" aria-hidden="true" />
-              {label}
+              <span className="nav-text">{label}</span>
             </NavLink>
           ))}
         </nav>
         <div className="nav-spacer" />
         <div className="nav-foot">
-          <button type="button" className="nav-link" onClick={toggle}>
+          <button type="button" className="nav-link" onClick={toggle} title={navCollapsed ? themeLabel : undefined}>
             <ThemeIcon className="icon" aria-hidden="true" />
-            {themeLabel}
+            <span className="nav-text">{themeLabel}</span>
           </button>
-          <a className="nav-link" href="/v7">
+          <a className="nav-link" href="/v7" title={navCollapsed ? '이전 화면(V7) 비교' : undefined}>
             <Newspaper className="icon" aria-hidden="true" />
-            이전 화면(V7) 비교
+            <span className="nav-text">이전 화면(V7) 비교</span>
           </a>
         </div>
       </aside>

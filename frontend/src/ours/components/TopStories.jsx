@@ -4,8 +4,8 @@
 // - 요약 문장은 묶음 안에서 요약이 있는 기사의 것 (AI 활용 금지 언론사 기사는 요약이 없어서 다른 언론사 요약을 씀)
 // - 판단을 붙이지 않음: 등락률은 어제 종가 대비 지금 값일 뿐 (기사 때문이라고 말하지 않음, 화면 맨 아래 안내와 같음)
 import { Link } from 'react-router-dom';
-import { dirClass, fmtRate, relativeTime } from '../lib/format';
-import Tone, { TitleText, storyCounts, toneOfStory, toneRowClass } from './Tone';
+import { dirClass, fmtPrice, fmtRate, relativeTime } from '../lib/format';
+import Tone, { TONE_TIP, TitleText, ToneRing, storyCounts, toneOfStory, toneRowClass } from './Tone';
 
 /** 묶음에서 요약이 있는 기사 (대표 → 나머지 순) */
 function summarized(story) {
@@ -27,6 +27,55 @@ function StoryStocks({ article, quotes }) {
         );
       })}
     </div>
+  );
+}
+
+/** 머리기사 숫자 띠 (J 시안의 '대담한 한 곳', 11/12 사용자: "가운데 크게 나온 게 회색 바탕에 밋밋해서 강조가 안 됨")
+ *  소식 성격 링(크게) · 오늘 기사·언론 수 · 주인공 종목 시세. 다른 시안에서는 CSS 로 숨김 (같은 정보가 알약·칩으로 이미 있음) */
+function StoryFacts({ story, quotes }) {
+  const c = storyCounts(story);
+  const judged = c.pos + c.neu + c.neg;
+  const main = story.lead.relatedStocks.find((s) => s.role === 'MAIN');
+  const q = main ? quotes?.[main.code] : null;
+  const toneText = !judged ? '판단 없음' : c.pos && c.neg ? '좋은·나쁜 내용 함께' : c.pos ? '좋은 소식' : c.neg ? '나쁜 소식' : '중립';
+  return (
+    <dl className="story-facts">
+      <div className="fact fact-tone" title={TONE_TIP}>
+        {judged > 0 && <ToneRing pos={c.pos} neu={c.neu} neg={c.neg} size={44} />}
+        <div>
+          <dt>소식 성격</dt>
+          <dd>{toneText}</dd>
+          {judged > 0 && (
+            <dd className="fact-sub num">
+              AI 판단 {judged}건 · 좋은 {c.pos} · 나쁜 {c.neg}
+            </dd>
+          )}
+        </div>
+      </div>
+      <div className="fact">
+        <dt>오늘 기사</dt>
+        <dd className="num">
+          {story.size || 1}건<span className="fact-sub"> · 언론 {story.pressCount || 1}곳</span>
+        </dd>
+      </div>
+      {main && (
+        <div className="fact">
+          <dt>
+            <Link to={`/stocks/${main.code}`}>{main.name}</Link>
+          </dt>
+          <dd className="num">
+            {q ? (
+              <>
+                {fmtPrice(q.price)}
+                <span className={`fact-rate ${dirClass(q.changeRate)}`}> {fmtRate(q.changeRate)}</span>
+              </>
+            ) : (
+              '시세 받는 중'
+            )}
+          </dd>
+        </div>
+      )}
+    </dl>
   );
 }
 
@@ -78,6 +127,7 @@ function StoryCard({ story, rank, quotes, big }) {
         <p className="story-summary muted">제목만 확인한 소식이에요. 원문에서 확인해 주세요.</p>
       )}
       <StoryStocks article={a} quotes={quotes} />
+      {big && <StoryFacts story={story} quotes={quotes} />}
       {big && story.others.length > 0 && (
         <div className="story-others">
           <p className="story-others-head">다른 언론은 이렇게 썼어요</p>
