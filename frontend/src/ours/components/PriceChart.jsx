@@ -3,23 +3,25 @@
 // 더한 것: 이동평균 5·20·60 (일·주·월봉), 십자선 값 줄(시·고·저·종·전봉 대비·거래량·이평), 화면 테마(토큰) 색 따라가기
 // v2: 기사 나온 때 표시(마커). 일봉 = 최근 30일 날마다 기사 수(언급량 API), 분봉 = 최근 기사 100건의 작성 시각 + 그날 첫 기사.
 //     주가 움직임과 나란히 보여 줄 뿐 "때문에"라고 하지 않음
+// v3 (11/12 사용자 피드백 "보기 불편하고 사용성이 떨어진다, 점으로 뉴스 시점 표시도 어색"):
+//   - 봉 단위 버튼 8개(1분~년) 대신 투자자에게 익숙한 기간 버튼 (오늘·1개월·3개월·6개월·1년·5년), 기본 3개월
+//   - 기사 점(마커) 대신 차트 맨 아래 칸에 "그날 기사 수" 막대 → 거래량처럼 읽히는 '뉴스 거래량'. 십자선을 올리면 그날 대표 기사 제목
 // 데이터는 우리 백엔드 GET /api/quotes/{code}/chart (원래 KIS). TradingView 서버·데이터는 쓰지 않음
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CandlestickSeries, HistogramSeries, LineSeries, createChart, createSeriesMarkers } from 'lightweight-charts';
+import { CandlestickSeries, HistogramSeries, LineSeries, createChart } from 'lightweight-charts';
 import { quoteApi } from '../../api';
 import { errorText } from '../lib/errors';
 import { Segmented } from './ui';
 
-const UNITS = [
-  { key: '1m', label: '1분' },
-  { key: '5m', label: '5분' },
-  { key: '10m', label: '10분' },
-  { key: '30m', label: '30분' },
-  { key: 'day', label: '일' },
-  { key: 'week', label: '주' },
-  { key: 'month', label: '월' },
-  { key: 'year', label: '년' },
+// 기간 버튼: 봉 단위는 기간에서 정함 (bars = 처음 보여 줄 봉 수, 거래일 기준). 오늘 = 5분봉, 5년 = 주봉
+const RANGES = [
+  { key: 'today', label: '오늘', unit: '5m' },
+  { key: '1m', label: '1개월', unit: 'day', bars: 22 },
+  { key: '3m', label: '3개월', unit: 'day', bars: 65 },
+  { key: '6m', label: '6개월', unit: 'day', bars: 130 },
+  { key: '1y', label: '1년', unit: 'day', bars: 250 },
+  { key: '5y', label: '5년', unit: 'week' },
 ];
 const MA = [
   { n: 5, color: '--ma5' },
@@ -29,10 +31,16 @@ const MA = [
 const MA_FALLBACK = { '--ma5': '#e8a317', '--ma20': '#8b5cf6', '--ma60': '#0ea5a4' };
 const KST_OFFSET_SEC = 9 * 3600;
 const MAX_INTRADAY_DAYS = 5;
-const DAY_INITIAL_BARS = 120;
 const LOAD_MORE_MARGIN = 10;
 
 const isIntraday = (unit) => unit.endsWith('m');
+
+/** 오른쪽 끝(최근)부터 bars 개를 보여 줌. bars 가 없으면(오늘·5년) 전부 */
+function showRange(timeScale, total, bars) {
+  if (!total) return;
+  if (bars) timeScale.setVisibleLogicalRange({ from: total - bars, to: total - 1 + 2 });
+  else timeScale.fitContent();
+}
 const hasMa = (unit) => unit === 'day' || unit === 'week' || unit === 'month';
 
 const dayBefore = (ymd) => {
@@ -169,7 +177,9 @@ function newsByBar(rows, unit, dayCounts, articles) {
 const kstDate = (iso) => new Date(new Date(iso).getTime() + KST_OFFSET_SEC * 1000).toISOString().slice(0, 10);
 
 export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null }) {
-  const [unit, setUnit] = useState('day');
+  const [rangeKey, setRangeKey] = useState('3m');
+  const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
+  const unit = range.unit;
   const [data, setData] = useState(EMPTY);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(null);
@@ -221,8 +231,16 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false }, 1);
     // 거래량 칸 위쪽에 여백을 둬서 가격 칸 아래 눈금 글자와 겹치지 않게
     volume.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: 0 } });
-    chart.panes()[0].setStretchFactor(3);
+    // 맨 아래 칸: 그날(그 봉) 기사 수 = 뉴스 거래량 (v3)
+    const news = chart.addSeries(
+      HistogramSeries,
+      { color: c.news, priceFormat: { type: 'custom', formatter: (v) => `${Math.round(v)}건` }, priceLineVisible: false, lastValueVisible: false },
+      2
+    );
+    news.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0 } });
+    chart.panes()[0].setStretchFactor(4);
     chart.panes()[1].setStretchFactor(1);
+    chart.panes()[2].setStretchFactor(1);
 
     chart.subscribeCrosshairMove((param) => setHover(param.time ?? null));
     const onRange = (range) => {
@@ -245,8 +263,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     };
     box.addEventListener('wheel', onWheel, { passive: false });
 
-    const markers = createSeriesMarkers(candles, []);
-    chartRef.current = { chart, candles, volume, maSeries, markers, colors: c };
+    chartRef.current = { chart, candles, volume, news, maSeries, colors: c };
 
     // 라이트/다크가 바뀌면(<html data-theme> 또는 운영체제 설정) 차트 색도 따라감
     const recolor = () => {
@@ -254,7 +271,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       chart.applyOptions({ layout: { textColor: n.text }, grid: { vertLines: { color: n.grid }, horzLines: { color: n.grid } } });
       candles.applyOptions({ upColor: n.up, downColor: n.down, borderUpColor: n.up, borderDownColor: n.down, wickUpColor: n.up, wickDownColor: n.down });
       MA.forEach((m) => maSeries[m.n].applyOptions({ color: n.ma[m.n] }));
-      markers.setMarkers(markers.markers().map((m) => ({ ...m, color: n.news })));
+      news.applyOptions({ color: n.news });
       if (chartRef.current) chartRef.current.colors = n;
     };
     const observer = new MutationObserver(recolor);
@@ -367,15 +384,18 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     if (placedKeyRef.current !== key) {
       placedKeyRef.current = key;
       ref.chart.applyOptions({ timeScale: { timeVisible: isIntraday(unit), secondsVisible: false } });
-      if (unit === 'day' && list.length > DAY_INITIAL_BARS) {
-        timeScale.setVisibleLogicalRange({ from: list.length - DAY_INITIAL_BARS, to: list.length - 1 });
-      } else {
-        timeScale.fitContent();
-      }
+      showRange(timeScale, list.length, range.bars);
     }
-  }, [data, key, unit]);
+  }, [data, key, unit, range.bars]);
 
-  // 기사 표시: 데이터나 기사 목록이 바뀌면 다시 찍음
+  // 같은 일봉 안에서 기간만 바꾸면(1개월↔1년) 다시 받지 않고 보이는 범위만 바꿈. 모자라면 왼쪽 끝에서 이전 데이터를 이어 받음
+  useEffect(() => {
+    const ref = chartRef.current;
+    if (!ref || placedKeyRef.current !== key) return;
+    showRange(ref.chart.timeScale(), rowsRef.current.length, range.bars);
+  }, [rangeKey, key, range.bars]);
+
+  // 기사 수 막대: 데이터나 기사 목록이 바뀌면 다시 그림
   const marks = newsByBar(rows, unit, dayCounts, articles);
   const marksKey = `${key}:${rows.length}:${[...marks.entries()].map(([t, m]) => `${t}=${m.count}`).join(',')}`;
   const marksRef = useRef(marks);
@@ -383,18 +403,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   useEffect(() => {
     const ref = chartRef.current;
     if (!ref) return;
-    const list = [...marksRef.current.entries()]
-      .sort((x, y) => (x[0] > y[0] ? 1 : -1))
-      .map(([t, m]) => ({
-        time: t,
-        position: 'belowBar',
-        shape: m.first ? 'arrowUp' : 'circle',
-        color: ref.colors.news,
-        // 점 크기 = 기사 수 (1~3건 · 4~9건 · 10건 이상). 숫자는 값 줄에서 보여 줌 (점 아래 숫자는 겹쳐서 뺌)
-        size: m.first ? 1 : m.count >= 10 ? 1 : m.count >= 4 ? 0.7 : 0.45,
-        text: m.first ? '첫 기사' : '',
-      }));
-    ref.markers.setMarkers(list);
+    // 모든 봉에 값을 줌 (기사가 없으면 0) → 막대 칸의 시간축이 가격 칸과 같게
+    ref.news.setData(rowsRef.current.map((r) => ({ time: r.t, value: marksRef.current.get(r.t)?.count || 0 })));
   }, [marksKey, unit]);
 
   const loading = data.key !== key;
@@ -442,7 +452,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
         <h2 className="card-title" id="chart-title">
           주가 차트
         </h2>
-        <Segmented label="봉 단위" size="sm" options={UNITS} value={unit} onChange={setUnit} />
+        <Segmented label="기간" size="sm" options={RANGES} value={rangeKey} onChange={setRangeKey} />
       </div>
 
       <div className="chart-readout" aria-live="off">
@@ -492,7 +502,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           {showMarks && (dayCounts || articles) && (
             <span>
               <i className="news-dot" />
-              {unit === 'day' ? '기사 나온 날 (점이 클수록 많음, 최근 30일)' : '기사 나온 때 (최근 기사 100건)'}
+              {unit === 'day' ? '맨 아래 막대 = 그날 기사 수 (최근 30일)' : '맨 아래 막대 = 5분마다 기사 수 (최근 기사 100건)'}
             </span>
           )}
         </div>

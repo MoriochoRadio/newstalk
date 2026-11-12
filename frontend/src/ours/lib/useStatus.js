@@ -41,9 +41,9 @@ export function useStatus() {
   return state;
 }
 
-/** 수집이 살아 있나: 마지막 수집이 성공했고 뉴스 수집이 20분 안이면 true */
+/** 수집이 살아 있나: 뉴스 수집이 20분 안이면 true
+ *  v3 (11/12): 마지막 한 차례 실패(인터넷 끊김 등)만으로 '멈춤'이라 하지 않음 — 수집기는 5분 뒤 다시 시도함 */
 export function isLive(s, now = Date.now()) {
   if (!s?.newsCollectedAt) return false;
-  if (s.lastRun?.status === 'FAILED') return false;
   return now - new Date(s.newsCollectedAt).getTime() < 20 * 60 * 1000;
 }

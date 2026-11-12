@@ -66,15 +66,22 @@ function LinkCard({ s, quote, priceOff }) {
           </span>
         )}
       </div>
-      {s.reason && <p className="lmap-reason">{s.reason}</p>}
-      {s.evidence && (
+      {/* v3 문구 (UX 글쓰기 점검 11/12): 카드가 답할 질문은 "왜 연결됐나" → 역할 한 줄 + 형광펜 근거 문장, AI 판단 문장은 작게 */}
+      <p className="lmap-role">{indirect ? '기사에 쓰인 사건이 이 업종에 닿는다고 AI가 추정했어요' : s.role === 'MAIN' ? '이 기사가 주로 다루는 회사예요' : '기사에 함께 나온 회사예요'}</p>
+      {s.evidence ? (
         <blockquote className="lmap-evidence">
           {s.factTypeLabel && <span className={`badge ${FACT_BADGE[s.factType] || ''}`}>{s.factTypeLabel}</span>}
           <Quote className="icon-sm" aria-label="근거 원문" style={{ display: 'inline', marginRight: 4, verticalAlign: -2, color: 'var(--text-3)' }} />
-          {s.evidence}
+          <span className="mark">{s.evidence}</span>
         </blockquote>
+      ) : (
+        !s.reason && <p className="lmap-reason sub">기사 제목에서 회사 이름을 찾아 연결했어요.</p>
       )}
-      {!s.reason && !s.evidence && <p className="lmap-reason sub">기사 제목에서 회사 이름으로 연결했어요.</p>}
+      {s.reason && (
+        <p className="lmap-memo">
+          <span>AI 메모</span> {s.reason}
+        </p>
+      )}
     </div>
   );
 }
@@ -229,12 +236,6 @@ function NewsDetail({ id }) {
           </h2>
         </div>
         {a.relatedStocks.length === 0 ? <p className="sub">이 글과 연결된 종목이 없어요.</p> : <LinkMap a={a} quotes={quotes} priceOff={disabled} />}
-        {a.relatedStocks.length > 0 && !disabled && (
-          <p className="note lmap-foot" style={{ marginTop: 14 }}>
-            <Info className="icon-sm" aria-hidden="true" />
-            시세는 어제 종가와 비교한 지금 값이에요. 기사 때문에 움직였다는 뜻이 아니에요.
-          </p>
-        )}
       </section>
 
       {a.sameNewsCount >= 2 && (
@@ -284,9 +285,13 @@ function NewsDetail({ id }) {
           ) : (
             <p className="sub">AI가 이 글의 분위기를 판단하지 않았어요.</p>
           )}
-          <p className="card-note">AI가 기사 문장만 읽고 나눈 거예요. 주가가 오르거나 내린다는 예측이 아니에요.</p>
         </section>
       )}
+
+      <p className="note page-foot-note">
+        <Info className="icon-sm" aria-hidden="true" />
+        시세는 어제 종가 대비 지금 값이고, 분위기는 AI가 기사 문장만 읽고 나눈 거예요. 둘 다 주가 예측이 아니에요.
+      </p>
 
       {a.relatedSns.length > 0 && (
         <section className="card" aria-labelledby="sns-title">

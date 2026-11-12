@@ -18,6 +18,8 @@ import { stockDigest } from '../lib/digest';
 import { buzzOf } from '../lib/buzz';
 import { groupStories } from '../lib/stories';
 import { StoryFeed } from '../components/ArticleRow';
+import TopStories, { rankStories } from '../components/TopStories';
+import MoodGauge, { moodOf } from '../components/MoodGauge';
 import BriefCard from '../components/BriefCard';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import HourStrip from '../components/HourStrip';
@@ -27,6 +29,7 @@ import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
 
 const MAP_LIMIT = 12; // 시장 지도·이슈 순위 종목 수 (시세 요청 10개씩 2번)
 const BRIEF_N = 4; // 브리핑 카드 (요약·언급량 요청 각 4번)
+const TOP_N = 4; // 맨 위 핵심 소식 (v3, 오늘 글로 계산 — 추가 요청 없음)
 const WATCH_N = 4; // 관심 종목 브리핑 (요약 최대 4번 더 → 요약은 홈에서 최대 8번)
 
 /**
@@ -53,6 +56,13 @@ function usePerStock(codes, fetcher, tag) {
 }
 
 /** 맨 위 한 문장 (데이터로 만든 문장, LLM 아님) */
+/** 머리말 한 줄 (v3): 가장 많이 다룬 소식을 먼저, 종목은 그다음 */
+function storyLine(story) {
+  if (!story) return '';
+  const size = story.size || 1;
+  return size >= 2 ? `가장 많이 다뤄진 소식은 언론 ${size}곳이 쓴 “${story.lead.title}”이에요.` : '';
+}
+
 function headline(issues, quotes) {
   if (!issues.length) return '';
   const top = issues[0];
@@ -300,19 +310,14 @@ function IssueRank({ issues, quotes, quoteLoading, priceOff }) {
 }
 
 function KeyNews({ feed }) {
-  // 오늘 많이 보도된 소식: 오늘 뉴스 전부를 소식으로 묶고 묶음 크기 순 5개 (관련도순은 작은 종목 기사가 앞에 와서 쓰지 않음)
-  const stories = useMemo(() => {
-    if (!feed.data) return [];
-    return groupStories(feed.data.items.filter((a) => !a.isDisclosure))
-      .sort((x, y) => (y.size || 1) - (x.size || 1) || (y.lead.publishedAtIso > x.lead.publishedAtIso ? 1 : -1))
-      .slice(0, 5);
-  }, [feed.data]);
+  // 그 밖의 소식 (v3): 맨 위 핵심 소식 4개 다음 순서부터 6개. 묶음 크기 순 (관련도순은 작은 종목 기사가 앞에 와서 쓰지 않음)
+  const stories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, TOP_N + 6).slice(TOP_N) : []), [feed.data]);
   return (
     <section className="card" aria-labelledby="news-title">
       <div className="card-head">
         <h2 className="card-title" id="news-title">
           <Newspaper className="icon" aria-hidden="true" />
-          오늘 많이 보도된 소식
+          그 밖의 소식
         </h2>
         <Link to="/news?period=today" className="link">
           오늘 글 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
@@ -350,9 +355,11 @@ export default function HomePage() {
   const issues = useApi((signal) => stockApi.issues({ limit: MAP_LIMIT }, { signal }), []);
   const feed = useApi((signal) => loadTodayFeed(signal), []);
   const issueItems = issues.data?.items || [];
+  const topStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, TOP_N) : []), [feed.data]);
+  const storyCodes = topStories.flatMap((st) => st.lead.relatedStocks.filter((s) => s.role === 'MAIN').map((s) => s.code));
   const briefCodes = issueItems.slice(0, BRIEF_N).map((i) => i.stockCode);
   const watchCodes = user ? watchlist.items.slice(0, WATCH_N).map((w) => w.stockCode) : [];
-  const { quotes, loading: quoteLoading, disabled: priceOff } = useQuotes([...issueItems.map((i) => i.stockCode), ...watchCodes]);
+  const { quotes, loading: quoteLoading, disabled: priceOff } = useQuotes([...new Set([...storyCodes, ...issueItems.map((i) => i.stockCode), ...watchCodes])]);
   const summaryCodes = [...new Set([...briefCodes, ...watchCodes])];
   const summaries = usePerStock(summaryCodes, (code, signal) => stockApi.summary(code, {}, { signal }), 'summary');
   const buzz = usePerStock(briefCodes, (code, signal) => stockApi.mentions(code, '7d', { signal }), 'mentions');
@@ -363,12 +370,33 @@ export default function HomePage() {
       <div className="page-head home-head">
         <div style={{ minWidth: 0 }}>
           <p className="eyebrow num">{todayLabel()}</p>
-          <h1 className="page-title">오늘의 종목 브리핑</h1>
-          {lead ? <p className="lead">{lead}</p> : issues.loading ? <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} /> : null}
+          <h1 className="page-title">오늘의 뉴스 브리핑</h1>
+          {topStories.length ? (
+            <p className="lead">{storyLine(topStories[0]) || lead}</p>
+          ) : feed.loading ? (
+            <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} />
+          ) : null}
         </div>
         <LivePill className="mobile-pill" />
       </div>
 
+      {feed.loading && !feed.data ? (
+        <div className="front-page">
+          <div className="story-card story-big">
+            <SkeletonRows rows={3} />
+          </div>
+          <div className="front-side">
+            <SkeletonRows rows={3} compact />
+          </div>
+        </div>
+      ) : (
+        <TopStories stories={topStories} quotes={quotes} />
+      )}
+
+      <div className="section-head">
+        <h2 className="section-title">오늘 화제 종목</h2>
+        {lead && <p className="section-sub">{lead}</p>}
+      </div>
       <BriefSection issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} buzz={buzz} feed={feed} />
       <WatchBrief quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} feed={feed} />
 
@@ -379,6 +407,7 @@ export default function HomePage() {
         </div>
         <div className="stack">
           <LoginNudge />
+          <MoodGauge mood={feed.data ? moodOf(feed.data.items) : null} />
           <HourCard feed={feed} />
           <IssueRank issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} />
         </div>

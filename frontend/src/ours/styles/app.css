@@ -17,8 +17,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo',
-    'Malgun Gothic', sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--fs-md);
   line-height: var(--lh);
   letter-spacing: -0.01em;
@@ -612,6 +611,7 @@ mark {
 /* ---------- 카드·구역 ---------- */
 .card {
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
   padding: 20px;
@@ -3273,4 +3273,311 @@ a.feed-title:hover {
 
 .count-cell .count-bar {
   width: 48px;
+}
+
+/* ===== v3 정체성: 뉴스 제목·섹션 제목은 명조, 근거·핵심은 형광펜 (tokens.css 설명 참고) ===== */
+.page-title,
+.section-title,
+.card-title,
+.feed-title,
+.article-title,
+.story-headline,
+.brand-text {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+}
+
+.page-title {
+  font-weight: 700;
+}
+
+.feed-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.card-title,
+.section-title {
+  font-weight: 700;
+}
+
+/* 형광펜: 글자 아래쪽 절반만 칠해서 실제로 그은 줄처럼 */
+.mark {
+  background: linear-gradient(transparent 52%, var(--mark-soft) 52%, var(--mark-soft) 92%, transparent 92%);
+  color: inherit;
+  padding: 0 1px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.brand-mark {
+  border-radius: 6px;
+  background: var(--accent);
+}
+
+/* ===== v3 홈 1면: 오늘의 핵심 소식 (머리기사 1 + 오른쪽 단 3) ===== */
+.front-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.front-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.story-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px 16px 56px;
+  min-width: 0;
+}
+
+.story-card.story-big {
+  padding: 26px 28px 22px 72px;
+  border-top: 3px solid var(--accent);
+}
+
+.story-rank {
+  position: absolute;
+  left: 20px;
+  top: 18px;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-3);
+}
+
+.story-big .story-rank {
+  left: 26px;
+  top: 26px;
+  font-size: 34px;
+  color: var(--accent-text);
+}
+
+.story-headline {
+  display: block;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.42;
+  color: var(--text);
+}
+
+.story-big .story-headline {
+  font-size: 24px;
+  line-height: 1.35;
+}
+
+a.story-headline:hover {
+  color: var(--accent-text);
+}
+
+.story-meta {
+  margin-top: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+.story-meta b {
+  color: var(--text-2);
+  font-weight: 700;
+}
+
+.story-summary {
+  margin-top: 10px;
+  color: var(--text-2);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.story-big .story-summary {
+  font-size: 15px;
+  color: var(--text);
+  -webkit-line-clamp: 4;
+}
+
+.story-summary.muted {
+  color: var(--text-3);
+}
+
+.story-stocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.story-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.story-stock:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+}
+
+.section-sub {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 1100px) {
+  .front-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .story-card.story-big {
+    padding: 20px 18px 18px 56px;
+  }
+  .story-big .story-rank {
+    left: 18px;
+    top: 20px;
+    font-size: 28px;
+  }
+  .story-big .story-headline {
+    font-size: 20px;
+  }
+}
+
+.story-others {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.story-others-head {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+.story-others li {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+
+.story-others .press {
+  flex: none;
+  width: 78px;
+  color: var(--text-3);
+}
+
+.story-others a {
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.story-others a:hover {
+  color: var(--accent-text);
+}
+
+/* ===== v3 오늘 기사 분위기 온도계 ===== */
+.mood-score {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+
+.mood-label {
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.mood-track {
+  position: relative;
+  height: 10px;
+  margin-top: 14px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--down-chart), var(--surface-3) 50%, var(--up-chart));
+}
+
+.mood-pin {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--text);
+  transform: translate(-50%, -50%);
+}
+
+.mood-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.mood-counts {
+  margin-top: 10px;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.mood-note {
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+/* ===== v3 연결 지도 문구 ===== */
+.lmap-role {
+  margin-top: 8px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lmap-memo {
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  line-height: 1.6;
+}
+
+.lmap-memo span {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.page-foot-note {
+  margin-top: 18px;
 }

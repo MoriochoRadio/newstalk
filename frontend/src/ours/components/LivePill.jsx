@@ -14,7 +14,7 @@ export default function LivePill({ className = '' }) {
       title={`뉴스 수집 ${at ? shortTime(at) : '기록 없음'} · 종목 요약 ${data.summaryGeneratedAt ? shortTime(data.summaryGeneratedAt) : '기록 없음'}`}
     >
       <i aria-hidden="true" />
-      {live ? `실시간 매칭 · ${shortTime(at)}` : at ? `수집 멈춤 · ${relativeTime(at)}` : '수집 기록 없음'}
+      {live ? `실시간 매칭 · ${shortTime(at)}` : at ? `업데이트 ${relativeTime(at)}` : '수집 기록 없음'}
     </span>
   );
 }
