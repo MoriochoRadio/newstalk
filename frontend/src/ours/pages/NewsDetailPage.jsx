@@ -4,19 +4,15 @@ import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Info, Quote } from 'lucide-react';
 import { articleApi } from '../../api';
-import { SENTIMENT_LABEL, toUiArticle } from '../../api/adapters';
+import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { fmtPrice, fmtRate, dirClass, fullTime, shortTime } from '../lib/format';
 import { ArticleTags, SAME_NEWS_TIP, sourceText } from '../components/ArticleRow';
+import { TONE_TIP, ToneRing, countsOf } from '../components/Tone';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 
-const SENTIMENT_TEXT = {
-  POSITIVE: '기사 내용이 회사에 좋은 소식 쪽이에요.',
-  NEGATIVE: '기사 내용이 회사에 나쁜 소식 쪽이에요.',
-  NEUTRAL: '좋고 나쁨을 가르기 어려운, 사실 전달 위주의 기사예요.',
-};
 const FACT_BADGE = { FACT: 'badge-ok', PLAN: 'badge-accent', FORECAST: 'badge-warn', RUMOR: 'badge-warn' };
 
 /** 브라우저 기록이 있으면 뒤로, 바로 들어온 주소면 목록으로 */
@@ -48,6 +44,47 @@ async function loadSameNews(a, signal) {
     .sort((x, y) => (x.publishedAtIso > y.publishedAtIso ? 1 : -1));
 }
 
+/** 종목 하나에 대한 판단 알약 (종목마다 다를 수 있음: 유가 급등 → 정유 좋음, 항공 나쁨) */
+function StockTone({ sentiment }) {
+  if (sentiment !== 'POSITIVE' && sentiment !== 'NEGATIVE') return null;
+  const pos = sentiment === 'POSITIVE';
+  return (
+    <span className={`tone ${pos ? 'tone-pos' : 'tone-neg'}`} title={TONE_TIP}>
+      <ToneRing {...(pos ? { pos: 1 } : { neg: 1 })} size={14} />
+      <i aria-hidden="true" />
+      {pos ? '좋은 소식' : '나쁜 소식'}
+    </span>
+  );
+}
+
+/** 맨 위 판단 띠 (11/12 사용자: "기사 분위기가 맨 밑에만 있어서 다 읽고 나서야 좋은지 나쁜지 나온다. 의미가 없다")
+ *  → 제목 바로 아래에, 연결 종목마다 "○○에 좋은 소식". 판단한 종목이 없으면 안 보임 */
+function ToneBand({ article }) {
+  const judged = (article.relatedStocks || []).filter((s) => s.sentiment === 'POSITIVE' || s.sentiment === 'NEGATIVE');
+  if (article.titleOnly || article.disclosurePending || article.sourceType === 'SNS' || judged.length === 0) return null;
+  const c = countsOf(judged.map((s) => s.sentiment));
+  const lead = judged.find((s) => s.role === 'MAIN') || judged[0];
+  const kind = c.pos && c.neg ? 'mixed' : c.pos ? 'pos' : 'neg';
+  return (
+    <div className={`tone-band tone-band-${kind}`}>
+      <ToneRing {...c} size={40} className="tone-band-ring" />
+      <div className="tone-band-text">
+        <p className="tone-band-main">
+          {judged.length === 1
+            ? `${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}이에요`
+            : judged.map((s, i) => (
+                <span key={s.code} className={s.sentiment === 'POSITIVE' ? 'tb-pos' : 'tb-neg'}>
+                  {i > 0 && ', '}
+                  {s.name}에 {s.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}
+                </span>
+              ))}
+        </p>
+        <p className="tone-band-sub">AI가 기사 내용을 읽고 나눈 판단이에요. 주가가 오르거나 내린다는 예측은 아니에요.</p>
+      </div>
+    </div>
+  );
+}
+
 /** 연결 지도의 종목 카드: 주인공은 크게(이유·근거 다 보임), 함께 언급은 작게, 간접 연결은 점선 + "AI 추정" */
 function LinkCard({ s, quote, priceOff }) {
   const indirect = s.matchType === 'INDIRECT';
@@ -60,6 +97,7 @@ function LinkCard({ s, quote, priceOff }) {
         </Link>
         <span className={`badge ${s.role === 'MAIN' ? 'badge-accent' : ''}`}>{s.roleLabel}</span>
         {indirect && <span className="badge badge-warn">간접 연결 · AI 추정</span>}
+        <StockTone sentiment={s.sentiment} />
         {!priceOff && quote && (
           <span className="lmap-quote num">
             {fmtPrice(quote.price)} <span className={`change ${dirClass(quote.changeRate)}`}>{fmtRate(quote.changeRate)}</span>
@@ -184,6 +222,7 @@ function NewsDetail({ id }) {
           <ArticleTags article={a} detail />
         </div>
         <h1 className="article-title">{a.title}</h1>
+        <ToneBand article={a} />
         <div className="article-meta">
           <span>{sourceText(a)}</span>
           {raw.reporter && <span>{raw.reporter} 기자</span>}
@@ -268,31 +307,9 @@ function NewsDetail({ id }) {
         </section>
       )}
 
-      {a.sourceType !== 'SNS' && (
-        <section className="card" aria-labelledby="mood-title">
-          <div className="card-head">
-            <h2 className="card-title" id="mood-title">
-              기사 분위기
-            </h2>
-          </div>
-          {raw.sentiment ? (
-            <div className="sentiment-line">
-              {/* 목록의 "○○에 좋은/나쁜 소식" 알약과 같은 말·색 (초록·주황, 시세 색과 다르게) */}
-              <span className={`tone ${raw.sentiment === 'POSITIVE' ? 'tone-pos' : raw.sentiment === 'NEGATIVE' ? 'tone-neg' : 'tone-mixed tone-neutral'}`}>
-                <i aria-hidden="true" />
-                {raw.sentiment === 'POSITIVE' ? '좋은 소식' : raw.sentiment === 'NEGATIVE' ? '나쁜 소식' : SENTIMENT_LABEL[raw.sentiment]}
-              </span>
-              <span className="sub">{SENTIMENT_TEXT[raw.sentiment]}</span>
-            </div>
-          ) : (
-            <p className="sub">AI가 이 글의 분위기를 판단하지 않았어요.</p>
-          )}
-        </section>
-      )}
-
       <p className="note page-foot-note">
         <Info className="icon-sm" aria-hidden="true" />
-        시세는 어제 종가 대비 지금 값이고, 분위기는 AI가 기사 문장만 읽고 나눈 거예요. 둘 다 주가 예측이 아니에요.
+        시세는 어제 종가 대비 지금 값이에요. 기사 때문에 움직였다는 뜻이 아니에요.
       </p>
 
       {a.relatedSns.length > 0 && (

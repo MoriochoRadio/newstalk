@@ -9,15 +9,19 @@ const PRESETS = [
   { key: 'sharp', label: 'F 단단한 금융', attrs: { variant: 'e', shape: 'sharp' } },
   { key: 'ink', label: 'G 남색 사이드바', attrs: { variant: 'e', shape: 'soft', nav: 'ink' } },
   { key: 'flat', label: 'H 지면형', attrs: { variant: 'e', shape: 'flat' } },
+  // 스킬 시안 (G 위에 얹음): unslop 정리 모드 / frontend-design 위계 배치
+  { key: 'unslop', label: 'I unslop', attrs: { variant: 'e', shape: 'soft', nav: 'ink', style: 'unslop' } },
+  { key: 'fd', label: 'J frontend-design', attrs: { variant: 'e', shape: 'soft', nav: 'ink', style: 'fd' } },
 ];
-const ATTRS = ['variant', 'shape', 'nav'];
+const ATTRS = ['variant', 'shape', 'nav', 'style'];
 // 11/12 저녁: 사용자가 G(남색 사이드바)를 고름 → 기본값
 const DEFAULT = 'ink';
 // 좋은·나쁜 소식 표시 방식 비교 (components/Tone.jsx)
-const TONE_KEY = 'snm_ours_tone';
+const TONE_KEY = 'snm_ours_tone2'; // 11/12 밤 기본값이 링으로 바뀌어 새 이름 (예전 선택이 남아 링이 안 보이지 않게)
 const TONES = [
-  { key: 'label', label: '글자' },
-  { key: 'tint', label: '글자+물들임' },
+  { key: 'ring', label: '링' },
+  { key: 'label', label: '작은 점' },
+  { key: 'tint', label: '링+물들임' },
   { key: 'off', label: '끔' },
 ];
 
@@ -31,7 +35,7 @@ function read(k, d) {
 
 export default function VariantSwitch() {
   const [key, setKey] = useState(() => read(KEY, DEFAULT));
-  const [tone, setTone] = useState(() => read(TONE_KEY, 'label'));
+  const [tone, setTone] = useState(() => read(TONE_KEY, 'ring'));
   useEffect(() => {
     document.documentElement.setAttribute('data-tone', tone);
     try {

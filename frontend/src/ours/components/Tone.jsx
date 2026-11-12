@@ -5,7 +5,10 @@
 //    단정처럼 보이지 않게: 화살표 대신 점(●), "오른다/내린다" 대신 "좋은/나쁜 소식", 마우스를 올리면 설명
 //    색: 좋은 소식 초록·나쁜 소식 주황 — 시세의 빨강(상승)·파랑(하락)과 일부러 다르게 (빨강·파랑이면 주가가 움직인 것으로 읽힘, 11/12)
 //    색만으로 전달하지 않게 글자로도 씀 (WCAG 1.4.1)
-// 보이는 방식은 시안 비교용으로 <html data-tone="label|tint|off"> 에 따라 바뀜 (기본 label)
+// 보이는 방식은 시안 비교용으로 <html data-tone="ring|label|tint|off"> 에 따라 바뀜 (기본 ring)
+// 3) ToneRing (11/12 밤, 사용자: "좋은·나쁜 내용 함께에 색이 섞인 동그라미가 맘에 든다, 더 크게 시각화"):
+//    unslop 스킬의 '시그니처' — 이 서비스에만 있는 작은 표시 하나를 정해 같은 뜻으로만 씀.
+//    링 = 이 기사·소식·종목의 좋은·중립·나쁜 판단 비율 (초록·회색·주황, 조각 사이 2px 틈 = dataviz 스킬)
 
 export const TONE_TIP = 'AI가 기사 내용을 읽고 이 회사에 좋은 소식인지 나쁜 소식인지 나눈 거예요. 주가가 오르거나 내린다는 예측이 아니에요.';
 
@@ -41,28 +44,92 @@ export function toneOf(article, focusCode) {
   return { kind: conflict ? 'mixed' : kind, name: s.name };
 }
 
-/** 같은 소식 묶음: 판단한 기사들이 모두 같으면 그것, 엇갈리면 mixed (대표 제목의 방향과도 맞춰 봄) */
+/** 같은 소식 묶음: 링·숫자와 같은 말이 되도록 판단 수로 정함 (좋은·나쁜 둘 다 있으면 mixed)
+ *  11/12 밤: 제목 방향(↓)으로 mixed 를 덧씌웠더니 "좋은·나쁜 내용 함께"인데 숫자는 "좋은 1 · 나쁜 0"이라 서로 어긋남 → 숫자 기준 */
 export function toneOfStory(story) {
-  const all = [story.lead, ...(story.others || [])];
-  const tones = all.map((x) => toneOf(x)).filter(Boolean);
-  if (!tones.length) return null;
-  const kinds = new Set(tones.map((t) => t.kind));
-  let kind = kinds.size === 1 ? tones[0].kind : 'mixed';
-  const dir = titleDir(story.lead.title);
-  if ((dir === 'down' && kind === 'pos') || (dir === 'up' && kind === 'neg')) kind = 'mixed';
-  return { kind, name: tones[0].name };
+  const c = storyCounts(story);
+  if (!c.pos && !c.neg) return null;
+  const main = story.lead.relatedStocks.find((s) => s.role === 'MAIN') || story.lead.relatedStocks[0];
+  return { kind: c.pos && c.neg ? 'mixed' : c.pos ? 'pos' : 'neg', name: main?.name || '' };
+}
+
+/** 좋은·중립·나쁜 판단 수를 링으로. 한 색이면 꽉 찬 링, 섞이면 조각. 합이 0 이면 그리지 않음 */
+export function ToneRing({ pos = 0, neu = 0, neg = 0, size = 16, className = '' }) {
+  const total = pos + neu + neg;
+  if (!total) return null;
+  const w = Math.max(2.5, size / 5);
+  const r = (size - w) / 2;
+  const c = 2 * Math.PI * r;
+  const parts = [
+    ['pos', pos],
+    ['neu', neu],
+    ['neg', neg],
+  ].filter(([, n]) => n > 0);
+  const gap = parts.length > 1 ? Math.min(2, c / 20) : 0;
+  let at = 0;
+  return (
+    <svg className={`tone-ring ${className}`} width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      {parts.map(([k, n]) => {
+        const len = (n / total) * c;
+        const el = (
+          <circle
+            key={k}
+            className={`ring-${k}`}
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            strokeWidth={w}
+            strokeDasharray={`${Math.max(0.01, len - gap)} ${c}`}
+            strokeDashoffset={-at}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        );
+        at += len;
+        return el;
+      })}
+    </svg>
+  );
+}
+
+/** 판단 값 → 링 재료 */
+export function countsOf(sentiments) {
+  const c = { pos: 0, neu: 0, neg: 0 };
+  for (const v of sentiments) {
+    if (v === 'POSITIVE') c.pos += 1;
+    else if (v === 'NEGATIVE') c.neg += 1;
+    else if (v === 'NEUTRAL') c.neu += 1;
+  }
+  return c;
+}
+
+/** 같은 소식 묶음의 판단 수 (주인공 종목 기준, 제목만 확인한 기사 제외) */
+export function storyCounts(story) {
+  const all = [story.lead, ...(story.others || [])].filter((x) => !x.titleOnly && !x.disclosurePending);
+  return countsOf(all.map((x) => (x.relatedStocks.find((s) => s.role === 'MAIN') || x.relatedStocks[0])?.sentiment));
 }
 
 const TONE_TEXT = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·나쁜 내용 함께' };
 
-export default function Tone({ article, focusCode, tone, withName = true }) {
+export default function Tone({ article, focusCode, tone, withName = true, counts }) {
   const t = tone !== undefined ? tone : toneOf(article, focusCode);
   if (!t) return null;
+  // 링 재료: 넘겨준 수(같은 소식 묶음)가 있으면 그것, 없으면 이 글 하나 (엇갈림이면 반반)
+  const ring = counts || (t.kind === 'pos' ? { pos: 1 } : t.kind === 'neg' ? { neg: 1 } : { pos: 1, neg: 1 });
+  const n = counts ? counts.pos + counts.neu + counts.neg : 0;
   return (
     <span className={`tone tone-${t.kind}`} title={TONE_TIP}>
+      <ToneRing {...ring} size={16} />
       <i aria-hidden="true" />
-      {withName ? `${t.name}에 ` : ''}
-      {TONE_TEXT[t.kind]}
+      <span>
+        {withName ? `${t.name}에 ` : ''}
+        {TONE_TEXT[t.kind]}
+      </span>
+      {n >= 2 && (
+        <span className="tone-count num">
+          AI가 판단한 {n}건 중 좋은 {counts.pos} · 나쁜 {counts.neg}
+        </span>
+      )}
     </span>
   );
 }

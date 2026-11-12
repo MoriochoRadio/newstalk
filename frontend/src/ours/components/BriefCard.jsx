@@ -6,6 +6,25 @@ import { Sparkles } from 'lucide-react';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import { BUZZ_TIP } from '../lib/buzz';
 import Sparkline from './Sparkline';
+import { TONE_TIP, ToneRing } from './Tone';
+
+/** 오늘 이 종목 기사들의 좋은·나쁜 소식 비율 (서버가 센 값, 링 = 시그니처) */
+function BriefTone({ sentiment: t }) {
+  if (!t || !t.articleCount || (!t.positiveCount && !t.negativeCount)) return null;
+  const lean = t.positiveCount > t.negativeCount ? 'pos' : t.negativeCount > t.positiveCount ? 'neg' : 'mixed';
+  return (
+    <p className={`brief-tone brief-tone-${lean}`} title={TONE_TIP}>
+      <ToneRing pos={t.positiveCount} neu={t.neutralCount} neg={t.negativeCount} size={22} />
+      <span>
+        <b>{lean === 'pos' ? '좋은 소식이 더 많아요' : lean === 'neg' ? '나쁜 소식이 더 많아요' : '좋은·나쁜 소식이 비슷해요'}</b>
+        <span className="num muted">
+          {' '}
+          AI가 판단한 {t.articleCount}건 중 좋은 {t.positiveCount} · 나쁜 {t.negativeCount}
+        </span>
+      </span>
+    </p>
+  );
+}
 
 export default function BriefCard({ rank, code, name, quote, quoteLoading, priceOff, summary, digest, buzz, firstAt, articleCount, compact = false }) {
   const cls = dirClass(quote?.changeRate);
@@ -65,6 +84,8 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
           <p className="brief-note">오늘 요약할 기사가 아직 없어요.</p>
         )}
       </div>
+
+      <BriefTone sentiment={summary?.sentiment} />
 
       {tags.length > 0 && (
         <div className="tags brief-tags">

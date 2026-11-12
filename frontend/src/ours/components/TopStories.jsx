@@ -5,7 +5,7 @@
 // - 판단을 붙이지 않음: 등락률은 어제 종가 대비 지금 값일 뿐 (기사 때문이라고 말하지 않음, 화면 맨 아래 안내와 같음)
 import { Link } from 'react-router-dom';
 import { dirClass, fmtRate, relativeTime } from '../lib/format';
-import Tone, { TitleText, toneOfStory, toneRowClass } from './Tone';
+import Tone, { TitleText, storyCounts, toneOfStory, toneRowClass } from './Tone';
 
 /** 묶음에서 요약이 있는 기사 (대표 → 나머지 순) */
 function summarized(story) {
@@ -62,7 +62,7 @@ function StoryCard({ story, rank, quotes, big }) {
       <span className="story-rank num" aria-label={`오늘 기사가 ${rank}번째로 많은 소식`}>
         {rank}
       </span>
-      <Tone tone={tone} />
+      <Tone tone={tone} counts={storyCounts(story)} />
       <Link to={`/news/${(s || a).id}`} className="story-headline">
         <TitleText text={a.title} />
       </Link>
