@@ -611,7 +611,6 @@ mark {
 /* ---------- 카드·구역 ---------- */
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
   padding: 20px;
@@ -3275,7 +3274,7 @@ a.feed-title:hover {
   width: 48px;
 }
 
-/* ===== v3 정체성: 뉴스 제목·섹션 제목은 명조, 근거·핵심은 형광펜 (tokens.css 설명 참고) ===== */
+/* ===== v3 제목·강조 (명조는 되돌림: --font-serif = Pretendard) ===== */
 .page-title,
 .section-title,
 .card-title,
@@ -3301,19 +3300,15 @@ a.feed-title:hover {
   font-weight: 700;
 }
 
-/* 형광펜: 글자 아래쪽 절반만 칠해서 실제로 그은 줄처럼 */
+/* 핵심 문장 은은한 밑칠 (v3 형광펜 → 강조색 옅은 바탕) */
 .mark {
-  background: linear-gradient(transparent 52%, var(--mark-soft) 52%, var(--mark-soft) 92%, transparent 92%);
+  background: linear-gradient(transparent 55%, var(--mark-soft) 55%);
   color: inherit;
   padding: 0 1px;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 
-.brand-mark {
-  border-radius: 6px;
-  background: var(--accent);
-}
 
 /* ===== v3 홈 1면: 오늘의 핵심 소식 (머리기사 1 + 오른쪽 단 3) ===== */
 .front-page {
@@ -3333,8 +3328,8 @@ a.feed-title:hover {
 .story-card {
   position: relative;
   background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   padding: 18px 20px 16px 56px;
   min-width: 0;
 }
