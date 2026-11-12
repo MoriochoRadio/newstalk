@@ -366,3 +366,77 @@
     --mark-soft: rgba(240, 138, 69, 0.2);
   }
 }
+
+/* ===== 완성 시안 비교 2차 (11/12 저녁): 파랑은 지키고 '모양'까지 바꿔 봄 =====
+   토스 느낌 = 파랑 + 푸른 회색 + 크게 둥근 카드 + 부드러운 그림자 + 넓은 여백의 '조합' → 조합을 바꿈
+   <html data-variant="e" data-shape="sharp|soft|flat" data-nav="ink"> (VariantSwitch 가 시안별로 정함) */
+
+/* 기본(토스 원본) 값 — 아래 모양 토큰을 쓰는 곳이 바뀌지 않게 */
+:root {
+  --card-border: 0 solid transparent;
+}
+
+/* E 밝은 화면: 토스의 푸른 회색 대신 중립 회색 (글자 대비: text-2 7.7 · text-3 4.8 — 흰 카드 기준) */
+:root[data-variant='e'] {
+  --bg: #f4f4f5;
+  --surface-2: #fafafa;
+  --surface-3: #f4f4f5;
+  --surface-hover: #f4f4f5;
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+  --text: #18181b;
+  --text-2: #52525b;
+  --text-3: #71717a;
+  --skeleton-a: #ececee;
+  --skeleton-b: #f6f6f7;
+  --heat-flat: #ececee;
+  --heat-none: #f0f0f2;
+}
+
+/* 모양: 단단한 금융 단말기 — 덜 둥글게, 그림자 대신 1px 선 */
+:root[data-shape='sharp'] {
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --shadow-card: none;
+  --card-border: 1px solid var(--line);
+}
+
+/* 모양: 부드럽지만 덜 둥글게 (토스 18px → 12px) */
+:root[data-shape='soft'] {
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 14px;
+}
+
+/* 모양: 지면형 — 바탕과 카드가 같은 색, 칸은 선으로만 나눔 (뉴스 지면처럼) */
+:root[data-shape='flat'] {
+  --radius-sm: 4px;
+  --radius: 4px;
+  --radius-lg: 6px;
+  --shadow-card: none;
+  --card-border: 1px solid var(--line);
+  --bg: var(--surface);
+}
+
+/* 사이드바: 남색 (밝은 화면에서도 왼쪽 메뉴만 어둡게 — 업무용 단말기 느낌). 글자 대비 9:1 · 보조 5.4:1 */
+:root[data-nav='ink'] {
+  --nav-bg: #0f1d36;
+  --nav-border: #0f1d36;
+  --nav-text: #b9c4d6;
+  --nav-text-strong: #ffffff;
+  --nav-text-3: #8a97ad;
+  --nav-hover: rgba(255, 255, 255, 0.07);
+  --nav-active-bg: rgba(74, 144, 247, 0.24);
+  --nav-active-text: #ffffff;
+}
+:root[data-nav='ink'][data-theme='dark'] {
+  --nav-bg: #0b0b0c;
+  --nav-border: #232325;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-nav='ink']:not([data-theme='light']) {
+    --nav-bg: #0b0b0c;
+    --nav-border: #232325;
+  }
+}

@@ -484,6 +484,7 @@ svg {
   border-radius: var(--radius-pill);
   background: var(--surface);
   box-shadow: var(--shadow-card);
+  border: var(--card-border);
   color: var(--text-3);
 }
 
@@ -613,6 +614,7 @@ mark {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
+  border: var(--card-border);
   padding: 20px;
   min-width: 0;
 }
@@ -1789,6 +1791,7 @@ a.feed-title:hover {
   border-radius: var(--radius-pill);
   background: var(--surface);
   box-shadow: var(--shadow-card);
+  border: var(--card-border);
   font-weight: 600;
   max-width: 180px;
 }
@@ -2120,6 +2123,7 @@ a.feed-title:hover {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
+  border: var(--card-border);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
   animation: rise 0.35s ease both;
 }
@@ -3333,6 +3337,7 @@ a.feed-title:hover {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
+  border: var(--card-border);
   padding: 18px 20px 16px 56px;
   min-width: 0;
 }
@@ -3622,4 +3627,26 @@ a.topic-example:hover {
     left: 8px;
     overflow-x: auto;
   }
+}
+
+/* ===== 시안: 사이드바 색 토큰 (없으면 지금 값) ===== */
+.sidenav {
+  background: var(--nav-bg, var(--surface));
+  border-right-color: var(--nav-border, var(--line));
+  color: var(--nav-text-strong, var(--text));
+}
+.sidenav .nav-link {
+  color: var(--nav-text, var(--text-2));
+}
+.sidenav .nav-link:hover {
+  background: var(--nav-hover, var(--surface-hover));
+  color: var(--nav-text-strong, var(--text));
+}
+.sidenav .nav-link.active {
+  background: var(--nav-active-bg, var(--accent-soft));
+  color: var(--nav-active-text, var(--accent-text));
+}
+.sidenav .brand-sub,
+.sidenav .nav-foot .muted {
+  color: var(--nav-text-3, var(--text-3));
 }
