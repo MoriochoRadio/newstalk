@@ -239,3 +239,78 @@
     --fs-3xl: 26px;
   }
 }
+
+/* ===== 시안 비교 (11/12, "토스 같다" 피드백): 강조색 하나 + 어두운 화면 바탕 톤만 바꿈. 나머지는 v2 그대로 =====
+   A = 지금(토스 파랑 + 푸른 검정) · B = 잉크 네이비 + 중립 회색 · C = 청록(틸) + 중립 회색 · D = 뉴스 주황 + 중립 회색
+   <html data-variant="b|c|d"> (없으면 A). 글자색(accent-text)은 바탕 대비 4.5:1 이상으로 고름 */
+:root[data-variant='b'] {
+  --accent: #23466e;
+  --accent-strong: #1b3858;
+  --accent-soft: #e8eef6;
+  --accent-text: #23466e;
+  --bar-news: #23466e;
+  --mark-soft: #e8eef6;
+}
+:root[data-variant='c'] {
+  --accent: #0f8a7e;
+  --accent-strong: #0b6b62;
+  --accent-soft: #e2f4f1;
+  --accent-text: #0b6b62;
+  --bar-news: #0f8a7e;
+  --mark-soft: #dcf2ee;
+}
+:root[data-variant='d'] {
+  --accent: #d9590f;
+  --accent-strong: #b8470a;
+  --accent-soft: #fdeee3;
+  --accent-text: #b04408;
+  --bar-news: #d9590f;
+  --mark-soft: #fde9da;
+}
+
+/* 어두운 화면: B·C·D 는 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
+:root[data-variant='b'][data-theme='dark'],
+:root[data-variant='c'][data-theme='dark'],
+:root[data-variant='d'][data-theme='dark'] {
+  --bg: #121212;
+  --surface: #1c1c1c;
+  --surface-2: #222222;
+  --surface-3: #2a2a2a;
+  --surface-hover: #262626;
+  --line: #2f2f2f;
+  --line-strong: #3d3d3d;
+  --text: #ededed;
+  --text-2: #c4c4c4;
+  --text-3: #a0a0a0;
+  --skeleton-a: #262626;
+  --skeleton-b: #2e2e2e;
+  --heat-flat: #2c2c2c;
+  --heat-none: #262626;
+}
+:root[data-variant='b'][data-theme='dark'] {
+  --text-on-accent: #0d1a2a; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
+  --accent: #7ea6d8;
+  --accent-strong: #3f6aa3;
+  --accent-soft: rgba(126, 166, 216, 0.15);
+  --accent-text: #9dbde6;
+  --bar-news: #7ea6d8;
+  --mark-soft: rgba(126, 166, 216, 0.2);
+}
+:root[data-variant='c'][data-theme='dark'] {
+  --text-on-accent: #062421; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
+  --accent: #2cc1b0;
+  --accent-strong: #138a7e;
+  --accent-soft: rgba(44, 193, 176, 0.15);
+  --accent-text: #5fd6c8;
+  --bar-news: #2cc1b0;
+  --mark-soft: rgba(44, 193, 176, 0.2);
+}
+:root[data-variant='d'][data-theme='dark'] {
+  --text-on-accent: #2a1205; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
+  --accent: #f08a45;
+  --accent-strong: #c25a14;
+  --accent-soft: rgba(240, 138, 69, 0.15);
+  --accent-text: #f6a56d;
+  --bar-news: #f08a45;
+  --mark-soft: rgba(240, 138, 69, 0.2);
+}

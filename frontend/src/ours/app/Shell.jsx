@@ -7,6 +7,7 @@ import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import SearchBox from '../components/SearchBox';
 import AuthModal from '../components/AuthModal';
+import VariantSwitch from '../components/VariantSwitch';
 
 const NAV = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -131,6 +132,7 @@ export default function Shell() {
 
   return (
     <div className="shell">
+      <VariantSwitch />
       <a href="#main" className="skip-link">
         본문으로 건너뛰기
       </a>

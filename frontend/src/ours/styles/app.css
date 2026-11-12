@@ -3576,3 +3576,47 @@ a.story-headline:hover {
 .page-foot-note {
   margin-top: 18px;
 }
+
+/* 시안 비교 버튼 (실험 브랜치 전용) */
+.variant-switch {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-sm);
+}
+
+.variant-switch > span {
+  padding: 0 8px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.variant-switch button {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.variant-switch button.on {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+@media (max-width: 768px) {
+  .variant-switch {
+    bottom: 76px;
+    right: 8px;
+    left: 8px;
+    overflow-x: auto;
+  }
+}

@@ -12,7 +12,7 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { dirClass, fmtPrice, fmtRate, hasBatchim, todayLabel } from '../lib/format';
+import { dirClass, fmtPrice, fmtRate, todayLabel } from '../lib/format';
 import { hourlyCounts, loadTodayFeed, pickWhy } from '../lib/todayFeed';
 import { stockDigest } from '../lib/digest';
 import { buzzOf } from '../lib/buzz';
@@ -60,15 +60,16 @@ function usePerStock(codes, fetcher, tag) {
 function storyLine(story) {
   if (!story) return '';
   const size = story.size || 1;
-  return size >= 2 ? `가장 많이 다뤄진 소식은 언론 ${size}곳이 쓴 “${story.lead.title}”이에요.` : '';
+  // 순위 기준이 둘이라 헷갈리지 않게 (11/12 사용자: "가장 많이 다뤄진 소식은 코스맥스인데 이슈 종목은 NAVER 1등?")
+  // 1면 = 한 소식을 몇 곳이 썼나 / 화제 종목 = 그 종목 기사 전부(여러 소식 합계)
+  return size >= 2 ? `가장 많은 언론이 함께 다룬 소식은 “${story.lead.title}”(언론 ${size}곳)이에요.` : '';
 }
 
 function headline(issues, quotes) {
   if (!issues.length) return '';
   const top = issues[0];
   const q = quotes[top.stockCode];
-  const tail = hasBatchim(top.stockName) ? '이에요' : '예요';
-  const first = `오늘 뉴스가 가장 많이 나온 종목은 ${top.stockName}(${top.articleCount}건${q ? `, ${fmtRate(q.changeRate)}` : ''})${tail}.`;
+  const first = `종목으로는 ${top.stockName}에 대한 기사가 가장 많아요(여러 소식 합계 ${top.articleCount}건${q ? `, ${fmtRate(q.changeRate)}` : ''}).`;
   const rated = issues.map((i) => quotes[i.stockCode]).filter((x) => x && x.changeRate != null);
   if (rated.length < issues.length) return first;
   const up = rated.filter((x) => x.changeRate > 0).length;
@@ -372,7 +373,9 @@ export default function HomePage() {
           <p className="eyebrow num">{todayLabel()}</p>
           <h1 className="page-title">오늘의 뉴스 브리핑</h1>
           {topStories.length ? (
-            <p className="lead">{storyLine(topStories[0]) || lead}</p>
+            <p className="lead">
+              {storyLine(topStories[0])} {lead}
+            </p>
           ) : feed.loading ? (
             <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} />
           ) : null}
@@ -395,7 +398,7 @@ export default function HomePage() {
 
       <div className="section-head">
         <h2 className="section-title">오늘 화제 종목</h2>
-        {lead && <p className="section-sub">{lead}</p>}
+        <p className="section-sub">종목마다 오늘 나온 기사를 모두 센 순서예요 (여러 소식의 합계).</p>
       </div>
       <BriefSection issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} buzz={buzz} feed={feed} />
       <WatchBrief quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} feed={feed} />

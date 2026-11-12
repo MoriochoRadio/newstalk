@@ -93,7 +93,7 @@ export default function TopStories({ stories, quotes }) {
   return (
     <section className="front-page" aria-labelledby="front-title">
       <h2 className="sr-only" id="front-title">
-        오늘의 핵심 소식
+        오늘의 핵심 소식 (한 소식을 함께 다룬 언론이 많은 순)
       </h2>
       <StoryCard story={lead} rank={1} quotes={quotes} big />
       <div className="front-side">
