@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { CandlestickSeries, HistogramSeries, LineSeries, createChart } from 'lightweight-charts';
 import { quoteApi } from '../../api';
 import { errorText } from '../lib/errors';
+import { fmtRate } from '../lib/format';
 import { Segmented } from './ui';
 
 // 기간 버튼: 봉 단위는 기간에서 정함 (bars = 처음 보여 줄 봉 수, 거래일 기준). 오늘 = 5분봉, 5년 = 주봉
@@ -417,6 +418,14 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   const bar = idx >= 0 ? rows[idx] : null;
   const prev = idx > 0 ? rows[idx - 1] : null;
   const diffRate = bar && prev && prev.close ? ((bar.close - prev.close) / prev.close) * 100 : null;
+  // 화면 낭독용 한 줄 (11/12 접근성 점검: 차트 값이 마우스·터치로만 보였음) — 고른 기간의 첫 봉과 마지막 봉 종가
+  const span = range.bars ? rows.slice(-range.bars) : rows;
+  const first = span[0];
+  const last = span[span.length - 1];
+  const chartLabel =
+    first && last && first.close
+      ? `${stockName} 주가 차트, ${range.label}. 마지막 종가 ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(Math.max(...span.map((r) => r.high)))}원, 최저 ${fmt(Math.min(...span.map((r) => r.low)))}원`
+      : `${stockName} 주가 차트`;
   const maAt = (n) => {
     if (!hasMa(unit) || idx < n - 1) return null;
     let s = 0;
@@ -509,7 +518,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       )}
 
       <div className="chart-box">
-        <div ref={boxRef} className="chart-canvas" role="img" aria-label={`${stockName} 주가 차트`} />
+        <div ref={boxRef} className="chart-canvas" role="img" aria-label={chartLabel} />
         {loading && (
           <div className="chart-skeleton" role="status">
             <span className="sr-only">차트를 받는 중…</span>

@@ -74,6 +74,33 @@ function useFilteredFeed({ tab, q, period, sort }) {
   return { ...state, fresh: state.key === key, loadMore: () => load(false) };
 }
 
+/**
+ * 새 소식 알림 (참고 조사 상위 5개 중 하나, 11/12): 목록 맨 위를 보고 있을 때 1분마다 첫 페이지를 다시 받아
+ * 지금 보이는 맨 위 글보다 새로 나온 글 수를 셈. 목록을 저절로 밀어 넣지 않고(읽던 자리가 흔들리지 않게) 버튼으로 알림
+ * 조건: 전체 탭·최신순·1페이지·검색어 없음, 화면이 보일 때만 (숨겨진 탭에서는 요청 안 함)
+ */
+const NEW_POLL_MS = 60000;
+function useNewArrivals(enabled, topIso, period) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    setCount(0);
+    if (!enabled || !topIso) return undefined;
+    const top = new Date(topIso).getTime();
+    const check = async () => {
+      if (document.hidden) return;
+      try {
+        const res = await articleApi.list({ period: period || undefined, sort: 'latest', page: 1, size: PAGE_SIZE });
+        setCount((res?.items || []).filter((x) => new Date(x.publishedAt).getTime() > top).length);
+      } catch {
+        /* 알림용이라 실패는 조용히 넘김 (다음 차례에 다시) */
+      }
+    };
+    const id = setInterval(check, NEW_POLL_MS);
+    return () => clearInterval(id);
+  }, [enabled, topIso, period]);
+  return [count, () => setCount(0)];
+}
+
 export default function NewsPage() {
   useTitle('뉴스·공시');
   const [params, setParams] = useSearchParams();
@@ -105,6 +132,13 @@ export default function NewsPage() {
   const loading = isAll ? all.loading : filtered.loading || !filtered.fresh;
   const error = isAll ? all.error : filtered.error;
   const total = all.data?.totalCount ?? 0;
+
+  const [newCount, clearNew] = useNewArrivals(isAll && page === 1 && sort === 'latest' && !q, items[0]?.publishedAtIso, period);
+  const showNew = () => {
+    clearNew();
+    all.reload();
+    window.scrollTo({ top: 0 });
+  };
 
   const goPage = (n) => {
     update({ page: n > 1 ? String(n) : '' });
@@ -164,6 +198,14 @@ export default function NewsPage() {
           </div>
         </div>
 
+        {/* 새 소식 알림: 버튼이 나타날 때 낭독기에 한 번 알림 (aria-live), 누르면 목록을 새로 받음 */}
+        <div aria-live="polite" className="new-arrivals-slot">
+          {newCount > 0 && (
+            <button type="button" className="new-arrivals" onClick={showNew}>
+              <span className="new-dot" aria-hidden="true" />새 소식 {newCount >= PAGE_SIZE ? `${PAGE_SIZE}개 이상` : `${newCount}개`} 보기
+            </button>
+          )}
+        </div>
         {error && <ErrorBox error={error} onRetry={isAll ? all.reload : filtered.loadMore} />}
         {loading && items.length === 0 && <SkeletonRows rows={6} />}
         {!loading && !error && items.length === 0 && !isAll && !filtered.done && (

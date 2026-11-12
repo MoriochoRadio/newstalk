@@ -144,7 +144,7 @@ function useNavCollapsed() {
 
 export default function Shell() {
   const { dark, toggle } = useTheme();
-  const { toasts } = useSession();
+  const { toasts, dismissToast } = useSession();
   const location = useLocation();
   const navType = useNavigationType();
   const [mobileSearch, setMobileSearch] = useState(false);
@@ -263,7 +263,19 @@ export default function Shell() {
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.tone === 'error' ? 'error' : ''}`} role={t.tone === 'error' ? 'alert' : undefined}>
-            {t.message}
+            <span className="toast-msg">{t.message}</span>
+            {t.action && (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => {
+                  dismissToast(t.id);
+                  t.action.run();
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

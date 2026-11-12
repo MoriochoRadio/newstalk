@@ -1,5 +1,5 @@
 // 관심 종목: 표(종목·현재가·등락·오늘 기사·최근 기사·빼기) + 종목 담기 + 관심 종목 소식(서버 페이지)
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LogIn, Star, X } from 'lucide-react';
 import { watchlistApi } from '../../api';
@@ -51,6 +51,15 @@ export default function WatchlistPage() {
   useTitle('관심 종목');
   const { user, checking, openAuth, watchlist, watchCodes, toggleWatch, reloadWatchlist } = useSession();
   const items = watchlist.items;
+  const titleRef = useRef(null);
+  // 빼기 뒤 포커스: 줄이 사라져도 맨 위로 떨어지지 않게 다음 줄(없으면 앞 줄, 그것도 없으면 제목)의 빼기 버튼으로 (11/12 점검)
+  const removeAt = async (i) => {
+    const next = items[i + 1] || items[i - 1];
+    await toggleWatch(items[i].stockCode, items[i].stockName);
+    const btn = next && document.querySelector(`[data-remove="${next.stockCode}"]`);
+    if (btn) btn.focus();
+    else titleRef.current?.focus();
+  };
   const { quotes, loading: quoteLoading, disabled } = useQuotes(items.map((w) => w.stockCode));
 
   if (checking) {
@@ -87,7 +96,9 @@ export default function WatchlistPage() {
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">관심 종목</h1>
+          <h1 className="page-title" ref={titleRef} tabIndex={-1}>
+            관심 종목
+          </h1>
           <p className="page-sub num">{items.length}개 종목</p>
         </div>
       </div>
@@ -129,7 +140,7 @@ export default function WatchlistPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((w) => {
+                {items.map((w, i) => {
                   const q = quotes[w.stockCode];
                   return (
                     <tr key={w.stockCode}>
@@ -161,7 +172,7 @@ export default function WatchlistPage() {
                       <td className="r">{w.todayArticleCount}건</td>
                       <td className="r hide-mobile muted">{w.lastMatchedAt ? relativeTime(w.lastMatchedAt) : '없음'}</td>
                       <td className="r">
-                        <button type="button" className="icon-btn" aria-label={`${w.stockName} 관심 종목에서 빼기`} title="관심 종목에서 빼기" onClick={() => toggleWatch(w.stockCode, w.stockName)}>
+                        <button type="button" className="icon-btn" aria-label={`${w.stockName} 관심 종목에서 빼기`} title="관심 종목에서 빼기" data-remove={w.stockCode} onClick={() => removeAt(i)}>
                           <X className="icon-sm" aria-hidden="true" />
                         </button>
                       </td>

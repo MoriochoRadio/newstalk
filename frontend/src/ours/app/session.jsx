@@ -15,12 +15,14 @@ export function SessionProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const toastId = useRef(0);
 
-  const toast = useCallback((message, tone = 'info') => {
+  // action: { label, run } — 알림 안의 버튼 (예: 되돌리기). 버튼이 있으면 누를 시간을 주려고 더 오래 보임
+  const toast = useCallback((message, tone = 'info', action = null) => {
     toastId.current += 1;
     const id = toastId.current;
-    setToasts((list) => [...list.slice(-2), { id, message, tone }]);
-    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), tone === 'error' ? 5000 : 3000);
+    setToasts((list) => [...list.slice(-2), { id, message, tone, action }]);
+    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), action ? 7000 : tone === 'error' ? 5000 : 3000);
   }, []);
+  const dismissToast = useCallback((id) => setToasts((list) => list.filter((t) => t.id !== id)), []);
 
   const loadWatchlist = useCallback(async () => {
     try {
@@ -100,7 +102,24 @@ export function SessionProvider({ children }) {
         if (has) await watchlistApi.remove(stockCode);
         else await watchlistApi.add(stockCode);
         await loadWatchlist();
-        toast(has ? `관심 종목에서 뺐어요 · ${stockName || stockCode}` : `관심 종목에 담았어요 · ${stockName || stockCode}`);
+        const name = stockName || stockCode;
+        if (has) {
+          // 뺀 뒤 되돌리기 (11/12 코드 점검: 누르면 바로 지워지고 되돌릴 방법이 없었음)
+          toast(`관심 종목에서 뺐어요 · ${name}`, 'info', {
+            label: '되돌리기',
+            run: async () => {
+              try {
+                await watchlistApi.add(stockCode);
+                await loadWatchlist();
+                toast(`다시 담았어요 · ${name}`);
+              } catch (err) {
+                if (!handleAuthError(err)) toast(errorText(err), 'error');
+              }
+            },
+          });
+        } else {
+          toast(`관심 종목에 담았어요 · ${name}`);
+        }
       } catch (err) {
         if (!handleAuthError(err)) toast(errorText(err), 'error');
       }
@@ -126,8 +145,9 @@ export function SessionProvider({ children }) {
       toggleWatch,
       toast,
       toasts,
+      dismissToast,
     }),
-    [user, checking, login, signup, logout, authModal, requireLogin, handleAuthError, watchlist, watchCodes, loadWatchlist, toggleWatch, toast, toasts]
+    [user, checking, login, signup, logout, authModal, requireLogin, handleAuthError, watchlist, watchCodes, loadWatchlist, toggleWatch, toast, toasts, dismissToast]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

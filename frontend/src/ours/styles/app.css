@@ -3959,3 +3959,59 @@ html {
   justify-content: center;
   padding: 0;
 }
+
+/* 알림 안 버튼 (되돌리기) */
+.toast-msg {
+  flex: 1;
+  min-width: 0;
+}
+.toast-action {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.toast-action:hover {
+  background: rgba(127, 127, 127, 0.2);
+}
+
+/* 새 소식 알림 버튼 (뉴스·공시 목록 위, 11/12). 목록 위에 붙어 따라오고, 누르면 새로 받음 */
+.new-arrivals-slot {
+  position: sticky;
+  top: 72px;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  overflow: visible;
+}
+.new-arrivals {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-pop);
+}
+.new-arrivals:hover {
+  background: var(--accent);
+}
+.new-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .new-arrivals {
+    animation: rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
