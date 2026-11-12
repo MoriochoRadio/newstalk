@@ -316,3 +316,53 @@
   --bar-news: #f08a45;
   --mark-soft: rgba(240, 138, 69, 0.2);
 }
+
+@media (prefers-color-scheme: dark) {
+  /* (운영체제 다크 설정을 따를 때도 같은 값) B·C·D·E 는 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
+  :root[data-variant='e']:not([data-theme='light']),
+  :root[data-variant='b']:not([data-theme='light']),
+  :root[data-variant='c']:not([data-theme='light']),
+  :root[data-variant='d']:not([data-theme='light']) {
+    --bg: #121212;
+    --surface: #1c1c1c;
+    --surface-2: #222222;
+    --surface-3: #2a2a2a;
+    --surface-hover: #262626;
+    --line: #2f2f2f;
+    --line-strong: #3d3d3d;
+    --text: #ededed;
+    --text-2: #c4c4c4;
+    --text-3: #a0a0a0;
+    --skeleton-a: #262626;
+    --skeleton-b: #2e2e2e;
+    --heat-flat: #2c2c2c;
+    --heat-none: #262626;
+  }
+  :root[data-variant='b']:not([data-theme='light']) {
+    --text-on-accent: #0d1a2a; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
+    --accent: #7ea6d8;
+    --accent-strong: #3f6aa3;
+    --accent-soft: rgba(126, 166, 216, 0.15);
+    --accent-text: #9dbde6;
+    --bar-news: #7ea6d8;
+    --mark-soft: rgba(126, 166, 216, 0.2);
+  }
+  :root[data-variant='c']:not([data-theme='light']) {
+    --text-on-accent: #062421; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
+    --accent: #2cc1b0;
+    --accent-strong: #138a7e;
+    --accent-soft: rgba(44, 193, 176, 0.15);
+    --accent-text: #5fd6c8;
+    --bar-news: #2cc1b0;
+    --mark-soft: rgba(44, 193, 176, 0.2);
+  }
+  :root[data-variant='d']:not([data-theme='light']) {
+    --text-on-accent: #2a1205; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
+    --accent: #f08a45;
+    --accent-strong: #c25a14;
+    --accent-soft: rgba(240, 138, 69, 0.15);
+    --accent-text: #f6a56d;
+    --bar-news: #f08a45;
+    --mark-soft: rgba(240, 138, 69, 0.2);
+  }
+}
