@@ -1,4 +1,4 @@
-"""1단계 (15번): 언론사 7곳의 RSS 11개에서 기사 목록 받기. 실행: python -m hk_llm.steps.step1_rss (ai 폴더에서) → 피드별 건수와 예시 출력
+"""1단계 (15번): 언론사 12곳의 RSS 16개에서 기사 목록 받기. 실행: python -m hk_llm.steps.step1_rss (ai 폴더에서) → 피드별 건수와 예시 출력
 
 돌려주는 값: Article 목록 (models.py)
 중복 제거(16번)·DB 저장(18번)은 여기서 하지 않는다.
@@ -29,8 +29,15 @@ FEEDS = {
     "전자신문": ["https://rss.etnews.com/02.xml"],
     "연합인포맥스": ["https://news.einfomax.co.kr/rss/allArticle.xml"],
     "비즈워치": ["https://news.bizwatch.co.kr/rss"],
+    # 2026-11-12 추가: 기사 끝 고지·규약 모두 AI·크롤링 금지 없음 (아주경제는 규약이 자동화 도구를 불허해 뺌)
+    "블로터": ["https://cdn.bloter.net/rss/gns_allArticle.xml"],
+    "시사저널e": ["https://cdn.sisajournal-e.com/rss/gns_allArticle.xml"],  # 조사표 ai/docs/조사/언론사_약관_조사_1112.md
+    "인사이트코리아": ["https://cdn.insightkorea.co.kr/rss/gn_rss_allArticle.xml"],
+    "헤럴드경제": ["https://biz.heraldcorp.com/rss/google/finance"],  # 조사표 언론사_추가_조사_1112.md
+    "뉴시스": ["https://www.newsis.com/RSS/economy.xml"],
 }
-DC = "{http://purl.org/dc/elements/1.1/}"  # 연합뉴스 기자명은 <dc:creator>
+DC = "{http://purl.org/dc/elements/1.1/}"
+HANGUL = re.compile(r"[가-힣]")  # 제목에 한글이 한 글자도 없으면 외국어판  # 연합뉴스 기자명은 <dc:creator>
 
 log = get_logger(__name__)
 
@@ -67,6 +74,8 @@ def parse(xml, press, now=None):
     for it in ET.fromstring(xml).iter("item"):
         url, title = _text(it, "link"), _text(it, "title")
         if not url or not title:
+            continue
+        if not HANGUL.search(title):  # 외국어판 기사(인사이트코리아 중국어판 등)는 종목 사전·요약이 한국어라 뺌 (11/12 QA)
             continue
         items.append(Article(
             url=url,
