@@ -5,7 +5,8 @@ import { errorText } from '../lib/errors';
 
 export function SkeletonRows({ rows = 4, compact = false }) {
   return (
-    <div role="status" aria-label="불러오는 중">
+    <div role="status">
+      <span className="sr-only">불러오는 중…</span>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} style={{ padding: compact ? '10px 0' : '14px 0' }}>
           <div className="skeleton sk-title" style={{ width: `${72 - (i % 3) * 12}%` }} />

@@ -37,7 +37,7 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
 
   return (
     <article className={`brief ${compact ? 'brief-compact' : ''}`}>
-      <Link to={`/stocks/${code}`} className="brief-head" aria-label={`${name} 종목 화면으로`}>
+      <Link to={`/stocks/${code}`} className="brief-head">
         {rank != null && <span className="brief-rank num">{rank}</span>}
         <span className="brief-name">{name}</span>
         <span className="brief-price num">
@@ -66,7 +66,8 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
           </>
         ) : text ? (
           <p className="brief-summary">
-            <Sparkles className="icon-sm brief-ai" aria-label="AI 요약" />
+            <Sparkles className="icon-sm brief-ai" aria-hidden="true" />
+            <span className="sr-only">AI 요약: </span>
             {text}
           </p>
         ) : digest?.headlines?.length ? (

@@ -1,6 +1,6 @@
 // 앱 틀: 데스크톱은 왼쪽 메뉴 + 위 검색줄, 휴대폰(768 이하)은 위 작은 줄 + 아래 탭 4개
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, Search, Star, Sun, User, X } from 'lucide-react';
 import { useSession } from './session';
@@ -8,6 +8,7 @@ import LivePill from '../components/LivePill';
 import SearchBox from '../components/SearchBox';
 import AuthModal from '../components/AuthModal';
 import VariantSwitch from '../components/VariantSwitch';
+import { useFocusTrap } from '../lib/focusTrap';
 
 const NAV = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -82,7 +83,7 @@ function UserMenu() {
   }
   return (
     <div className="menu" ref={ref}>
-      <button type="button" className="user-chip" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="user-chip" aria-expanded={open} aria-controls="user-menu" onClick={() => setOpen((o) => !o)}>
         <span className="avatar" aria-hidden="true">
           <User className="icon-sm" />
         </span>
@@ -90,16 +91,16 @@ function UserMenu() {
         <span className="sr-only">계정 메뉴</span>
       </button>
       {open && (
-        <div className="menu-pop" role="menu">
+        // 펼치기 버튼 + 보통 링크·버튼 (화살표 키 이동이 없는데 menu 역할을 붙이면 낭독기가 메뉴 조작을 안내해서 혼란 — 11/12 점검)
+        <div className="menu-pop" id="user-menu">
           <p className="menu-who">{user.loginId}님</p>
-          <Link to="/watchlist" className="menu-item" role="menuitem" onClick={() => setOpen(false)}>
+          <Link to="/watchlist" className="menu-item" onClick={() => setOpen(false)}>
             <Star className="icon-sm" aria-hidden="true" />
             관심 종목
           </Link>
           <button
             type="button"
             className="menu-item"
-            role="menuitem"
             onClick={() => {
               setOpen(false);
               logout();
@@ -120,6 +121,9 @@ export default function Shell() {
   const location = useLocation();
   const navType = useNavigationType();
   const [mobileSearch, setMobileSearch] = useState(false);
+  const mobileSearchRef = useRef(null);
+  const closeMobileSearch = useCallback(() => setMobileSearch(false), []);
+  useFocusTrap(mobileSearchRef, mobileSearch, closeMobileSearch); // Esc 로 닫기 + Tab 가두기 (11/12 코드 점검)
 
   // 새 화면은 맨 위부터 (뒤로 가기는 브라우저가 기억한 위치)
   useEffect(() => {
@@ -185,7 +189,7 @@ export default function Shell() {
         </header>
 
         {mobileSearch && (
-          <div className="mobile-search" role="dialog" aria-modal="true" aria-label="검색">
+          <div className="mobile-search" ref={mobileSearchRef} role="dialog" aria-modal="true" aria-label="검색">
             <div className="mobile-search-head">
               <SearchBox autoFocus onDone={() => setMobileSearch(false)} placeholder="종목·뉴스 검색" />
               <button type="button" className="icon-btn" aria-label="검색 닫기" onClick={() => setMobileSearch(false)}>
@@ -216,9 +220,10 @@ export default function Shell() {
       </nav>
 
       <AuthModal />
+      {/* 알림 상자 하나만 '조용히 읽기', 오류만 alert (안에 status 를 또 두면 두 번 읽힘 — 11/12 점검) */}
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.tone === 'error' ? 'error' : ''}`} role={t.tone === 'error' ? 'alert' : 'status'}>
+          <div key={t.id} className={`toast ${t.tone === 'error' ? 'error' : ''}`} role={t.tone === 'error' ? 'alert' : undefined}>
             {t.message}
           </div>
         ))}

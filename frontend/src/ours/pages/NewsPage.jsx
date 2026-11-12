@@ -83,6 +83,7 @@ export default function NewsPage() {
   const sort = params.get('sort') === 'relevance' ? 'relevance' : 'latest';
   const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
   const [draft, setDraft] = useState(q);
+  const qRef = useRef(null);
   useEffect(() => setDraft(q), [q]);
 
   const update = (next) => {
@@ -132,7 +133,9 @@ export default function NewsPage() {
           >
             <Search className="icon-sm" aria-hidden="true" />
             <input
+              ref={qRef}
               type="search"
+              autoComplete="off"
               aria-label="제목·요약에서 찾기"
               placeholder="제목·요약·키워드에서 찾기"
               value={draft}
@@ -140,7 +143,10 @@ export default function NewsPage() {
               onChange={(e) => setDraft(e.target.value)}
             />
             {q && (
-              <button type="button" className="icon-btn" style={{ width: 28, height: 28 }} aria-label="검색어 지우기" onClick={() => update({ q: '' })}>
+              <button type="button" className="icon-btn" style={{ width: 28, height: 28 }} aria-label="검색어 지우기" onClick={() => {
+                update({ q: '' });
+                qRef.current?.focus();
+              }}>
                 <X className="icon-sm" aria-hidden="true" />
               </button>
             )}

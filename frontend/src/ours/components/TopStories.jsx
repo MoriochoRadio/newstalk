@@ -20,7 +20,7 @@ function StoryStocks({ article, quotes }) {
       {stocks.map((s) => {
         const q = quotes?.[s.code];
         return (
-          <Link key={s.code} to={`/stocks/${s.code}`} className="story-stock" aria-label={`${s.name} 종목 보기`}>
+          <Link key={s.code} to={`/stocks/${s.code}`} className="story-stock">
             <span className="name">{s.name}</span>
             {q && q.changeRate != null && <span className={`num ${dirClass(q.changeRate)}`}>{fmtRate(q.changeRate)}</span>}
           </Link>
@@ -59,8 +59,10 @@ function StoryCard({ story, rank, quotes, big }) {
   const tone = toneOfStory(story);
   return (
     <article className={`story-card ${big ? 'story-big' : ''} ${toneRowClass(tone)}`}>
-      <span className="story-rank num" aria-label={`오늘 기사가 ${rank}번째로 많은 소식`}>
+      <span className="story-rank num">
+        <span className="sr-only">오늘 기사가 많은 소식 </span>
         {rank}
+        <span className="sr-only">위</span>
       </span>
       <Tone tone={tone} counts={storyCounts(story)} />
       <Link to={`/news/${(s || a).id}`} className="story-headline">

@@ -511,7 +511,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       <div className="chart-box">
         <div ref={boxRef} className="chart-canvas" role="img" aria-label={`${stockName} 주가 차트`} />
         {loading && (
-          <div className="chart-skeleton" role="status" aria-label="차트를 받는 중">
+          <div className="chart-skeleton" role="status">
+            <span className="sr-only">차트를 받는 중…</span>
             {[38, 52, 46, 64, 58, 72, 66, 80, 74, 62, 70, 84, 78, 90, 82, 68, 76, 88, 72, 60].map((h, i) => (
               <div key={i} className="skeleton" style={{ height: `${h}%` }} />
             ))}

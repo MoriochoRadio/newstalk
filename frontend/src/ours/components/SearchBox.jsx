@@ -26,7 +26,7 @@ function Highlight({ text, q }) {
 
 export default function SearchBox({
   mode = 'all',
-  placeholder = '종목·뉴스 검색 (예: 삼전, 005930, 반도체)',
+  placeholder = '종목·뉴스 검색 (예: 삼전, 005930, 반도체)…',
   onPick,
   autoFocus = false,
   onDone,
@@ -41,6 +41,7 @@ export default function SearchBox({
   const [res, setRes] = useState({ q: '', stocks: [], stockTotal: 0, articles: [], articleTotal: 0, error: null, loading: false });
   const debounced = useDebounced(q.trim(), 200);
   const boxRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!debounced || debounced.length > 50) return undefined;
@@ -142,7 +143,9 @@ export default function SearchBox({
       <div className="search-box">
         <Search className="icon" aria-hidden="true" />
         <input
+          ref={inputRef}
           type="search"
+          autoComplete="off"
           role="combobox"
           aria-label={label}
           aria-expanded={showPop}
@@ -162,67 +165,89 @@ export default function SearchBox({
           onKeyDown={onKey}
         />
         {q && (
-          <button type="button" className="icon-btn" style={{ width: 32, height: 32 }} aria-label="검색어 지우기" onClick={() => setQ('')}>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 32, height: 32 }}
+            aria-label="검색어 지우기"
+            onClick={() => {
+              setQ('');
+              inputRef.current?.focus(); // 버튼이 사라져도 포커스가 맨 위로 떨어지지 않게
+            }}
+          >
             <X className="icon-sm" aria-hidden="true" />
           </button>
         )}
       </div>
       {showPop && (
-        <div className="search-pop" id={listId} role="listbox" aria-label="검색 결과">
+        // 11/12 접근성 점검: listbox 안에는 선택지와 묶음(group)만 — 로딩·안내 글과 '모두 보기' 버튼은 목록 밖
+        <div className="search-pop">
           {!fresh && (
             <div role="status" style={{ padding: 8 }}>
+              <span className="sr-only">찾는 중…</span>
               <div className="skeleton sk-line" style={{ width: '60%' }} />
               <div className="skeleton sk-line" style={{ width: '40%' }} />
             </div>
           )}
           {fresh && res.error && <p className="search-group" style={{ color: 'var(--danger)' }}>{errorText(res.error)}</p>}
           {fresh && !res.error && options.length === 0 && (
-            <p style={{ padding: 12, color: 'var(--text-2)' }}>
+            <p role="status" style={{ padding: 12, color: 'var(--text-2)' }}>
               ‘{debounced}’와 맞는 {mode === 'stock' ? '종목이' : '종목·뉴스가'} 없어요.
             </p>
           )}
-          {stockCount > 0 && <p className="search-group">종목 {res.stockTotal > stockCount ? `${res.stockTotal}개 중 ${stockCount}` : stockCount}</p>}
-          {options.map((opt, i) => {
-            const isFirstArticle = opt.type === 'article' && i === stockCount;
-            return (
-              <div key={opt.key}>
-                {isFirstArticle && <p className="search-group">뉴스·공시 {res.articleTotal.toLocaleString('ko-KR')}건</p>}
-                <div
-                  id={`${listId}-${opt.key}`}
-                  role="option"
-                  aria-selected={active === i}
-                  className="search-opt"
-                  onPointerDown={(e) => e.preventDefault()}
-                  onClick={() => choose(opt)}
-                  onMouseEnter={() => setActive(i)}
-                >
-                  {opt.type === 'stock' ? (
-                    <div className="opt-main">
-                      <div className="opt-title">
-                        <Highlight text={opt.item.stockName} q={debounced} />
-                      </div>
-                      <div className="opt-sub num">
-                        {opt.item.stockCode} · {opt.item.market || '시장 정보 없음'}
-                        {opt.item.matchedTheme ? ` · 테마: ${opt.item.matchedTheme}` : ''}
-                      </div>
+          <div id={listId} role="listbox" aria-label="검색 결과">
+            {[
+              { kind: 'stock', title: stockCount > 0 ? `종목 ${res.stockTotal > stockCount ? `${res.stockTotal}개 중 ${stockCount}` : stockCount}` : '' },
+              { kind: 'article', title: fresh && res.articleTotal != null ? `뉴스·공시 ${res.articleTotal.toLocaleString('ko-KR')}건` : '' },
+            ].map((g) => {
+              const items = options.map((opt, i) => ({ opt, i })).filter(({ opt }) => opt.type === g.kind);
+              if (!items.length) return null;
+              const gid = `${listId}-g-${g.kind}`;
+              return (
+                <div key={g.kind} role="group" aria-labelledby={gid}>
+                  <p className="search-group" id={gid} role="presentation">
+                    {g.title}
+                  </p>
+                  {items.map(({ opt, i }) => (
+                    <div
+                      key={opt.key}
+                      id={`${listId}-${opt.key}`}
+                      role="option"
+                      aria-selected={active === i}
+                      className="search-opt"
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => choose(opt)}
+                      onMouseEnter={() => setActive(i)}
+                    >
+                      {opt.type === 'stock' ? (
+                        <div className="opt-main">
+                          <div className="opt-title">
+                            <Highlight text={opt.item.stockName} q={debounced} />
+                          </div>
+                          <div className="opt-sub num">
+                            {opt.item.stockCode} · {opt.item.market || '시장 정보 없음'}
+                            {opt.item.matchedTheme ? ` · 테마: ${opt.item.matchedTheme}` : ''}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <FileText className="icon-sm muted" aria-hidden="true" />
+                          <div className="opt-main">
+                            <div className="opt-title">
+                              <Highlight text={opt.item.title} q={debounced} />
+                            </div>
+                            <div className="opt-sub">
+                              {opt.item.isDisclosure ? '전자공시' : opt.item.press} · {shortTime(opt.item.publishedAtIso)}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <FileText className="icon-sm muted" aria-hidden="true" />
-                      <div className="opt-main">
-                        <div className="opt-title">
-                          <Highlight text={opt.item.title} q={debounced} />
-                        </div>
-                        <div className="opt-sub">
-                          {opt.item.isDisclosure ? '전자공시' : opt.item.press} · {shortTime(opt.item.publishedAtIso)}
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  ))}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
           {mode === 'all' && fresh && !res.error && (
             <button
               type="button"

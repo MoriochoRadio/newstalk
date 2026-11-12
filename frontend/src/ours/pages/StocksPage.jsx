@@ -82,7 +82,7 @@ export default function StocksPage() {
       <SearchBox
         mode="stock"
         label="종목 찾기"
-        placeholder="종목 이름·코드·별칭 (예: 삼전, 005930)"
+        placeholder="종목 이름·코드·별칭 (예: 삼전, 005930)…"
         onPick={(s) => navigate(`/stocks/${s.stockCode}`)}
       />
       <div className="grid-2" style={{ marginTop: 16 }}>

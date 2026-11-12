@@ -109,7 +109,8 @@ function LinkCard({ s, quote, priceOff }) {
       {s.evidence ? (
         <blockquote className="lmap-evidence">
           {s.factTypeLabel && <span className={`badge ${FACT_BADGE[s.factType] || ''}`}>{s.factTypeLabel}</span>}
-          <Quote className="icon-sm" aria-label="근거 원문" style={{ display: 'inline', marginRight: 4, verticalAlign: -2, color: 'var(--text-3)' }} />
+          <span className="sr-only">근거 원문: </span>
+          <Quote className="icon-sm" aria-hidden="true" style={{ display: 'inline', marginRight: 4, verticalAlign: -2, color: 'var(--text-3)' }} />
           <span className="mark">{s.evidence}</span>
         </blockquote>
       ) : (

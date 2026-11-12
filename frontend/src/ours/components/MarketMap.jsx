@@ -177,7 +177,8 @@ export function MapLegend({ priceReady }) {
     ['up-3', '+3%'],
   ];
   return (
-    <div className="map-legend" aria-label="색 기준: 빨강은 오름, 파랑은 내림, 진할수록 많이 움직임">
+    <div className="map-legend">
+      <span className="sr-only">색 기준: 빨강은 오름, 파랑은 내림, 진할수록 많이 움직임.</span>
       <span>칸 크기 = 오늘 기사 수</span>
       <span className="map-scale" aria-hidden="true">
         {steps.map(([k, t]) => (

@@ -46,7 +46,7 @@ function PostForm({ stockCode, onDone }) {
       <label className="sr-only" htmlFor="post-title">
         제목
       </label>
-      <input id="post-title" className="input" placeholder="제목" maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <input id="post-title" className="input" autoComplete="off" placeholder="제목" maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
       <label className="sr-only" htmlFor="post-content">
         내용
       </label>
@@ -124,7 +124,7 @@ function Comments({ postId, onCount }) {
             <b style={{ color: 'var(--text-2)' }}>{c.authorLoginId}</b>
             <span className="num">{relativeTime(c.createdAt)}</span>
             {user?.loginId === c.authorLoginId && (
-              <button type="button" className="btn btn-sm btn-danger" onClick={() => remove(c)} aria-label="댓글 삭제">
+              <button type="button" className="btn btn-sm btn-danger" onClick={() => remove(c)} aria-label={`${c.authorLoginId} 댓글 삭제`}>
                 <Trash2 className="icon-sm" aria-hidden="true" />
                 삭제
               </button>
@@ -224,7 +224,7 @@ function Post({ post, onRemoved }) {
           댓글 <span className="num">{commentCount}</span>
         </button>
         {mine && (
-          <button type="button" className="btn btn-sm btn-danger" onClick={remove}>
+          <button type="button" className="btn btn-sm btn-danger" onClick={remove} aria-label={`글 삭제: ${post.title}`}>
             <Trash2 className="icon-sm" aria-hidden="true" />
             삭제
           </button>

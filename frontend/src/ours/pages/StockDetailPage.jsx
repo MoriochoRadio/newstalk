@@ -46,8 +46,11 @@ function StockHeader({ code, info, quote, quoteState }) {
   return (
     <div className="stock-head">
       <div>
-        <h1 className="stock-name">
-          {info?.stockName || <span className="skeleton" style={{ display: 'inline-block', width: 140, height: 28 }} />}
+        {/* 별 버튼은 제목 밖 (제목 안에 두면 낭독기가 제목을 "삼성전자 관심 종목에 담기"로 읽음 — 11/12 점검) */}
+        <div className="stock-name-row">
+          <h1 className="stock-name">
+            {info?.stockName || <span className="skeleton" style={{ display: 'inline-block', width: 140, height: 28 }} />}
+          </h1>
           <button
             type="button"
             className="icon-btn star-btn"
@@ -58,7 +61,7 @@ function StockHeader({ code, info, quote, quoteState }) {
           >
             <Star className="icon" aria-hidden="true" />
           </button>
-        </h1>
+        </div>
         <p className="stock-sub num">
           <span>{code}</span>
           {info?.market && <span className="badge">{info.market}</span>}
@@ -311,10 +314,18 @@ const SECTIONS = [
   { id: 'sec-mention', label: '언급량' },
   { id: 'sec-board', label: '토론' },
 ];
+// 이동 + 주소 # 바꾸기 + 키보드 포커스도 그 칸으로 (11/12 점검: 예전엔 포커스가 바로 가기 줄에 남음.
+// 보통 앵커에 맡겨 보니 이 앱 안에서는 주소만 바뀌고 스크롤이 안 됨 → 직접 처리)
 function SectionNav() {
   const go = (e, id) => {
     e.preventDefault();
-    document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    const el = document.getElementById(id);
+    if (!el) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    window.history.replaceState(window.history.state, '', `#${id}`);
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+    el.focus({ preventScroll: true });
   };
   return (
     <nav className="sec-nav" aria-label="이 종목 화면 바로 가기">

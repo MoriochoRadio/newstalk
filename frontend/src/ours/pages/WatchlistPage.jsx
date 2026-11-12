@@ -94,7 +94,7 @@ export default function WatchlistPage() {
       <SearchBox
         mode="stock"
         label="관심 종목 담기"
-        placeholder="담을 종목 찾기 (이름·코드·별칭)"
+        placeholder="담을 종목 찾기 (이름·코드·별칭)…"
         onPick={(s) => {
           if (!watchCodes.has(s.stockCode)) toggleWatch(s.stockCode, s.stockName);
         }}

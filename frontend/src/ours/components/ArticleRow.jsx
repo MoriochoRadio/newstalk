@@ -105,6 +105,7 @@ export function StockChips({ stocks, focusCode, max = 3 }) {
       {hidden.length > 0 && (
         <span className="chip-more" title={hidden.map((s) => s.name).join(', ')}>
           외 {hidden.length}종목
+          <span className="sr-only">: {hidden.map((s) => s.name).join(', ')}</span>
         </span>
       )}
     </>
@@ -136,7 +137,8 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
       {sns ? (
         <a className="feed-title" href={a.url} target="_blank" rel="noreferrer">
           <TitleText text={a.title} />
-          <ExternalLink className="icon-sm" aria-label="새 창에서 원문 열기" style={{ display: 'inline', marginLeft: 4, verticalAlign: -2 }} />
+          <ExternalLink className="icon-sm" aria-hidden="true" style={{ display: 'inline', marginLeft: 4, verticalAlign: -2 }} />
+          <span className="sr-only">(새 창에서 원문 열기)</span>
         </a>
       ) : (
         <Link className="feed-title" to={`/news/${a.id}`}>
