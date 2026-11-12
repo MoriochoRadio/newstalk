@@ -3494,58 +3494,58 @@ a.story-headline:hover {
   color: var(--accent-text);
 }
 
-/* ===== v3 오늘 기사 분위기 온도계 ===== */
-.mood-score {
-  font-family: var(--font-serif);
-  font-size: 30px;
+/* ===== 오늘 많이 나온 소식 종류 (분위기 온도계 대신, 11/12) ===== */
+.topic-mix ul {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.topic-line {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+}
+
+.topic-label {
   font-weight: 700;
-  line-height: 1;
+  font-size: var(--fs-sm);
   color: var(--text);
 }
 
-.mood-label {
-  margin-top: 4px;
+.topic-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.topic-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.topic-count {
+  text-align: right;
   font-weight: 700;
   color: var(--text-2);
 }
 
-.mood-track {
-  position: relative;
-  height: 10px;
-  margin-top: 14px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--down-chart), var(--surface-3) 50%, var(--up-chart));
-}
-
-.mood-pin {
-  position: absolute;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 3px solid var(--text);
-  transform: translate(-50%, -50%);
-}
-
-.mood-scale {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 6px;
+.topic-example {
+  display: block;
+  margin: 3px 0 0 94px;
   font-size: var(--fs-xs);
   color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.mood-counts {
-  margin-top: 10px;
-  font-size: var(--fs-sm);
-  color: var(--text-2);
-}
-
-.mood-note {
-  margin-top: 4px;
-  font-size: var(--fs-xs);
-  color: var(--text-3);
+a.topic-example:hover {
+  color: var(--accent-text);
 }
 
 /* ===== v3 연결 지도 문구 ===== */

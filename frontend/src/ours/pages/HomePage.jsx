@@ -19,7 +19,7 @@ import { buzzOf } from '../lib/buzz';
 import { groupStories } from '../lib/stories';
 import { StoryFeed } from '../components/ArticleRow';
 import TopStories, { rankStories } from '../components/TopStories';
-import MoodGauge, { moodOf } from '../components/MoodGauge';
+import TopicMix, { topicMix } from '../components/TopicMix';
 import BriefCard from '../components/BriefCard';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import HourStrip from '../components/HourStrip';
@@ -357,6 +357,9 @@ export default function HomePage() {
   const feed = useApi((signal) => loadTodayFeed(signal), []);
   const issueItems = issues.data?.items || [];
   const topStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, TOP_N) : []), [feed.data]);
+  // 오늘 뉴스 전부를 소식으로 묶은 것 (소식 종류 카드 재료, 공시 제외)
+  const allStories = useMemo(() => (feed.data ? groupStories(feed.data.items.filter((a) => !a.isDisclosure)) : []), [feed.data]);
+  const topicRows = useMemo(() => topicMix(allStories), [allStories]);
   const storyCodes = topStories.flatMap((st) => st.lead.relatedStocks.filter((s) => s.role === 'MAIN').map((s) => s.code));
   const briefCodes = issueItems.slice(0, BRIEF_N).map((i) => i.stockCode);
   const watchCodes = user ? watchlist.items.slice(0, WATCH_N).map((w) => w.stockCode) : [];
@@ -410,7 +413,7 @@ export default function HomePage() {
         </div>
         <div className="stack">
           <LoginNudge />
-          <MoodGauge mood={feed.data ? moodOf(feed.data.items) : null} />
+          <TopicMix rows={topicRows} storyCount={allStories.length} />
           <HourCard feed={feed} />
           <IssueRank issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} />
         </div>
