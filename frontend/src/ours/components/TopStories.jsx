@@ -1,10 +1,11 @@
 // 홈 맨 위 "오늘의 핵심 소식" (v3, 2026-11-12): 신문 1면처럼 소식이 주인공, 종목은 소식에 딸린 정보
-// - 재료: 오늘 글(loadTodayFeed) → 같은 소식 묶기(groupStories) → 많이 다룬 순 (같은 소식 수 = 서버 sameNewsCount)
+// - 재료: 오늘 글(loadTodayFeed) → 같은 소식 묶기(groupStories) → 오늘 기사가 많은 순 (11/12: 서버 sameNewsCount 는 어제 기사까지 셈 → 오늘 받은 기사로 셈)
 // - 머리기사 1개(크게) + 나머지 3개(오른쪽 단). 카드마다: 제목(명조) · 언론 n곳·첫 보도 · AI 요약 첫 문장(형광펜) · 닿은 종목과 오늘 등락
 // - 요약 문장은 묶음 안에서 요약이 있는 기사의 것 (AI 활용 금지 언론사 기사는 요약이 없어서 다른 언론사 요약을 씀)
 // - 판단을 붙이지 않음: 등락률은 어제 종가 대비 지금 값일 뿐 (기사 때문이라고 말하지 않음, 화면 맨 아래 안내와 같음)
 import { Link } from 'react-router-dom';
 import { dirClass, fmtRate, relativeTime } from '../lib/format';
+import Tone, { TitleText, toneOfStory, toneRowClass } from './Tone';
 
 /** 묶음에서 요약이 있는 기사 (대표 → 나머지 순) */
 function summarized(story) {
@@ -32,12 +33,15 @@ function StoryStocks({ article, quotes }) {
 function StoryMeta({ story }) {
   const a = story.lead;
   const size = story.size || 1;
+  // 오늘 기사 수 · 언론 수를 따로 (기사 11건 ≠ 언론 11곳, 11/12). 이전 보도까지 묶였으면 전체 수를 덧붙임
   return (
     <p className="story-meta num">
       {size >= 2 ? (
         <>
-          <b>언론 {size}곳</b>
-          {a.firstReportPress ? ` · 첫 보도 ${a.firstReportPress}` : ''}
+          <b>
+            오늘 기사 {size}건 · 언론 {story.pressCount}곳
+          </b>
+          {story.total > size ? ` · 이전 보도까지 ${story.total}건` : ''}
         </>
       ) : (
         a.press
@@ -52,13 +56,15 @@ function StoryCard({ story, rank, quotes, big }) {
   const a = story.lead;
   const s = summarized(story);
   const [first, ...rest] = s ? s.summary : [];
+  const tone = toneOfStory(story);
   return (
-    <article className={`story-card ${big ? 'story-big' : ''}`}>
-      <span className="story-rank num" aria-label={`${rank}번째로 많이 다룬 소식`}>
+    <article className={`story-card ${big ? 'story-big' : ''} ${toneRowClass(tone)}`}>
+      <span className="story-rank num" aria-label={`오늘 기사가 ${rank}번째로 많은 소식`}>
         {rank}
       </span>
+      <Tone tone={tone} />
       <Link to={`/news/${(s || a).id}`} className="story-headline">
-        {a.title}
+        <TitleText text={a.title} />
       </Link>
       <StoryMeta story={story} />
       {first ? (
@@ -92,9 +98,12 @@ export default function TopStories({ stories, quotes }) {
   const [lead, ...side] = stories;
   return (
     <section className="front-page" aria-labelledby="front-title">
-      <h2 className="sr-only" id="front-title">
-        오늘의 핵심 소식 (한 소식을 함께 다룬 언론이 많은 순)
-      </h2>
+      <div className="section-head front-head">
+        <h2 className="section-title" id="front-title">
+          가장 많이 다룬 소식
+        </h2>
+        <p className="section-sub">같은 소식을 쓴 오늘 기사가 많은 순서예요.</p>
+      </div>
       <StoryCard story={lead} rank={1} quotes={quotes} big />
       <div className="front-side">
         {side.map((st, i) => (

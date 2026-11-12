@@ -1459,20 +1459,29 @@ a.feed-title:hover {
 /* 감성 비율 막대 */
 .ratio-bar {
   display: flex;
+  gap: 2px; /* dataviz: 쌓은 조각 사이 2px 틈 (색이 붙어 경계가 흐려지지 않게) */
   height: 10px;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: var(--surface-3);
   margin: 10px 0 8px;
 }
 
 .ratio-bar span {
   display: block;
   height: 100%;
+  border-radius: 2px;
+}
+.ratio-bar span:first-child {
+  border-radius: 5px 2px 2px 5px;
+}
+.ratio-bar span:last-child {
+  border-radius: 2px 5px 5px 2px;
+}
+.ratio-bar span[style*='width: 0%'] {
+  display: none;
 }
 
+/* 좋은·나쁜 소식 비율: 시세 색(빨강·파랑)이 아니라 소식 색(초록·주황) — 11/12 */
 .ratio-pos {
-  background: var(--up-chart);
+  background: var(--good);
 }
 
 .ratio-neu {
@@ -1480,7 +1489,7 @@ a.feed-title:hover {
 }
 
 .ratio-neg {
-  background: var(--down-chart);
+  background: var(--bad);
 }
 
 .ratio-legend {
@@ -2665,6 +2674,7 @@ a.feed-title:hover {
   width: 100%;
   display: flex;
   flex-direction: column-reverse;
+  gap: 2px; /* dataviz: 뉴스·공시 조각 사이 2px 틈 */
   border-radius: 4px 4px 2px 2px;
   overflow: hidden;
   transform-origin: bottom;
@@ -3325,6 +3335,11 @@ a.feed-title:hover {
   margin-bottom: 28px;
 }
 
+.front-page > .front-head {
+  grid-column: 1 / -1;
+  margin-bottom: -4px;
+}
+
 .front-side {
   display: flex;
   flex-direction: column;
@@ -3590,6 +3605,9 @@ a.topic-example:hover {
   position: fixed;
   right: 16px;
   bottom: 16px;
+  max-width: calc(100vw - 32px);
+  overflow-x: auto;
+  scrollbar-width: none;
   z-index: 60;
   display: flex;
   align-items: center;
@@ -3607,6 +3625,11 @@ a.topic-example:hover {
   color: var(--text-3);
 }
 
+.variant-switch > * {
+  flex: none;
+  white-space: nowrap;
+}
+
 .variant-switch button {
   height: 32px;
   padding: 0 12px;
@@ -3616,8 +3639,8 @@ a.topic-example:hover {
 }
 
 .variant-switch button.on {
-  background: var(--accent);
-  color: var(--text-on-accent);
+  background: var(--accent-strong); /* 흰 글자 대비 (--accent 는 3.7) */
+  color: #fff;
 }
 
 @media (max-width: 768px) {
@@ -3649,4 +3672,159 @@ a.topic-example:hover {
 .sidenav .brand-sub,
 .sidenav .nav-foot .muted {
   color: var(--nav-text-3, var(--text-3));
+}
+
+/* ===== 좋은·나쁜 소식 한눈에 (11/12, components/Tone.jsx) =====
+   label(기본): 제목 위 "○○에 좋은 소식" 작은 알약 / tint: 알약 + 카드 왼쪽 위 아주 옅은 물들임 / off: 안 보임
+   색은 시세(빨강·파랑)와 겹치지 않게 초록·주황. 제목 속 ↑↓ 에는 색을 입히지 않음 (값이 떨어진 것처럼 읽혀서, 11/12) */
+.feed-kicker-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 4px;
+}
+.feed-kicker-line .feed-kicker {
+  margin-bottom: 0;
+}
+.tone {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 18px;
+  cursor: help;
+  white-space: nowrap;
+}
+.tone i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.tone-pos {
+  color: var(--good);
+  background: var(--good-soft);
+}
+.tone-neg {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.tone-neutral i {
+  background: var(--text-3) !important;
+}
+.tone-mixed {
+  color: var(--text-2);
+  background: var(--surface-3);
+}
+.tone-mixed i {
+  background: linear-gradient(90deg, var(--good) 50%, var(--bad) 50%);
+}
+.story-card .tone {
+  margin-bottom: 6px;
+}
+[data-tone='off'] .tone {
+  display: none;
+}
+[data-tone='tint'] .feed-row.tone-row-pos,
+[data-tone='tint'] .story-card.tone-row-pos {
+  background-image: linear-gradient(100deg, var(--good-soft), transparent 45%);
+}
+[data-tone='tint'] .feed-row.tone-row-neg,
+[data-tone='tint'] .story-card.tone-row-neg {
+  background-image: linear-gradient(100deg, var(--bad-soft), transparent 45%);
+}
+/* 움직임: 점이 한 번 '톡' 커짐 (처음 보일 때만). 움직임 줄이기 설정이면 없음 */
+@media (prefers-reduced-motion: no-preference) {
+  .tone i {
+    animation: tone-pop 0.6s ease-out 0.15s both;
+  }
+  @keyframes tone-pop {
+    0% {
+      transform: scale(0.2);
+      box-shadow: 0 0 0 0 currentColor;
+    }
+    60% {
+      transform: scale(1.4);
+      box-shadow: 0 0 0 4px transparent;
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+}
+.variant-switch > .vs-sep {
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+
+/* 종목 화면 섹션 바로 가기 (예전 목업의 종목 탭 → 바로 가기 줄, 11/12). 위 검색 줄(64px) 아래에 붙음 */
+.sec-nav {
+  position: sticky;
+  top: 64px;
+  z-index: 12;
+  display: flex;
+  gap: 4px;
+  margin: 0 -4px 12px;
+  padding: 6px 4px;
+  background: var(--bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sec-nav a {
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.sec-nav a:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.sec-anchor {
+  height: 0;
+  scroll-margin-top: 120px;
+}
+.stack > .sec-anchor {
+  margin-bottom: -16px;
+}
+.sec-anchor-box,
+#related-news {
+  scroll-margin-top: 120px;
+}
+
+/* 실시간 값이 바뀌면 잠깐 물듦 (증권 앱의 체결 깜빡임). 움직임 줄이기 설정이면 없음 */
+@media (prefers-reduced-motion: no-preference) {
+  .tick-up {
+    animation: tick-up 0.9s ease-out;
+  }
+  .tick-down {
+    animation: tick-down 0.9s ease-out;
+  }
+  @keyframes tick-up {
+    0% {
+      background: var(--up-soft);
+    }
+    100% {
+      background: transparent;
+    }
+  }
+  @keyframes tick-down {
+    0% {
+      background: var(--down-soft);
+    }
+    100% {
+      background: transparent;
+    }
+  }
 }

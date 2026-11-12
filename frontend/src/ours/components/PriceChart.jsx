@@ -28,7 +28,7 @@ const MA = [
   { n: 20, color: '--ma20' },
   { n: 60, color: '--ma60' },
 ];
-const MA_FALLBACK = { '--ma5': '#e8a317', '--ma20': '#8b5cf6', '--ma60': '#0ea5a4' };
+const MA_FALLBACK = { '--ma5': '#a16207', '--ma20': '#7c3aed', '--ma60': '#0d9488' };
 const KST_OFFSET_SEC = 9 * 3600;
 const MAX_INTRADAY_DAYS = 5;
 const LOAD_MORE_MARGIN = 10;

@@ -1,5 +1,5 @@
 // 종목 상세: 머리(이름·코드·시장·현재가) → 캔들 차트 → 오늘 AI 요약(다시 만들기) · 감성 비율 · 언급량 → 관련 뉴스(페이지) → 토론
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Sparkles, Star } from 'lucide-react';
 import { articleApi, stockApi } from '../../api';
@@ -24,8 +24,22 @@ const MENTION_PERIODS = [
   { key: '30d', label: '30일' },
 ];
 
+/** 값이 바뀔 때마다 'tick-up'/'tick-down' 을 잠깐 붙임 (처음 받은 값에는 안 붙임) */
+function useTick(value) {
+  const prev = useRef(value);
+  const [tick, setTick] = useState({ cls: '', n: 0 });
+  useEffect(() => {
+    if (prev.current != null && value != null && value !== prev.current) {
+      setTick((t) => ({ cls: value > prev.current ? 'tick-up' : 'tick-down', n: t.n + 1 }));
+    }
+    prev.current = value;
+  }, [value]);
+  return tick;
+}
+
 function StockHeader({ code, info, quote, quoteState }) {
   const { watchCodes, toggleWatch } = useSession();
+  const tick = useTick(quote?.price);
   const watching = watchCodes.has(code);
   const cls = dirClass(quote?.changeRate);
   return (
@@ -53,7 +67,9 @@ function StockHeader({ code, info, quote, quoteState }) {
       <div className="stock-price">
         {quote ? (
           <>
-            <div className="price-big">{fmtPrice(quote.price)}원</div>
+            <div key={tick.n} className={`price-big ${tick.cls}`}>
+              {fmtPrice(quote.price)}원
+            </div>
             <div className={`change ${cls}`}>
               {fmtAmount(quote.changeAmount)} ({fmtRate(quote.changeRate)})
             </div>
@@ -173,7 +189,7 @@ function SentimentCard({ summary }) {
           <p className="ratio-legend">
             <span>
               <i className="ratio-pos" />
-              긍정 {ratio.positive}%
+              좋은 소식 {ratio.positive}%
             </span>
             <span>
               <i className="ratio-neu" />
@@ -181,7 +197,7 @@ function SentimentCard({ summary }) {
             </span>
             <span>
               <i className="ratio-neg" />
-              부정 {ratio.negative}%
+              나쁜 소식 {ratio.negative}%
             </span>
             <span className="muted">
               {basis === 'event' ? '소식' : '기사'} {count}건
@@ -277,6 +293,32 @@ function QuickSwitch({ code }) {
   );
 }
 
+/** 섹션 바로 가기 (예전 목업 test/fe-ui-redesign 의 종목 탭에서 가져옴, 11/12):
+ * 종목 화면이 길어서(차트 → 요약 → 기사 10건 → 토론) 토론까지 한참 내려가야 했음. 탭으로 화면을 나누지 않고
+ * 한 화면에 두되, 위에 붙는 바로 가기 줄로 이동 — 스크롤로 훑는 사람과 바로 가고 싶은 사람 둘 다 */
+const SECTIONS = [
+  { id: 'sec-chart', label: '차트' },
+  { id: 'sec-summary', label: 'AI 요약' },
+  { id: 'related-news', label: '뉴스·공시' },
+  { id: 'sec-mention', label: '언급량' },
+  { id: 'sec-board', label: '토론' },
+];
+function SectionNav() {
+  const go = (e, id) => {
+    e.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
+  return (
+    <nav className="sec-nav" aria-label="이 종목 화면 바로 가기">
+      {SECTIONS.map((s) => (
+        <a key={s.id} href={`#${s.id}`} onClick={(e) => go(e, s.id)}>
+          {s.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function StockDetail({ code }) {
   const back = useBack('/stocks');
   const info = useApi((signal) => stockApi.get(code, { signal }), [code]);
@@ -313,21 +355,25 @@ function StockDetail({ code }) {
       <QuickSwitch code={code} />
       {info.error && <ErrorBox error={info.error} onRetry={info.reload} />}
       <StockHeader code={code} info={stock} quote={quotes[code]} quoteState={{ loading, disabled }} />
+      <SectionNav />
+      <div id="sec-chart" className="sec-anchor" />
       <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} />
       <div className="grid-2" style={{ marginTop: 16 }}>
         <div className="stack">
+          <div id="sec-summary" className="sec-anchor" />
           <SummaryCard code={code} summary={summary} />
           <RelatedNews code={code} name={stock?.stockName} />
         </div>
         <div className="stack">
           <SentimentCard summary={summary} />
+          <div id="sec-mention" className="sec-anchor" />
           <MentionCard code={code} />
           {summary.data?.generatedAt && (
             <p className="status-line">요약 갱신 {relativeTime(summary.data.generatedAt)}</p>
           )}
         </div>
       </div>
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16 }} id="sec-board" className="sec-anchor-box">
         <Board key={code} stockCode={code} stockName={stock?.stockName || code} />
       </div>
     </>

@@ -277,8 +277,10 @@ function NewsDetail({ id }) {
           </div>
           {raw.sentiment ? (
             <div className="sentiment-line">
-              <span className="badge badge-outline" style={{ fontSize: 'var(--fs-sm)', height: 26 }}>
-                {SENTIMENT_LABEL[raw.sentiment]}
+              {/* 목록의 "○○에 좋은/나쁜 소식" 알약과 같은 말·색 (초록·주황, 시세 색과 다르게) */}
+              <span className={`tone ${raw.sentiment === 'POSITIVE' ? 'tone-pos' : raw.sentiment === 'NEGATIVE' ? 'tone-neg' : 'tone-mixed tone-neutral'}`}>
+                <i aria-hidden="true" />
+                {raw.sentiment === 'POSITIVE' ? '좋은 소식' : raw.sentiment === 'NEGATIVE' ? '나쁜 소식' : SENTIMENT_LABEL[raw.sentiment]}
               </span>
               <span className="sub">{SENTIMENT_TEXT[raw.sentiment]}</span>
             </div>

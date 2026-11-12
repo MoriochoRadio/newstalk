@@ -54,7 +54,8 @@ export default function MentionChart({ data }) {
           return (
             <g key={p.time} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               <rect x={PAD.l + i * step} y={PAD.t} width={step} height={plotH} fill="transparent" />
-              {p.snsCount > 0 && <rect className="bar-sns" x={x} y={y(p.totalCount)} width={barW} height={y(p.newsCount) - y(p.totalCount)} rx="2" />}
+              {/* dataviz: 쌓은 칸 사이 2px 틈 */}
+              {p.snsCount > 0 && <rect className="bar-sns" x={x} y={y(p.totalCount)} width={barW} height={Math.max(1, y(p.newsCount) - y(p.totalCount) - 2)} rx="2" />}
               {p.newsCount > 0 && (
                 <rect className="bar-news" x={x} y={y(p.newsCount)} width={barW} height={PAD.t + plotH - y(p.newsCount)} rx="2" opacity={hover == null || hover === i ? 1 : 0.45} />
               )}

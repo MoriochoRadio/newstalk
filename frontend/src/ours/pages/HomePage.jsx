@@ -55,26 +55,25 @@ function usePerStock(codes, fetcher, tag) {
   return map;
 }
 
-/** 맨 위 한 문장 (데이터로 만든 문장, LLM 아님) */
-/** 머리말 한 줄 (v3): 가장 많이 다룬 소식을 먼저, 종목은 그다음 */
-function storyLine(story) {
-  if (!story) return '';
-  const size = story.size || 1;
-  // 순위 기준이 둘이라 헷갈리지 않게 (11/12 사용자: "가장 많이 다뤄진 소식은 코스맥스인데 이슈 종목은 NAVER 1등?")
-  // 1면 = 한 소식을 몇 곳이 썼나 / 화제 종목 = 그 종목 기사 전부(여러 소식 합계)
-  return size >= 2 ? `가장 많은 언론이 함께 다룬 소식은 “${story.lead.title}”(언론 ${size}곳)이에요.` : '';
-}
-
-function headline(issues, quotes) {
-  if (!issues.length) return '';
-  const top = issues[0];
-  const q = quotes[top.stockCode];
-  const first = `종목으로는 ${top.stockName}에 대한 기사가 가장 많아요(여러 소식 합계 ${top.articleCount}건${q ? `, ${fmtRate(q.changeRate)}` : ''}).`;
-  const rated = issues.map((i) => quotes[i.stockCode]).filter((x) => x && x.changeRate != null);
-  if (rated.length < issues.length) return first;
-  const up = rated.filter((x) => x.changeRate > 0).length;
-  const down = rated.filter((x) => x.changeRate < 0).length;
-  return `${first} 이슈 종목 ${issues.length}개 중 ${up}개가 오르고 ${down}개가 내렸어요.`;
+/** 맨 위 한 줄 (데이터로 만든 문장, LLM 아님)
+ * 11/12 사용자: "가장 많이 다룬 소식은 삼양식품인데 기사가 가장 많은 종목은 NAVER? 이게 뭔 소리야"
+ * → 순위 두 개(소식별·종목별)를 한 문장에 넣지 않음. 소식 순위는 바로 아래 '가장 많이 다룬 소식' 칸이 말하고,
+ *   여기서는 오늘 전체 양 + 종목 쪽 사실만. 종목 순위는 기사 수(여러 소식 합계)라서 소식 순위와 다를 수 있음 */
+function headline(newsCount, storyCount, issues, quotes) {
+  const parts = [];
+  if (newsCount) parts.push(`오늘 뉴스 ${newsCount}건이 나왔고, 같은 소식끼리 묶으면 ${storyCount}개예요.`);
+  if (issues.length) {
+    const top = issues[0];
+    const q = quotes[top.stockCode];
+    parts.push(`종목별로는 ${top.stockName} 기사가 ${top.articleCount}건으로 가장 많아요${q && q.changeRate != null ? `(주가 ${fmtRate(q.changeRate)})` : ''}.`);
+    const rated = issues.map((i) => quotes[i.stockCode]).filter((x) => x && x.changeRate != null);
+    if (rated.length === issues.length) {
+      const up = rated.filter((x) => x.changeRate > 0).length;
+      const down = rated.filter((x) => x.changeRate < 0).length;
+      parts.push(`이슈 종목 ${issues.length}개 중 ${up}개가 오르고 ${down}개가 내렸어요.`);
+    }
+  }
+  return parts.join(' ');
 }
 
 function BriefSection({ issues, quotes, quoteLoading, priceOff, summaries, buzz, feed }) {
@@ -367,7 +366,8 @@ export default function HomePage() {
   const summaryCodes = [...new Set([...briefCodes, ...watchCodes])];
   const summaries = usePerStock(summaryCodes, (code, signal) => stockApi.summary(code, {}, { signal }), 'summary');
   const buzz = usePerStock(briefCodes, (code, signal) => stockApi.mentions(code, '7d', { signal }), 'mentions');
-  const lead = headline(issueItems, quotes);
+  const newsCount = feed.data ? feed.data.items.filter((a) => !a.isDisclosure).length : 0;
+  const lead = headline(newsCount, allStories.length, issueItems, quotes);
 
   return (
     <>
@@ -376,9 +376,7 @@ export default function HomePage() {
           <p className="eyebrow num">{todayLabel()}</p>
           <h1 className="page-title">오늘의 뉴스 브리핑</h1>
           {topStories.length ? (
-            <p className="lead">
-              {storyLine(topStories[0])} {lead}
-            </p>
+            <p className="lead">{lead}</p>
           ) : feed.loading ? (
             <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} />
           ) : null}
@@ -401,7 +399,7 @@ export default function HomePage() {
 
       <div className="section-head">
         <h2 className="section-title">오늘 화제 종목</h2>
-        <p className="section-sub">종목마다 오늘 나온 기사를 모두 센 순서예요 (여러 소식의 합계).</p>
+        <p className="section-sub">종목마다 오늘 기사를 모두 센 순서예요. 작은 소식이 여러 개면 위 소식 순위와 달라요.</p>
       </div>
       <BriefSection issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} buzz={buzz} feed={feed} />
       <WatchBrief quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} summaries={summaries} feed={feed} />

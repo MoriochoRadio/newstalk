@@ -376,7 +376,7 @@
   --card-border: 0 solid transparent;
 }
 
-/* E 밝은 화면: 토스의 푸른 회색 대신 중립 회색 (글자 대비: text-2 7.7 · text-3 4.8 — 흰 카드 기준) */
+/* E 밝은 화면: 토스의 푸른 회색 대신 중립 회색 (글자 대비: text-2 7.7 · text-3 5.3 — 흰 카드 기준, 회색 바탕 4.8) */
 :root[data-variant='e'] {
   --bg: #f4f4f5;
   --surface-2: #fafafa;
@@ -386,7 +386,7 @@
   --line-strong: #d4d4d8;
   --text: #18181b;
   --text-2: #52525b;
-  --text-3: #71717a;
+  --text-3: #6b6b74; /* 11/12 접근성 점검: #71717a 는 회색 바탕(#f4f4f5) 위 4.4 로 미달 → 4.8 */
   --skeleton-a: #ececee;
   --skeleton-b: #f6f6f7;
   --heat-flat: #ececee;
@@ -439,4 +439,49 @@
     --nav-bg: #0b0b0c;
     --nav-border: #232325;
   }
+}
+
+/* 좋은·나쁜 소식 색 (11/12 저녁): 시세 색(상승 빨강·하락 파랑)과 일부러 다르게.
+   사용자: "빨강·파랑으로 강조하니 주식이 떨어진 것처럼 느껴진다" → 소식의 성격은 초록·주황, 값의 움직임만 빨강·파랑
+   글자 대비 4.5:1 이상 (밝은 화면 알약 바탕 위 4.9·5.2, 어두운 화면 7 이상) */
+:root {
+  --good: #047857;
+  --good-soft: #e7f6ee;
+  --bad: #a3480a;
+  --bad-soft: #fdf1e3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --good: #34d399;
+    --good-soft: rgba(52, 211, 153, 0.13);
+    --bad: #f5a524;
+    --bad-soft: rgba(245, 165, 36, 0.13);
+  }
+}
+:root[data-theme='dark'] {
+  --good: #34d399;
+  --good-soft: rgba(52, 211, 153, 0.13);
+  --bad: #f5a524;
+  --bad-soft: rgba(245, 165, 36, 0.13);
+}
+
+/* 이동평균선 색 (11/12, dataviz 스킬 validate_palette.js 로 검사)
+   밝은 화면 #a16207·#7c3aed·#0d9488: 세 색끼리 + 캔들 빨강·파랑과 모든 쌍 통과 (예전 주황 #e8a317 은 캔들 빨강과 색약 기준 ΔE 5.4 로 겹침, 흰 바탕 대비 2.1)
+   어두운 화면 #c4870c·#9061f9·#13a394: 세 색끼리 통과. 캔들과는 일부 쌍이 가까움 → 선(얇은 줄) vs 몸통(채운 칸) 모양 차이 + 값 줄의 이름·값으로 보완 */
+:root {
+  --ma5: #a16207;
+  --ma20: #7c3aed;
+  --ma60: #0d9488;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ma5: #c4870c;
+    --ma20: #9061f9;
+    --ma60: #13a394;
+  }
+}
+:root[data-theme='dark'] {
+  --ma5: #c4870c;
+  --ma20: #9061f9;
+  --ma60: #13a394;
 }

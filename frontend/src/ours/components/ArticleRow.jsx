@@ -1,11 +1,12 @@
 // 글 한 줄: 제목 → 언론사·시각 → "무슨 일인가" 태그(공시 유형·정정·같은 소식) → 종목 칩
-// 감성(긍정·부정)은 목록에 넣지 않음 (상세에서 설명과 함께). 판단 낱말(호재·악재)도 쓰지 않음
+// 감성: 11/12 저녁부터 제목 위에 "○○에 좋은/나쁜 소식" 한 줄 (components/Tone.jsx, 회사 이름을 붙여 무엇에 대한 판단인지 분명히). 판단 낱말(호재·악재)은 쓰지 않음
 // 부품 출처: V7 adapters.toUiArticle + ArticleInfoBadges·sourceLabelOf (main frontend/src/pages/DashboardPageV7.jsx)
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { groupStories } from '../lib/stories';
 import { relativeTime } from '../lib/format';
+import Tone, { TitleText, toneOf, toneRowClass } from './Tone';
 
 export const SAME_NEWS_TIP = '같은 종목·24시간 안·제목이 비슷한 기사를 같은 소식으로 묶은 수예요. 묶음은 틀릴 수 있어요.';
 const CORRECTION_TIP = '앞서 낸 공시를 고쳐 다시 낸 공시예요.';
@@ -119,21 +120,27 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
   // 공시는 요약이 제목과 같음 → 요약 줄 생략
   const summary = showSummary && a.hasSummary && !a.isDisclosure ? a.summary.join(' ') : '';
   const tags = ArticleTags({ article: a });
+  const tone = toneOf(a, focusCode);
   return (
-    <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''}`}>
-      {a.isDisclosure && (
-        <span className="feed-kicker">
-          공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
-        </span>
+    <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>
+      {(a.isDisclosure || tone) && (
+        <div className="feed-kicker-line">
+          {a.isDisclosure && (
+            <span className="feed-kicker">
+              공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
+            </span>
+          )}
+          <Tone tone={tone} withName={!focusCode} />
+        </div>
       )}
       {sns ? (
         <a className="feed-title" href={a.url} target="_blank" rel="noreferrer">
-          {a.title}
+          <TitleText text={a.title} />
           <ExternalLink className="icon-sm" aria-label="새 창에서 원문 열기" style={{ display: 'inline', marginLeft: 4, verticalAlign: -2 }} />
         </a>
       ) : (
         <Link className="feed-title" to={`/news/${a.id}`}>
-          {a.title}
+          <TitleText text={a.title} />
         </Link>
       )}
       {summary && !compact && <p className="feed-summary">{summary}</p>}

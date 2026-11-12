@@ -11,17 +11,35 @@ const PRESETS = [
   { key: 'flat', label: 'H 지면형', attrs: { variant: 'e', shape: 'flat' } },
 ];
 const ATTRS = ['variant', 'shape', 'nav'];
+// 11/12 저녁: 사용자가 G(남색 사이드바)를 고름 → 기본값
+const DEFAULT = 'ink';
+// 좋은·나쁜 소식 표시 방식 비교 (components/Tone.jsx)
+const TONE_KEY = 'snm_ours_tone';
+const TONES = [
+  { key: 'label', label: '글자' },
+  { key: 'tint', label: '글자+물들임' },
+  { key: 'off', label: '끔' },
+];
 
-function read() {
+function read(k, d) {
   try {
-    return localStorage.getItem(KEY) || 'toss';
+    return localStorage.getItem(k) || d;
   } catch {
-    return 'toss';
+    return d;
   }
 }
 
 export default function VariantSwitch() {
-  const [key, setKey] = useState(read);
+  const [key, setKey] = useState(() => read(KEY, DEFAULT));
+  const [tone, setTone] = useState(() => read(TONE_KEY, 'label'));
+  useEffect(() => {
+    document.documentElement.setAttribute('data-tone', tone);
+    try {
+      localStorage.setItem(TONE_KEY, tone);
+    } catch {
+      /* 저장 못 해도 화면은 바뀜 */
+    }
+  }, [tone]);
   useEffect(() => {
     const root = document.documentElement;
     const preset = PRESETS.find((p) => p.key === key) || PRESETS[0];
@@ -41,6 +59,12 @@ export default function VariantSwitch() {
       {PRESETS.map((p) => (
         <button key={p.key} type="button" className={key === p.key ? 'on' : ''} aria-pressed={key === p.key} onClick={() => setKey(p.key)}>
           {p.label}
+        </button>
+      ))}
+      <span className="vs-sep">소식 표시</span>
+      {TONES.map((t) => (
+        <button key={t.key} type="button" className={tone === t.key ? 'on' : ''} aria-pressed={tone === t.key} onClick={() => setTone(t.key)}>
+          {t.label}
         </button>
       ))}
     </div>
