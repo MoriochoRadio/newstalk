@@ -22,7 +22,8 @@ export function sourceText(a) {
 export function ArticleTags({ article: a, detail = false }) {
   const tags = [];
   if (a.isDisclosure) {
-    tags.push(
+    // 목록에서는 제목 위 "공시 · 유형" 글자로 보여 주므로 상세에서만 배지 (11/12: 왼쪽 파란 띠가 뭔지 모르겠다는 피드백)
+    if (detail) tags.push(
       <span key="d" className="badge badge-accent">
         공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
       </span>
@@ -120,6 +121,11 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
   const tags = ArticleTags({ article: a });
   return (
     <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''}`}>
+      {a.isDisclosure && (
+        <span className="feed-kicker">
+          공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
+        </span>
+      )}
       {sns ? (
         <a className="feed-title" href={a.url} target="_blank" rel="noreferrer">
           {a.title}

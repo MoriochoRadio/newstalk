@@ -2869,10 +2869,13 @@ a.feed-title:hover {
   color: #ffffff;
 }
 
-/* 공시 줄은 왼쪽에 얇은 색 띠 (V7 장점) */
-.feed-row.is-disclosure {
-  box-shadow: inset 3px 0 0 var(--accent);
-  padding-left: 14px;
+/* 공시 줄: 왼쪽 색 띠 대신 제목 위에 "공시 · 유형" 글자 (11/12 사용자: "띠가 뭔지 처음엔 모르겠다" — 설명이 필요한 표시는 글자로) */
+.feed-kicker {
+  display: inline-block;
+  margin-bottom: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent-text);
 }
 
 /* 같은 소식 펼치기 */

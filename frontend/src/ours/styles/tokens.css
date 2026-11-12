@@ -241,6 +241,7 @@
 }
 
 /* ===== 시안 비교 (11/12, "토스 같다" 피드백): 강조색 하나 + 어두운 화면 바탕 톤만 바꿈. 나머지는 v2 그대로 =====
+   E = 파랑은 그대로 + 어두운 화면만 중립 회색 (11/12 사용자: '파랑이 제일 좋다')
    A = 지금(토스 파랑 + 푸른 검정) · B = 잉크 네이비 + 중립 회색 · C = 청록(틸) + 중립 회색 · D = 뉴스 주황 + 중립 회색
    <html data-variant="b|c|d"> (없으면 A). 글자색(accent-text)은 바탕 대비 4.5:1 이상으로 고름 */
 :root[data-variant='b'] {
@@ -269,6 +270,7 @@
 }
 
 /* 어두운 화면: B·C·D 는 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
+:root[data-variant='e'][data-theme='dark'],
 :root[data-variant='b'][data-theme='dark'],
 :root[data-variant='c'][data-theme='dark'],
 :root[data-variant='d'][data-theme='dark'] {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 const KEY = 'snm_ours_variant';
 const OPTIONS = [
   { key: 'a', label: 'A 지금(토스 파랑)' },
+  { key: 'e', label: 'E 파랑 + 회색 다크' },
   { key: 'b', label: 'B 잉크 네이비' },
   { key: 'c', label: 'C 청록' },
   { key: 'd', label: 'D 뉴스 주황' },
