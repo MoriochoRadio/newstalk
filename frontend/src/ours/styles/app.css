@@ -4096,3 +4096,16 @@ a.topic-example:hover {
   flex-wrap: wrap;
   white-space: normal;
 }
+
+/* 종목 화면 좋은·나쁜 소식 칸: 링 + 한 줄 */
+.ratio-ring-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: var(--fs-lg);
+}
+[data-tone='label'] .ratio-ring-line .tone-ring,
+[data-tone='off'] .ratio-ring-line {
+  display: none;
+}

@@ -14,6 +14,7 @@ import { StoryFeed } from '../components/ArticleRow';
 import PriceChart from '../components/PriceChart';
 import MentionChart from '../components/MentionChart';
 import Board from '../components/Board';
+import { ToneRing } from '../components/Tone';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { useBack } from './NewsDetailPage';
 
@@ -162,7 +163,7 @@ function SentimentCard({ summary }) {
     <section className="card" aria-labelledby="mood-title">
       <div className="card-head">
         <h2 className="card-title" id="mood-title">
-          오늘 기사 분위기
+          오늘 좋은·나쁜 소식
         </h2>
         {s?.sentimentByEvent && (
           <Segmented
@@ -178,9 +179,16 @@ function SentimentCard({ summary }) {
         )}
       </div>
       {summary.loading && !s && <SkeletonRows rows={1} compact />}
-      {s && count === 0 && <p className="sub">오늘 분위기를 판단한 기사가 아직 없어요.</p>}
+      {s && count === 0 && <p className="sub">오늘 좋은·나쁜 소식을 판단한 기사가 아직 없어요.</p>}
       {s && count > 0 && (
         <>
+          {/* 시그니처 링(다른 화면과 같은 표시) + 비율 막대(정확한 비율은 막대가 더 잘 읽힘 — dataviz) */}
+          <div className="ratio-ring-line">
+            <ToneRing pos={ratio.positiveCount ?? 0} neu={ratio.neutralCount ?? 0} neg={ratio.negativeCount ?? 0} size={36} />
+            <b className={ratio.positive > ratio.negative ? 'tb-pos' : ratio.negative > ratio.positive ? 'tb-neg' : ''}>
+              {ratio.positive > ratio.negative ? '좋은 소식이 더 많아요' : ratio.negative > ratio.positive ? '나쁜 소식이 더 많아요' : '좋은·나쁜 소식이 비슷해요'}
+            </b>
+          </div>
           <div className="ratio-bar" role="img" aria-label={`좋은 소식 ${ratio.positive}%, 중립 ${ratio.neutral}%, 나쁜 소식 ${ratio.negative}%`}>
             <span className="ratio-pos" style={{ width: `${ratio.positive}%` }} />
             <span className="ratio-neu" style={{ width: `${ratio.neutral}%` }} />
