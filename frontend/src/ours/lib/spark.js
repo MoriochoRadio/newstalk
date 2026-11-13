@@ -1,9 +1,9 @@
 // 작은 추세선(스파크라인)용 최근 일봉 종가. GET /api/quotes/{code}/chart?unit=day (백엔드가 KIS 에 물음)
-// KIS 초당 한도를 지키려고: 한 번에 2개까지만 부르고(나머지는 줄 서기), 받은 것은 메모리에 두고 다시 쓰고,
+// KIS 초당 한도를 지키려고: 한 번에 4개까지만 부르고(나머지는 줄 서기), 받은 것은 메모리에 두고 다시 쓰고,
 // 화면에서 사라진 종목은 줄에서 빼서 부르지 않음. 실패하면 그 종목 추세선은 그냥 안 그림
 import { quoteApi } from '../../api';
 
-const MAX_ACTIVE = 2;
+const MAX_ACTIVE = 4; // 11/13: 백엔드가 KIS 호출을 동시에(줄 서기는 그대로) 하게 되어 2 → 4
 const DAYS = 20;
 
 const cache = new Map(); // code → { status: 'queued'|'loading'|'done'|'failed', data, wanted, listeners:Set }

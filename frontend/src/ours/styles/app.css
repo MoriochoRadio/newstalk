@@ -823,7 +823,7 @@ a.feed-title:hover {
   margin-top: 4px;
   color: var(--text-2);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1; /* 11/13: 목록마다 요약 두 줄이라 글이 많음 → 한 줄 맛보기, 전체는 글 화면에서 */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -5068,5 +5068,16 @@ html {
   }
   .ws-price b {
     font-size: var(--fs-lg);
+  }
+}
+
+/* 종목 화면 넓은 화면: 오른쪽(좋은/나쁜 소식·언급량)이 짧아 긴 기사 목록 옆이 텅 빔 (11/13 QA) → 내릴 때 따라오게 */
+@media (min-width: 769px) {
+  .stock-flow .sf-grid {
+    align-items: start;
+  }
+  .stock-flow .sf-grid > .sf-stack:last-child {
+    position: sticky;
+    top: 124px; /* 위 머리줄(64) + 바로 가기 줄(약 44) 아래 */
   }
 }
