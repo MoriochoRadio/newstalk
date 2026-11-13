@@ -208,7 +208,8 @@ function NewsDetail({ id }) {
   if (!a) return null;
 
   const raw = detail.data;
-  const summaryIsTitle = a.isDisclosure || (a.summary.length === 1 && a.summary[0] === a.title);
+  // 공시도 원문을 AI 가 요약함 (summarizedAt 있음). 요약 전 공시만 요약 칸에 제목이 들어 있음 (11/13: 요약이 있는데도 '제목으로만'이라 나오던 것)
+  const summaryIsTitle = a.isDisclosure ? !raw.summarizedAt : a.summary.length === 1 && a.summary[0] === a.title;
 
   return (
     <article className="article-page">
@@ -248,7 +249,7 @@ function NewsDetail({ id }) {
           {raw.summarizedAt && <span className="muted num" style={{ fontSize: 'var(--fs-xs)' }}>{shortTime(raw.summarizedAt)} 요약</span>}
         </div>
         {summaryIsTitle ? (
-          <p className="sub">공시는 제목으로만 종목을 연결했어요. 자세한 내용은 원문에서 확인해 주세요.</p>
+          <p className="sub">공시 원문을 아직 요약하지 못했어요. 자세한 내용은 원문에서 확인해 주세요.</p>
         ) : a.hasSummary ? (
           <ul className="summary-list">
             {a.summary.map((line, i) => (
