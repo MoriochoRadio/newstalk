@@ -9,14 +9,18 @@ const MAX_PAGES = 10;
 const KST_MS = 9 * 3600 * 1000;
 
 export async function loadTodayFeed(signal) {
-  let items = [];
-  let total = 0;
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const res = await articleApi.list({ period: 'today', size: SIZE, page }, { signal });
-    total = res?.totalCount ?? 0;
-    items = items.concat((res?.items || []).map(toUiArticle));
-    if (items.length >= total || (res?.items || []).length < SIZE) break;
-  }
+  // 첫 쪽으로 전체 수를 안 뒤 나머지 쪽은 한꺼번에 (11/13 로딩 개선: 한 쪽씩 차례로 기다리던 것)
+  const first = await articleApi.list({ period: 'today', size: SIZE, page: 1 }, { signal });
+  const total = first?.totalCount ?? 0;
+  const pages = Math.min(MAX_PAGES, Math.ceil(total / SIZE));
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(0, pages - 1) }, (_, i) => articleApi.list({ period: 'today', size: SIZE, page: i + 2 }, { signal }))
+  );
+  // 받는 사이 새 글이 들어오면 쪽이 밀려 같은 글이 두 번 올 수 있음 → id 로 한 번만
+  const seen = new Set();
+  const items = [first, ...rest]
+    .flatMap((res) => (res?.items || []).map(toUiArticle))
+    .filter((a) => (seen.has(a.id) ? false : seen.add(a.id)));
   return { items, total, complete: items.length >= total };
 }
 

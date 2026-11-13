@@ -4895,3 +4895,178 @@ html {
     grid-column: 1 / -1;
   }
 }
+
+/* 11/13 2차: 뉴스 지도 '기사 n' 크게 · 관심 종목 카드 · 소식 1~5위 한 줄 목록 */
+.nm-count {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  opacity: 0.95;
+}
+.nm-count b {
+  font-size: 1.3em;
+  font-weight: 800;
+  margin-left: 2px;
+}
+.nm-tile.big .nm-count {
+  font-size: var(--fs-lg);
+}
+
+.watch-strip {
+  display: block;
+  margin: 16px 0 0;
+  overflow: visible;
+}
+.watch-strip .ws-head {
+  margin-bottom: 8px;
+  font-size: var(--fs-lg);
+}
+.watch-strip ul {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.watch-strip li {
+  flex: 1 1 0;
+  min-width: 168px;
+}
+.watch-strip li:last-child {
+  flex: 0 0 112px;
+  min-width: 112px;
+}
+.ws-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: var(--card-border);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  text-decoration: none;
+}
+.ws-card:hover {
+  background: var(--surface-hover);
+}
+.ws-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ws-card .ws-name {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-price {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-md);
+  color: var(--text-2);
+}
+.ws-price b {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+}
+.ws-price > * {
+  white-space: nowrap;
+}
+.ws-card.ws-more {
+  white-space: nowrap;
+  padding: 0 6px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.front-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.front-list .rank-list {
+  padding: 4px 8px;
+}
+.rank-list .story-titles li {
+  display: grid;
+  grid-template-columns: 32px 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+}
+.rank-list .st-rank {
+  width: auto;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  color: var(--text-3);
+  text-align: center;
+}
+.rank-list li:first-child .st-rank {
+  color: var(--accent-text);
+}
+.rank-list .st-ring {
+  padding-top: 0;
+}
+.rank-list .st-main {
+  display: contents;
+}
+.rank-list .st-title {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  -webkit-line-clamp: 1;
+}
+.rank-list .st-meta {
+  justify-content: flex-end;
+  gap: 14px;
+  font-size: var(--fs-md);
+  white-space: nowrap;
+}
+.rank-list .st-meta b {
+  font-weight: 800;
+}
+@media (max-width: 768px) {
+  .rank-list .story-titles li {
+    grid-template-columns: 26px 16px minmax(0, 1fr);
+    gap: 4px 10px;
+    padding: 12px 6px;
+  }
+  .rank-list .st-title {
+    -webkit-line-clamp: 2;
+    font-size: var(--fs-md);
+  }
+  .rank-list .st-meta {
+    grid-column: 3;
+    justify-content: flex-start;
+    font-size: var(--fs-sm);
+  }
+  .watch-strip li {
+    min-width: 132px;
+  }
+  .watch-strip li:last-child {
+    flex-basis: 68px;
+    min-width: 68px;
+  }
+  .ws-card {
+    padding: 10px 12px;
+  }
+  .ws-card .ws-name {
+    font-size: var(--fs-md);
+  }
+  .ws-price {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    font-size: var(--fs-sm);
+  }
+  .ws-price b {
+    font-size: var(--fs-lg);
+  }
+}

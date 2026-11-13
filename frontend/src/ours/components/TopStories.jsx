@@ -99,7 +99,7 @@ function StoryCard({ story, rank, quotes, big }) {
  *  한 줄: 순위 · 좋은/나쁜 소식 점(링) · 제목 · 주인공 종목과 등락 · 오늘 기사 수 */
 function StoryTitles({ stories, quotes, start = 2 }) {
   return (
-    <ol className="story-titles">
+    <ol className="story-titles" start={start}>
       {stories.map((st, i) => {
         const a = st.lead;
         const s = summarized(st) || a;
@@ -133,9 +133,25 @@ function StoryTitles({ stories, quotes, start = 2 }) {
   );
 }
 
-export default function TopStories({ stories, quotes, titles = false, moreLink = null }) {
+export default function TopStories({ stories, quotes, titles = false, list = false, moreLink = null }) {
   if (!stories.length) return null;
   const [lead, ...side] = stories;
+  // 순위 목록만 (11/13 피드백: "그냥 1~5 순위만, 여백 안 남게") — 1위 큰 카드 옆이 비던 것
+  if (list) {
+    return (
+      <section className="front-page front-dash front-list" aria-labelledby="front-title">
+        <div className="section-head front-head">
+          <h2 className="section-title" id="front-title">
+            가장 많이 다룬 소식
+          </h2>
+          {moreLink}
+        </div>
+        <div className="front-titles rank-list">
+          <StoryTitles stories={stories} quotes={quotes} start={1} />
+        </div>
+      </section>
+    );
+  }
   return (
     <section className={`front-page ${titles ? 'front-dash' : ''}`} aria-labelledby="front-title">
       <div className="section-head front-head">

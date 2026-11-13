@@ -1,7 +1,7 @@
 // 홈 맨 위 '오늘 뉴스 한눈에' (11/13 피드백: "뉴스 중심이니까 뉴스에 대한 시각화를 메인에 크게 딱")
 // 뉴스 지도: 오늘의 소식(같은 소식끼리 묶음)을 네모 칸으로. 칸 크기 = 그 소식을 쓴 오늘 기사 수,
 //            색 = 그 소식이 주인공 종목에 좋은 소식(초록)·나쁜 소식(주황)·둘 다(반반)·판단 없음(회색). 시세 색(빨강·파랑)과 일부러 다르게
-// 옆: 오늘 뉴스 수 · 좋은/나쁜 소식 큰 링 · 시간대별 보도량
+// 옆: 오늘 뉴스 수 · 좋은/나쁜 소식 큰 링 · 오늘 많이 나온 소식 3개
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { squarify } from './MarketMap';
@@ -60,7 +60,7 @@ export function NewsMap({ stories, height = 380 }) {
           const nameLen = Math.max(2, (main?.name || '').length);
           const nameSize = Math.round(Math.max(13, Math.min(30, Math.sqrt(w * h) / 8, (w - 28) / (nameLen * 0.95))));
           const showWord = word && h >= 60 && w >= 80;
-          const showCount = h >= 90 && w >= 90;
+          const showCount = h >= 80 && w >= 80;
           return (
             <li key={a.id} className="nm-cell" style={{ left: r.x, top: r.y, width: w, height: h }}>
               <Link
@@ -75,7 +75,11 @@ export function NewsMap({ stories, height = 380 }) {
                   </span>
                 )}
                 {showWord && <span className="nm-word">{word}</span>}
-                {showCount && <span className="nm-count num">기사 {st.size || 1}</span>}
+                {showCount && (
+                  <span className="nm-count num">
+                    기사 <b>{st.size || 1}</b>
+                  </span>
+                )}
               </Link>
             </li>
           );

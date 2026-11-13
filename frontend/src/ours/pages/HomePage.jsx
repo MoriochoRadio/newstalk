@@ -1,7 +1,7 @@
 // 홈 = 뉴스 대시보드 (11/13 피드백 2차: "뉴스 중심이니 뉴스 상태를 메인에 크게 한눈에", "시장 지도는 따로 큰 화면으로")
-// 1) 맨 위: 오늘 뉴스 한눈에 — 뉴스 지도(소식 칸: 크기 = 기사 수, 색 = 좋은/나쁜 소식) + 오늘 뉴스 수·좋은/나쁜 링·시간대 보도량
+// 1) 맨 위: 오늘 뉴스 한눈에 — 뉴스 지도(소식 칸: 크기 = 기사 수, 색 = 좋은/나쁜 소식) + 오늘 뉴스 수·좋은/나쁜 링·많이 나온 소식
 // 2) 로그인: 내 관심 종목 한 줄 (링·등락)
-// 3) 가장 많이 다룬 소식: 1위만 요약, 2~7위는 제목만
+// 3) 가장 많이 다룬 소식: 1~5위 한 줄씩 (순위·좋은/나쁜 점·제목·주인공 종목 등락·기사 수)
 // 4) 바로 가기: 시장 지도(/map)·종목·소식 전체
 // 이전 홈(세 칸 띠·화제 종목 카드·그 밖의 소식·소식 종류·보도량·이슈 순위)은 브랜치 test/fe-ours-1113-before-dashboard
 // 말은 조심스럽게: 호재·악재·예측·"때문에" 금지. 등락률은 어제 종가 대비 값
@@ -13,7 +13,7 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { fmtRate, todayLabel } from '../lib/format';
+import { fmtPrice, fmtRate, todayLabel } from '../lib/format';
 import { loadTodayFeed } from '../lib/todayFeed';
 import { topicMix } from '../components/TopicMix';
 import { groupStories } from '../lib/stories';
@@ -26,7 +26,7 @@ import { SkeletonRows } from '../components/ui';
 import { dirClass } from '../lib/format';
 
 const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
-const TOP_N = 7; // 1위(요약) + 2~7위(제목만)
+const TOP_N = 5; // 1~5위 제목 목록 (11/13 피드백: 순위만, 여백 없이)
 const WATCH_N = 8; // 관심 종목 한 줄
 const MAP_STORIES = 12; // 뉴스 지도 칸 수 (18칸은 제목이 다 잘림)
 
@@ -82,16 +82,21 @@ function WatchStrip({ quotes }) {
           const q = quotes[w.stockCode];
           return (
             <li key={w.stockCode}>
-              <Link to={`/stocks/${w.stockCode}`} className="ws-chip" title={pos || neg ? leanOf(pos, neu, neg).text : '오늘 판단한 기사가 아직 없어요'}>
-                {pos || neg ? <ToneRing pos={pos} neu={neu} neg={neg} size={18} /> : <span className="wr-dot" />}
-                <span className="ws-name">{w.stockName}</span>
-                {q && q.changeRate != null && <b className={`num ${dirClass(q.changeRate)}`}>{fmtRate(q.changeRate)}</b>}
+              <Link to={`/stocks/${w.stockCode}`} className="ws-card" title={pos || neg ? leanOf(pos, neu, neg).text : '오늘 판단한 기사가 아직 없어요'}>
+                <span className="ws-top">
+                  {pos || neg ? <ToneRing pos={pos} neu={neu} neg={neg} size={22} /> : <span className="wr-dot" />}
+                  <span className="ws-name">{w.stockName}</span>
+                </span>
+                <span className="ws-price num">
+                  {q && q.price != null ? <span>{fmtPrice(q.price)}</span> : <span className="muted">–</span>}
+                  {q && q.changeRate != null && <b className={dirClass(q.changeRate)}>{fmtRate(q.changeRate)}</b>}
+                </span>
               </Link>
             </li>
           );
         })}
         <li>
-          <Link to="/watchlist" className="ws-chip ws-more">
+          <Link to="/watchlist" className="ws-card ws-more">
             관리 <ChevronRight className="icon-sm" aria-hidden="true" />
           </Link>
         </li>
@@ -169,7 +174,7 @@ export default function HomePage() {
         <TopStories
           stories={topStories}
           quotes={quotes}
-          titles
+          list
           moreLink={
             <Link to="/news?period=today" className="link">
               소식 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
