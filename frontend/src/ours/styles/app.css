@@ -4285,3 +4285,18 @@ html {
 .quick-picks .tags {
   justify-content: center;
 }
+/* 휴대폰: 상태 알약이 오른쪽에 붙어 띠가 200px 로 찌그러짐 → 알약은 띠 아래 줄로 (11/13 전체 사진 점검) */
+@media (max-width: 768px) {
+  .home-head {
+    flex-wrap: wrap;
+  }
+  .home-head > div:first-child {
+    flex: 1 1 100%;
+  }
+}
+/* PC: 1위 카드가 오른쪽 세 카드 높이에 맞춰 늘어나 카드 안 아래가 크게 비었음 → 내용만큼만 */
+@media (min-width: 769px) {
+  .front-page > .story-big {
+    align-self: start;
+  }
+}
