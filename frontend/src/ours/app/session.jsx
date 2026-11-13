@@ -72,9 +72,18 @@ export function SessionProvider({ children }) {
     toast('로그아웃했어요.');
   }, [toast]);
 
-  const requireLogin = useCallback((reason) => {
+  // 로그인 뒤에 이어서 할 일 (11/13 사용자 눈으로: 별을 눌러 가입까지 했는데 돌아오니 안 담겨 있어 별을 또 눌러야 했음)
+  const pendingRef = useRef(null);
+  const requireLogin = useCallback((reason, then) => {
+    pendingRef.current = then || null;
     setAuthModal({ mode: 'login', reason });
   }, []);
+  useEffect(() => {
+    if (!user || !pendingRef.current) return;
+    const run = pendingRef.current;
+    pendingRef.current = null;
+    run();
+  }, [user]);
 
   /** 로그인이 필요한 API 를 부르다 401 이 나면 로그아웃 상태로 돌리고 로그인 창 */
   const handleAuthError = useCallback(
@@ -94,7 +103,17 @@ export function SessionProvider({ children }) {
   const toggleWatch = useCallback(
     async (stockCode, stockName) => {
       if (!user) {
-        requireLogin('관심 종목은 로그인하면 저장돼요.');
+        const name = stockName || stockCode;
+        requireLogin('관심 종목은 로그인하면 저장돼요. 로그인하면 바로 담아 드려요.', async () => {
+          try {
+            await watchlistApi.add(stockCode);
+            toast(`관심 종목에 담았어요 · ${name}`);
+          } catch (err) {
+            if (err?.status === 409) toast(`이미 관심 종목에 있어요 · ${name}`);
+            else if (!handleAuthError(err)) toast(errorText(err), 'error');
+          }
+          await loadWatchlist();
+        });
         return;
       }
       const has = watchCodes.has(stockCode);
@@ -136,7 +155,12 @@ export function SessionProvider({ children }) {
       logout,
       authModal,
       openAuth: (mode = 'login', reason) => setAuthModal({ mode, reason }),
-      closeAuth: () => setAuthModal(null),
+      closeAuth: () => {
+        // 로그인하지 않고 닫을 때만 맡긴 일을 버림. user 값은 이 함수가 만들어진 때의 옛 값일 수 있어(로그인 직후 닫힘)
+        // 로그인하면 바로 저장되는 토큰으로 판단
+        if (!tokenStore.get()) pendingRef.current = null;
+        setAuthModal(null);
+      },
       requireLogin,
       handleAuthError,
       watchlist,

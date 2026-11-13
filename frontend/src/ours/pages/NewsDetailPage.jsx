@@ -9,6 +9,7 @@ import { useApi } from '../../hooks/useApi';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { fmtPrice, fmtRate, dirClass, fullTime, shortTime } from '../lib/format';
+import { explainDisclosure } from '../lib/disclosureGlossary';
 import { ArticleTags, SAME_NEWS_TIP, sourceText } from '../components/ArticleRow';
 import { TONE_TIP, ToneRing, countsOf } from '../components/Tone';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
@@ -232,6 +233,11 @@ function NewsDetail({ id }) {
           <ArticleTags article={a} detail />
         </div>
         <h1 className="article-title">{a.title}</h1>
+        {a.isDisclosure && explainDisclosure(a.disclosureType) && (
+          <p className="disclosure-explain">
+            <b>{a.disclosureType}</b> {explainDisclosure(a.disclosureType)}
+          </p>
+        )}
         <ToneBand article={a} />
         <div className="article-meta">
           <span>{sourceText(a)}</span>
@@ -319,7 +325,7 @@ function NewsDetail({ id }) {
 
       <p className="note page-foot-note">
         <Info className="icon-sm" aria-hidden="true" />
-        시세는 어제 종가 대비 지금 값이에요. 기사 때문에 움직였다는 뜻이 아니에요.
+        시세는 어제 종가 대비 지금 값이에요. {a.isDisclosure ? '공시' : '기사'} 때문에 움직였다는 뜻이 아니에요.
       </p>
 
       {a.relatedSns.length > 0 && (

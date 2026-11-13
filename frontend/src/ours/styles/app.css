@@ -4055,3 +4055,19 @@ html {
   .sec-nav .sn-sec-mention { order: 4; }
   .sec-nav .sn-sec-board { order: 5; }
 }
+
+/* 공시 종류 쉬운 설명 한 줄 (11/13 일반 사용자 눈으로) */
+.disclosure-explain {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+.disclosure-explain b {
+  color: var(--text);
+  font-weight: 600;
+  margin-right: 4px;
+}

@@ -108,7 +108,8 @@ export default function AuthModal() {
               spellCheck={false}
               value={loginId}
               maxLength={20}
-              onChange={(e) => setLoginId(e.target.value)}
+              // 아이디는 소문자만 (서버 규칙). 휴대폰 키보드가 첫 글자를 대문자로 바꿔도 막히지 않게 바로 소문자로 (11/13 사용자 눈으로)
+              onChange={(e) => setLoginId(e.target.value.toLowerCase())}
               aria-invalid={Boolean(errors.loginId)}
               aria-describedby="auth-id-help"
             />
