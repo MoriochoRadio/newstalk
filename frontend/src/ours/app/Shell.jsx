@@ -1,6 +1,6 @@
 // 앱 틀: 데스크톱은 왼쪽 메뉴 + 위 검색줄, 휴대폰(768 이하)은 위 작은 줄 + 아래 탭 4개
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
@@ -9,6 +9,7 @@ import { useNetStatus } from '../lib/netStatus';
 import SearchBox from '../components/SearchBox';
 import AuthModal from '../components/AuthModal';
 import { useFocusTrap } from '../lib/focusTrap';
+import { SkeletonRows } from '../components/ui';
 
 const NAV = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -274,7 +275,9 @@ export default function Shell() {
 
         <main id="main" className="content" tabIndex={-1}>
           <NetBanner />
-          <Outlet />
+          <Suspense fallback={<SkeletonRows rows={6} />}>
+            <Outlet />
+          </Suspense>
         </main>
 
         <footer className="footer">

@@ -1,4 +1,5 @@
 // 우리 안 화면 묶음 (README 5절 정보 구조)
+import { lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -12,14 +13,35 @@ root.setAttribute('data-nav', 'ink');
 import { SessionProvider } from './app/session';
 import Shell from './app/Shell';
 import HomePage from './pages/HomePage';
-import NewsPage from './pages/NewsPage';
-import NewsDetailPage from './pages/NewsDetailPage';
-import StocksPage from './pages/StocksPage';
-import MapPage from './pages/MapPage';
-import StockDetailPage from './pages/StockDetailPage';
-import WatchlistPage from './pages/WatchlistPage';
-import SearchPage from './pages/SearchPage';
-import NotFoundPage from './pages/NotFoundPage';
+
+// 첫 화면(홈)만 바로 싣고, 나머지 화면은 들어갈 때 받음 (11/13 최적화: 차트 라이브러리가 홈 묶음에 들어 있었음)
+// 첫 화면이 뜬 뒤 쉬는 틈에 미리 받아 둬서 옮겨 갈 때 기다림이 없게 함
+const pages = {
+  news: () => import('./pages/NewsPage'),
+  newsDetail: () => import('./pages/NewsDetailPage'),
+  stocks: () => import('./pages/StocksPage'),
+  map: () => import('./pages/MapPage'),
+  stockDetail: () => import('./pages/StockDetailPage'),
+  watchlist: () => import('./pages/WatchlistPage'),
+  search: () => import('./pages/SearchPage'),
+  notFound: () => import('./pages/NotFoundPage'),
+};
+const NewsPage = lazy(pages.news);
+const NewsDetailPage = lazy(pages.newsDetail);
+const StocksPage = lazy(pages.stocks);
+const MapPage = lazy(pages.map);
+const StockDetailPage = lazy(pages.stockDetail);
+const WatchlistPage = lazy(pages.watchlist);
+const SearchPage = lazy(pages.search);
+const NotFoundPage = lazy(pages.notFound);
+
+if (typeof window !== 'undefined') {
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+  const prefetch = () => idle(() => Object.values(pages).forEach((load) => load().catch(() => {})));
+  // 이 파일 자체가 나중에 받아지므로 load 가 이미 지났을 수 있음
+  if (document.readyState === 'complete') prefetch();
+  else window.addEventListener('load', prefetch, { once: true });
+}
 
 export default function OursApp() {
   return (
