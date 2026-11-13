@@ -147,18 +147,21 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
         </Link>
       )}
       {summary && !compact && <p className="feed-summary">{summary}</p>}
-      <div className="feed-meta">
-        <span>{sourceText(a)}</span>
-        <time className="dot num" dateTime={a.publishedAtIso || undefined}>
-          {relativeTime(a.publishedAtIso)}
-        </time>
-      </div>
-      {(tags.length > 0 || a.relatedStocks.length > 0) && (
-        <div className="tags feed-tags">
-          <StockChips stocks={a.relatedStocks} focusCode={focusCode} max={compact ? 2 : 3} />
-          {tags}
+      {/* 종목 칩과 언론·시각을 한 줄로 (11/13: 글마다 세 줄이라 스크롤이 길었음). 좁으면 자연히 두 줄 */}
+      <div className="feed-foot">
+        {(tags.length > 0 || a.relatedStocks.length > 0) && (
+          <div className="tags feed-tags">
+            <StockChips stocks={a.relatedStocks} focusCode={focusCode} max={compact ? 2 : 3} />
+            {tags}
+          </div>
+        )}
+        <div className="feed-meta">
+          <span>{sourceText(a)}</span>
+          <time className="dot num" dateTime={a.publishedAtIso || undefined}>
+            {relativeTime(a.publishedAtIso)}
+          </time>
         </div>
-      )}
+      </div>
       {others.length > 0 && (
         <div className="story-more">
           <button type="button" className="story-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>

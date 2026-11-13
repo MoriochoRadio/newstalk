@@ -5081,3 +5081,22 @@ html {
     top: 124px; /* 위 머리줄(64) + 바로 가기 줄(약 44) 아래 */
   }
 }
+
+/* 기사 목록 한 줄 아래칸: 종목 칩(왼쪽) · 언론·시각(오른쪽) */
+.feed-row {
+  padding: 14px 4px;
+}
+.feed-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 8px;
+}
+.feed-foot .feed-tags {
+  margin-top: 0;
+}
+.feed-foot .feed-meta {
+  margin: 0 0 0 auto;
+  white-space: nowrap;
+}
