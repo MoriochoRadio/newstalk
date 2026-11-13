@@ -2440,7 +2440,13 @@ a.feed-title:hover {
 
 .map-cell {
   position: absolute;
-  animation: pop 0.4s ease both;
+  /* 투명에서 시작하면 효과가 멈출 때(안 보이는 탭·캡처) 지도 전체가 사라짐 (11/13) → 크기만 살짝 */
+  animation: tile-in 0.35s ease both;
+}
+@keyframes tile-in {
+  from {
+    transform: scale(0.96);
+  }
 }
 
 .map-tile {
@@ -4299,4 +4305,165 @@ html {
   .front-page > .story-big {
     align-self: start;
   }
+}
+
+/* ===== 홈 대시보드 (11/13 피드백: 한 화면, 지도 맨 위, 1위만 요약·나머지 제목만) ===== */
+.dash-head {
+  margin-bottom: 12px;
+}
+.dash-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+.dash-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.dash-map-box {
+  height: 360px;
+  border-radius: var(--radius);
+}
+/* 관심 종목 줄 */
+.watch-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.watch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+}
+.watch-row:hover {
+  background: var(--surface-hover);
+}
+.watch-rows li + li .watch-row {
+  border-top: 1px solid var(--line);
+}
+.wr-ring {
+  display: inline-flex;
+  width: 18px;
+  justify-content: center;
+}
+.wr-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.wr-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wr-count {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+/* 소식: 1위 요약 카드 + 2위부터 제목 목록 */
+.front-dash {
+  margin-bottom: 16px;
+}
+.front-titles {
+  background: var(--surface);
+  border: var(--card-border);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+  padding: 6px 4px;
+}
+.story-titles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.story-titles li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.story-titles li + li {
+  border-top: 1px solid var(--line);
+}
+.st-rank {
+  width: 18px;
+  flex: none;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.st-ring {
+  flex: none;
+  padding-top: 3px;
+}
+.st-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.st-title {
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text);
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.st-title:hover {
+  text-decoration: underline;
+}
+.st-meta {
+  display: flex;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.st-stock {
+  color: var(--text-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+@media (max-width: 1100px) {
+  .dash-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* 많이 오른·내린: 넓은 옆 칸에선 위아래, 휴대폰에선 양옆 두 칸 (11/13 피드백: 홈 스크롤 줄이기) */
+.movers-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .movers-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .movers-cols .mover {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 6px;
+  }
+}
+.hot-section {
+  margin-top: 16px;
+}
+.hot-section .section-title {
+  margin-bottom: 10px;
 }

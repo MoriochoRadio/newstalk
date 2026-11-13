@@ -11,6 +11,7 @@ import { useTitle } from '../lib/hooks';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import SearchBox from '../components/SearchBox';
 import Movers from '../components/Movers';
+import HotStocks from '../components/HotStocks';
 import Sparkline from '../components/Sparkline';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 
@@ -92,6 +93,13 @@ export default function StocksPage() {
         placeholder="종목 이름·코드·별칭 (예: 삼전, 005930)…"
         onPick={(s) => navigate(`/stocks/${s.stockCode}`)}
       />
+      {/* 홈에서 옮겨 온 화제 종목 카드 (11/13 피드백: 홈은 한 화면 대시보드, 자세한 건 눌러서 다른 화면) */}
+      <section className="hot-section" aria-labelledby="hot-title">
+        <h2 className="section-title" id="hot-title">
+          오늘 화제 종목
+        </h2>
+        <HotStocks issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={disabled} />
+      </section>
       <div className="grid-2 sl-grid" style={{ marginTop: 16 }}>
         <section className="card sl-rank" aria-labelledby="rank-title">
           <div className="card-head">

@@ -5,7 +5,7 @@
 // - 판단을 붙이지 않음: 등락률은 어제 종가 대비 지금 값일 뿐 (기사 때문이라고 말하지 않음, 화면 맨 아래 안내와 같음)
 import { Link } from 'react-router-dom';
 import { dirClass, fmtRate, relativeTime } from '../lib/format';
-import Tone, { TitleText, storyCounts, toneOfStory, toneRowClass } from './Tone';
+import Tone, { TitleText, ToneRing, storyCounts, toneOfStory, toneRowClass } from './Tone';
 
 /** 묶음에서 요약이 있는 기사 (대표 → 나머지 순) */
 function summarized(story) {
@@ -95,23 +95,67 @@ function StoryCard({ story, rank, quotes, big }) {
   );
 }
 
-export default function TopStories({ stories, quotes }) {
+/** 2위부터 제목만 (11/13 피드백: "1등은 세부 요약이 나와도 좋은데 나머지는 제목들만 깔끔하게")
+ *  한 줄: 순위 · 좋은/나쁜 소식 점(링) · 제목 · 주인공 종목과 등락 · 오늘 기사 수 */
+function StoryTitles({ stories, quotes, start = 2 }) {
+  return (
+    <ol className="story-titles">
+      {stories.map((st, i) => {
+        const a = st.lead;
+        const s = summarized(st) || a;
+        const c = storyCounts(st);
+        const main = (a.relatedStocks || []).find((x) => x.role === 'MAIN') || a.relatedStocks?.[0];
+        const q = main ? quotes?.[main.code] : null;
+        return (
+          <li key={a.id}>
+            <span className="st-rank num">{start + i}</span>
+            <span className="st-ring" aria-hidden="true">
+              <ToneRing pos={c.pos} neu={c.neu} neg={c.neg} size={14} />
+            </span>
+            <span className="st-main">
+              <Link to={`/news/${s.id}`} className="st-title">
+                <TitleText text={a.title} />
+              </Link>
+              <span className="st-meta num">
+                {main && (
+                  <Link to={`/stocks/${main.code}`} className="st-stock">
+                    {main.name}
+                    {q && q.changeRate != null && <b className={dirClass(q.changeRate)}> {fmtRate(q.changeRate)}</b>}
+                  </Link>
+                )}
+                <span>기사 {st.size || 1}건</span>
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export default function TopStories({ stories, quotes, titles = false, moreLink = null }) {
   if (!stories.length) return null;
   const [lead, ...side] = stories;
   return (
-    <section className="front-page" aria-labelledby="front-title">
+    <section className={`front-page ${titles ? 'front-dash' : ''}`} aria-labelledby="front-title">
       <div className="section-head front-head">
         <h2 className="section-title" id="front-title">
           가장 많이 다룬 소식
         </h2>
-        <p className="section-sub">같은 소식을 쓴 오늘 기사가 많은 순서예요.</p>
+        {moreLink || <p className="section-sub">같은 소식을 쓴 오늘 기사가 많은 순서예요.</p>}
       </div>
       <StoryCard story={lead} rank={1} quotes={quotes} big />
-      <div className="front-side">
-        {side.map((st, i) => (
-          <StoryCard key={st.lead.id} story={st} rank={i + 2} quotes={quotes} />
-        ))}
-      </div>
+      {titles ? (
+        <div className="front-side front-titles">
+          <StoryTitles stories={side} quotes={quotes} />
+        </div>
+      ) : (
+        <div className="front-side">
+          {side.map((st, i) => (
+            <StoryCard key={st.lead.id} story={st} rank={i + 2} quotes={quotes} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

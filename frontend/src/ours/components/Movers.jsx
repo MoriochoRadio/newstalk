@@ -42,7 +42,7 @@ export default function Movers({ issues, quotes, disabled, loading, title = '이
       ) : loading && rows.length === 0 ? (
         <SkeletonRows rows={3} compact />
       ) : (
-        <div className="stack" style={{ gap: 12 }}>
+        <div className="movers-cols">
           <MoverBlock label="많이 오른" list={ups} emptyText="오른 종목이 없어요" />
           <MoverBlock label="많이 내린" list={downs} emptyText="내린 종목이 없어요" />
         </div>
