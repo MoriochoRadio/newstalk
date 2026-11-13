@@ -36,6 +36,8 @@ export default function SearchPage() {
   const stocks = useApi((signal) => stockApi.search(q, { size: 12 }, { signal }), [q], { enabled: Boolean(q) });
 
   const stockItems = stocks.data?.items || [];
+  const sameTheme =
+    stockItems.length > 1 && stockItems.every((s) => s.matchedTheme && s.matchedTheme === stockItems[0].matchedTheme) ? stockItems[0].matchedTheme : '';
   const top = stockItems[0];
   const exact = top && (top.stockCode === q.toUpperCase() || top.stockName === q || stocks.data.totalCount === 1) ? top : null;
   const linked = useApi((signal) => articleApi.list({ stockCode: exact.stockCode, size: 5 }, { signal }), [exact?.stockCode], {
@@ -64,6 +66,7 @@ export default function SearchPage() {
           <h2 className="card-title" id="sr-stocks">
             종목 {stocks.data && <span className="count num">{stocks.data.totalCount}</span>}
           </h2>
+          {sameTheme && <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>테마 ‘{sameTheme}’ 종목</span>}
         </div>
         {stocks.loading && !stocks.data && <SkeletonRows rows={2} compact />}
         {stocks.error && <ErrorBox error={stocks.error} onRetry={stocks.reload} />}
@@ -73,9 +76,10 @@ export default function SearchPage() {
             {stockItems.map((s) => (
               <Link key={s.stockCode} to={`/stocks/${s.stockCode}`} className="chip">
                 {s.stockName}
+                {/* 모두 같은 테마면 테마는 위에 한 번만 → 칩이 짧아져 휴대폰에서 한 줄에 여럿 (11/13: 칩 12개가 한 줄씩 차지해 기사가 한참 아래) */}
                 <span className="role num">
                   {s.stockCode}
-                  {s.matchedTheme ? ` · 테마 ${s.matchedTheme}` : ''}
+                  {s.matchedTheme && !sameTheme ? ` · 테마 ${s.matchedTheme}` : ''}
                 </span>
               </Link>
             ))}

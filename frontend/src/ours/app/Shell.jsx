@@ -175,9 +175,16 @@ export default function Shell() {
   useFocusTrap(mobileSearchRef, mobileSearch, closeMobileSearch); // Esc 로 닫기 + Tab 가두기 (11/12 코드 점검)
 
   // 새 화면은 맨 위부터 (뒤로 가기는 브라우저가 기억한 위치)
+  // + 초점을 본문으로 (11/13 키보드 점검: 기사를 열면 초점이 문서 처음으로 돌아가 Tab 을 10번 넘게 다시 눌러야 본문). 첫 화면은 그대로
+  const firstRoute = useRef(true);
   useEffect(() => {
     if (navType !== 'POP') window.scrollTo(0, 0);
     setMobileSearch(false);
+    if (firstRoute.current) {
+      firstRoute.current = false;
+      return;
+    }
+    document.getElementById('main')?.focus({ preventScroll: true });
   }, [location.pathname, navType]);
 
   const ThemeIcon = dark ? Sun : Moon;
@@ -222,10 +229,13 @@ export default function Shell() {
             <ThemeIcon className="icon" aria-hidden="true" />
             <span className="nav-text">{themeLabel}</span>
           </button>
-          <a className="nav-link" href="/v7" title={navCollapsed ? '이전 화면(V7) 비교' : undefined}>
-            <Newspaper className="icon" aria-hidden="true" />
-            <span className="nav-text">이전 화면(V7) 비교</span>
-          </a>
+          {/* 개발용 비교 링크: 일반 사용자에겐 'V7'이 무슨 뜻인지 모름 (11/13 키보드 점검) → 개발 서버에서만. 주소 /v7 은 그대로 열림 */}
+          {import.meta.env.DEV && (
+            <a className="nav-link" href="/v7" title={navCollapsed ? '이전 화면(V7) 비교' : undefined}>
+              <Newspaper className="icon" aria-hidden="true" />
+              <span className="nav-text">이전 화면(V7) 비교</span>
+            </a>
+          )}
         </div>
       </aside>
 

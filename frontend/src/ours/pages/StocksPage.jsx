@@ -83,7 +83,7 @@ export default function StocksPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">종목</h1>
-          <p className="page-sub">오늘 뉴스에 많이 나온 종목부터 보여 드려요.</p>
+          <p className="page-sub hide-mobile">오늘 뉴스에 많이 나온 종목부터 보여 드려요.</p>
         </div>
       </div>
       <SearchBox
@@ -92,8 +92,8 @@ export default function StocksPage() {
         placeholder="종목 이름·코드·별칭 (예: 삼전, 005930)…"
         onPick={(s) => navigate(`/stocks/${s.stockCode}`)}
       />
-      <div className="grid-2" style={{ marginTop: 16 }}>
-        <section className="card" aria-labelledby="rank-title">
+      <div className="grid-2 sl-grid" style={{ marginTop: 16 }}>
+        <section className="card sl-rank" aria-labelledby="rank-title">
           <div className="card-head">
             <h2 className="card-title" id="rank-title">
               오늘의 이슈 순위
@@ -184,9 +184,14 @@ export default function StocksPage() {
             <p className="card-note">소식은 같은 내용을 여러 언론사가 쓴 것을 한 번으로 센 수예요. 공시는 순위에 넣지 않고 따로 표시해요.</p>
           )}
         </section>
-        <div className="stack">
-          {items.length > 0 && <Movers issues={items} quotes={quotes} disabled={disabled} loading={quoteLoading} top={5} title={`이슈 종목 ${items.length}개 중 등락`} />}
-          <WatchMini />
+        {/* 휴대폰에선 등락을 순위표(30줄) 위로 (11/13 사용자 눈으로: '오늘 많이 내린 종목'을 찾다가 표 밑에 있어 못 찾음) */}
+        <div className="stack sl-side">
+          <div className="sl-movers">
+            {items.length > 0 && <Movers issues={items} quotes={quotes} disabled={disabled} loading={quoteLoading} top={5} title={`이슈 종목 ${items.length}개 중 등락`} />}
+          </div>
+          <div className="sl-watch">
+            <WatchMini />
+          </div>
         </div>
       </div>
     </>

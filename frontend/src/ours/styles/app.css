@@ -4092,3 +4092,32 @@ html {
   background: var(--good-soft);
   color: var(--good);
 }
+
+/* 종목 목록: 휴대폰에선 등락(많이 오른·내린) → 순위표 → 관심 종목 (11/13 사용자 눈으로) */
+@media (max-width: 768px) {
+  .sl-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .sl-grid .sl-side {
+    display: contents;
+  }
+  .sl-movers { order: 1; }
+  .sl-rank { order: 2; }
+  .sl-watch { order: 3; }
+}
+
+/* 화면 높이가 낮을 때(200% 확대한 PC·가로로 눕힌 휴대폰): 위 머리줄·바로 가기 줄을 고정하지 않음
+   (11/13 확대 점검: 1280×900 을 200% 로 보면 640×450 → 고정된 줄들이 화면의 1/4 이상을 가려 글 읽을 공간이 300px 아래) */
+@media (max-height: 520px) {
+  .topbar,
+  .sec-nav {
+    position: static;
+  }
+}
+
+/* 화면이 바뀌면 초점을 본문(main)으로 옮김(Shell) → 본문 전체에 테두리는 그리지 않음 (누르는 것이 아니라 영역) */
+#main:focus {
+  outline: none;
+}
