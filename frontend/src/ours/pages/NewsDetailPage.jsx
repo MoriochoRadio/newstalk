@@ -79,14 +79,14 @@ function ToneBand({ article }) {
                 </span>
               ))}
         </p>
-        <p className="tone-band-sub">AI가 기사 내용을 읽고 나눈 판단이에요. 주가가 오르거나 내린다는 예측은 아니에요.</p>
+        <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용을 읽고 나눈 판단이에요. 주가가 오르거나 내린다는 예측은 아니에요.</p>
       </div>
     </div>
   );
 }
 
 /** 연결 지도의 종목 카드: 주인공은 크게(이유·근거 다 보임), 함께 언급은 작게, 간접 연결은 점선 + "AI 추정" */
-function LinkCard({ s, quote, priceOff }) {
+function LinkCard({ s, quote, priceOff, disclosure = false }) {
   const indirect = s.matchType === 'INDIRECT';
   const cls = s.role === 'MAIN' ? 'is-main' : 'is-mentioned';
   return (
@@ -105,7 +105,15 @@ function LinkCard({ s, quote, priceOff }) {
         )}
       </div>
       {/* v3 문구 (UX 글쓰기 점검 11/12): 카드가 답할 질문은 "왜 연결됐나" → 역할 한 줄 + 형광펜 근거 문장, AI 판단 문장은 작게 */}
-      <p className="lmap-role">{indirect ? '기사에 쓰인 사건이 이 업종에 닿는다고 AI가 추정했어요' : s.role === 'MAIN' ? '이 기사가 주로 다루는 회사예요' : '기사에 함께 나온 회사예요'}</p>
+      <p className="lmap-role">
+        {indirect
+          ? '기사에 쓰인 사건이 이 업종에 닿는다고 AI가 추정했어요'
+          : disclosure
+            ? '이 공시를 낸 회사예요'
+            : s.role === 'MAIN'
+              ? '이 기사가 주로 다루는 회사예요'
+              : '기사에 함께 나온 회사예요'}
+      </p>
       {s.evidence ? (
         <blockquote className="lmap-evidence">
           {s.factTypeLabel && <span className={`badge ${FACT_BADGE[s.factType] || ''}`}>{s.factTypeLabel}</span>}
@@ -144,7 +152,7 @@ function LinkMap({ a, quotes, priceOff }) {
       <div className="lmap-branch">
         {mains.length > 0 && <p className="lmap-group">주인공 {mains.length}</p>}
         {mains.map((s) => (
-          <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} />
+          <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} disclosure={a.isDisclosure} />
         ))}
         {others.length > 0 && <p className="lmap-group">함께 언급 {others.length}</p>}
         {others.length > 0 && (
@@ -209,7 +217,7 @@ function NewsDetail({ id }) {
 
   const raw = detail.data;
   // 공시도 원문을 AI 가 요약함 (summarizedAt 있음). 요약 전 공시만 요약 칸에 제목이 들어 있음 (11/13: 요약이 있는데도 '제목으로만'이라 나오던 것)
-  const summaryIsTitle = a.isDisclosure ? !raw.summarizedAt : a.summary.length === 1 && a.summary[0] === a.title;
+  const summaryIsTitle = a.isDisclosure ? a.disclosurePending : a.summary.length === 1 && a.summary[0] === a.title;
 
   return (
     <article className="article-page">

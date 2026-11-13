@@ -118,8 +118,8 @@ export function StockChips({ stocks, focusCode, max = 3 }) {
 export default function ArticleRow({ article: a, others = [], focusCode, compact = false, showSummary = true }) {
   const [open, setOpen] = useState(false);
   const sns = a.sourceType === 'SNS';
-  // 공시는 요약이 제목과 같음 → 요약 줄 생략
-  const summary = showSummary && a.hasSummary && !a.isDisclosure ? a.summary.join(' ') : '';
+  // 공시도 원문을 AI 가 요약함 (11/13 지난 공시까지 채움). 요약 전 공시는 어댑터가 hasSummary=false 로 줌 → 요약 줄 생략
+  const summary = showSummary && a.hasSummary ? a.summary.join(' ') : '';
   const tags = ArticleTags({ article: a });
   const tone = toneOf(a, focusCode);
   return (

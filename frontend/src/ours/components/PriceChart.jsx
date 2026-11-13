@@ -177,6 +177,14 @@ function newsByBar(rows, unit, dayCounts, articles) {
 
 const kstDate = (iso) => new Date(new Date(iso).getTime() + KST_OFFSET_SEC * 1000).toISOString().slice(0, 10);
 
+/** 지금 정규장(평일 09:00~15:30, 한국 시간)인가. 공휴일은 모름 → 공휴일엔 오늘 봉 자체가 없어 영향 없음 */
+function tradingNow(now = new Date()) {
+  const k = new Date(now.getTime() + KST_OFFSET_SEC * 1000);
+  const day = k.getUTCDay();
+  const min = k.getUTCHours() * 60 + k.getUTCMinutes();
+  return day >= 1 && day <= 5 && min >= 9 * 60 && min < 15 * 60 + 30;
+}
+
 export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null }) {
   const [rangeKey, setRangeKey] = useState('3m');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
@@ -417,6 +425,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   }
   const bar = idx >= 0 ? rows[idx] : null;
   const prev = idx > 0 ? rows[idx - 1] : null;
+  // 장중의 오늘 일봉은 아직 종가가 아님 → "종" 대신 "현재" (11/13: 장중에 '종 27,650'이 위 현재가와 달라 헷갈림)
+  const live = bar && idx === rows.length - 1 && unit === 'day' && bar.t === kstDate(new Date().toISOString()) && tradingNow();
   const diffRate = bar && prev && prev.close ? ((bar.close - prev.close) / prev.close) * 100 : null;
   // 화면 낭독용 한 줄 (11/12 접근성 점검: 차트 값이 마우스·터치로만 보였음) — 고른 기간의 첫 봉과 마지막 봉 종가
   const span = range.bars ? rows.slice(-range.bars) : rows;
@@ -424,7 +434,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   const last = span[span.length - 1];
   const chartLabel =
     first && last && first.close
-      ? `${stockName} 주가 차트, ${range.label}. 마지막 종가 ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(Math.max(...span.map((r) => r.high)))}원, 최저 ${fmt(Math.min(...span.map((r) => r.low)))}원`
+      ? `${stockName} 주가 차트, ${range.label}. ${unit === 'day' && last.t === kstDate(new Date().toISOString()) && tradingNow() ? '현재' : '마지막 종가'} ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(Math.max(...span.map((r) => r.high)))}원, 최저 ${fmt(Math.min(...span.map((r) => r.low)))}원`
       : `${stockName} 주가 차트`;
   const maAt = (n) => {
     if (!hasMa(unit) || idx < n - 1) return null;
@@ -481,7 +491,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
               <b className="down">{fmt(bar.low)}</b>
             </span>
             <span>
-              <span className="k">종</span>
+              <span className="k">{live ? '현재' : '종'}</span>
               <b>{fmt(bar.close)}</b>
               {diffRate != null && (
                 <span className={diffRate > 0 ? 'up' : diffRate < 0 ? 'down' : 'flat'} style={{ marginLeft: 4 }}>
