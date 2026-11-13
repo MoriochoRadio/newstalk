@@ -195,7 +195,7 @@ export default function Shell() {
       <a href="#main" className="skip-link">
         본문으로 건너뛰기
       </a>
-      <aside className="sidenav" aria-label="주 메뉴">
+      <aside className="sidenav" aria-label="사이드바">
         <div className="brand-row">
           <Link to="/" className="brand" aria-label="StockNews 홈">
             <Mark />
@@ -215,7 +215,8 @@ export default function Shell() {
             {navCollapsed ? <PanelLeftOpen className="icon" aria-hidden="true" /> : <PanelLeftClose className="icon" aria-hidden="true" />}
           </button>
         </div>
-        <nav>
+        {/* 이름은 nav 에 (11/13 낭독기 구조 점검: 바깥 aside 에만 이름이 있어 '이름 없는 길잡이'로 들렸음) */}
+        <nav aria-label="주 메뉴">
           {NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} title={navCollapsed ? label : undefined} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <Icon className="icon" aria-hidden="true" />

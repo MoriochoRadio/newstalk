@@ -396,7 +396,16 @@ export default function HomePage() {
               <MarketGlance issues={issueItems} quotes={quotes} articles={feed.data?.items?.filter((a) => !a.isDisclosure)} priceOff={priceOff} />
             </>
           ) : feed.loading ? (
-            <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} />
+            // 띠와 같은 모양으로 자리를 잡아 둠 (11/13 느린 인터넷 점검: 띠가 늦게 나타나며 아래 내용을 밀어냄)
+            <div className="glance" aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="glance-tile">
+                  <span className="skeleton sk-line" style={{ width: '50%', height: 14, margin: 0 }} />
+                  <span className="skeleton sk-line" style={{ width: '80%', height: 31, margin: 0 }} />
+                  <span className="skeleton sk-line" style={{ width: '60%', height: 6, margin: 0 }} />
+                </div>
+              ))}
+            </div>
           ) : null}
         </div>
         <LivePill className="mobile-pill" />

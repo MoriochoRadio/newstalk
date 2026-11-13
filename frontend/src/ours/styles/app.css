@@ -4267,3 +4267,7 @@ html {
   .chart-box[data-ind='1'] { height: 390px; }
   .chart-box[data-ind='2'] { height: 480px; }
 }
+/* PC: 머리 영역 칸이 내용만큼만 줄어 띠가 작게 나옴 → 남는 폭을 차지 (띠는 최대 640px) */
+.home-head > div:first-child {
+  flex: 1;
+}
