@@ -2,7 +2,7 @@
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
-import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User, X } from 'lucide-react';
+import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import SearchBox from '../components/SearchBox';
@@ -231,8 +231,9 @@ export default function Shell() {
           <div className="mobile-search" ref={mobileSearchRef} role="dialog" aria-modal="true" aria-label="검색">
             <div className="mobile-search-head">
               <SearchBox autoFocus onDone={() => setMobileSearch(false)} placeholder="종목·뉴스 검색" />
-              <button type="button" className="icon-btn" aria-label="검색 닫기" onClick={() => setMobileSearch(false)}>
-                <X className="icon" aria-hidden="true" />
+              {/* 11/13 휴대폰: 입력칸의 '지우기 X' 바로 옆에 '닫기 X' 가 또 있어 헷갈림 → 휴대폰 앱처럼 글자 '취소' */}
+              <button type="button" className="btn btn-ghost btn-sm mobile-search-cancel" onClick={() => setMobileSearch(false)}>
+                취소
               </button>
             </div>
           </div>

@@ -6,21 +6,18 @@ import { Sparkles } from 'lucide-react';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import { BUZZ_TIP } from '../lib/buzz';
 import Sparkline from './Sparkline';
-import { TONE_TIP, ToneRing } from './Tone';
+import { TONE_TIP, ToneRing, leanOf, toneCountText } from './Tone';
 
 /** 오늘 이 종목 기사들의 좋은·나쁜 소식 비율 (서버가 센 값, 링 = 시그니처) */
 function BriefTone({ sentiment: t }) {
   if (!t || !t.articleCount || (!t.positiveCount && !t.negativeCount)) return null;
-  const lean = t.positiveCount > t.negativeCount ? 'pos' : t.negativeCount > t.positiveCount ? 'neg' : 'mixed';
+  const lean = leanOf(t.positiveCount, t.neutralCount || 0, t.negativeCount);
   return (
-    <p className={`brief-tone brief-tone-${lean}`} title={TONE_TIP}>
+    <p className={`brief-tone brief-tone-${lean.kind}`} title={TONE_TIP}>
       <ToneRing pos={t.positiveCount} neu={t.neutralCount} neg={t.negativeCount} size={22} />
       <span>
-        <b>{lean === 'pos' ? '좋은 소식이 더 많아요' : lean === 'neg' ? '나쁜 소식이 더 많아요' : '좋은·나쁜 소식이 비슷해요'}</b>
-        <span className="num muted">
-          {' '}
-          AI가 판단한 {t.articleCount}건 중 좋은 {t.positiveCount} · 나쁜 {t.negativeCount}
-        </span>
+        <b>{lean.text}</b>
+        <span className="num muted"> {toneCountText(t.positiveCount, t.neutralCount || 0, t.negativeCount)}</span>
       </span>
     </p>
   );

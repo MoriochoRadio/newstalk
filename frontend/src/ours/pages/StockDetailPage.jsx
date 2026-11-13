@@ -14,7 +14,7 @@ import { StoryFeed } from '../components/ArticleRow';
 import PriceChart from '../components/PriceChart';
 import MentionChart from '../components/MentionChart';
 import Board from '../components/Board';
-import { ToneRing } from '../components/Tone';
+import { ToneRing, leanOf } from '../components/Tone';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { useBack } from './NewsDetailPage';
 
@@ -91,6 +91,20 @@ function StockHeader({ code, info, quote, quoteState }) {
   );
 }
 
+/** 종합 요약을 문장마다 한 줄씩 (11/13 사용자 눈으로: 8줄짜리 한 덩어리라 휴대폰에서 훑어 읽기 어려웠음).
+ *  '~다.' 로 끝나는 곳에서만 나눔 (숫자 속 마침표 '1.5배'는 안 나눔). 한 문장이면 그대로 */
+function SummaryText({ text }) {
+  const lines = String(text).split(/(?<=다\.)\s+/).map((x) => x.trim()).filter(Boolean);
+  if (lines.length < 2) return <p style={{ fontSize: 15, lineHeight: 1.7 }}>{text}</p>;
+  return (
+    <ul className="summary-list">
+      {lines.map((line, i) => (
+        <li key={i}>{line}</li>
+      ))}
+    </ul>
+  );
+}
+
 function SummaryCard({ code, summary }) {
   const { user, requireLogin, handleAuthError, toast } = useSession();
   const [override, setOverride] = useState(null);
@@ -136,7 +150,7 @@ function SummaryCard({ code, summary }) {
       {summary.error && !s && <ErrorBox error={summary.error} onRetry={summary.reload} />}
       {s && (s.newsSummary ? (
         <>
-          <p style={{ fontSize: 15, lineHeight: 1.7 }}>{s.newsSummary}</p>
+          <SummaryText text={s.newsSummary} />
           {s.snsSummary && (
             <>
               <h3 className="link-label">SNS 반응 · 참고용</h3>
@@ -173,8 +187,8 @@ function SentimentCard({ summary }) {
             label="세는 방법"
             size="sm"
             options={[
-              { key: 'article', label: '기사마다' },
-              { key: 'event', label: '같은 소식 1번' },
+              { key: 'article', label: '기사 기준' },
+              { key: 'event', label: '소식 기준' },
             ]}
             value={basis}
             onChange={setBasis}
@@ -188,9 +202,10 @@ function SentimentCard({ summary }) {
           {/* 시그니처 링(다른 화면과 같은 표시) + 비율 막대(정확한 비율은 막대가 더 잘 읽힘 — dataviz) */}
           <div className="ratio-ring-line">
             <ToneRing pos={ratio.positiveCount ?? 0} neu={ratio.neutralCount ?? 0} neg={ratio.negativeCount ?? 0} size={36} />
-            <b className={ratio.positive > ratio.negative ? 'tb-pos' : ratio.negative > ratio.positive ? 'tb-neg' : ''}>
-              {ratio.positive > ratio.negative ? '좋은 소식이 더 많아요' : ratio.negative > ratio.positive ? '나쁜 소식이 더 많아요' : '좋은·나쁜 소식이 비슷해요'}
-            </b>
+            {(() => {
+              const lean = leanOf(ratio.positiveCount ?? 0, ratio.neutralCount ?? 0, ratio.negativeCount ?? 0);
+              return <b className={lean.kind === 'pos' ? 'tb-pos' : lean.kind === 'neg' ? 'tb-neg' : ''}>{lean.text}</b>;
+            })()}
           </div>
           <div className="ratio-bar" role="img" aria-label={`좋은 소식 ${ratio.positive}%, 중립 ${ratio.neutral}%, 나쁜 소식 ${ratio.negative}%`}>
             <span className="ratio-pos" style={{ width: `${ratio.positive}%` }} />
@@ -216,7 +231,10 @@ function SentimentCard({ summary }) {
           </p>
         </>
       )}
-      <p className="card-note">AI가 오늘 기사 내용이 이 회사에 좋은 소식인지 나쁜 소식인지 나눈 비율이에요. 주가 예측이 아니에요.</p>
+      <p className="card-note">
+        {basis === 'event' && '같은 소식을 여러 언론이 써도 한 번만 셌어요. '}
+        AI가 오늘 기사·공시 내용이 이 회사에 좋은 소식인지 나쁜 소식인지 나눈 비율이에요. 주가 예측이 아니에요.
+      </p>
     </section>
   );
 }
@@ -330,7 +348,7 @@ function SectionNav() {
   return (
     <nav className="sec-nav" aria-label="이 종목 화면 바로 가기">
       {SECTIONS.map((s) => (
-        <a key={s.id} href={`#${s.id}`} onClick={(e) => go(e, s.id)}>
+        <a key={s.id} className={`sn-${s.id}`} href={`#${s.id}`} onClick={(e) => go(e, s.id)}>
           {s.label}
         </a>
       ))}
@@ -375,21 +393,35 @@ function StockDetail({ code }) {
       {info.error && <ErrorBox error={info.error} onRetry={info.reload} />}
       <StockHeader code={code} info={stock} quote={quotes[code]} quoteState={{ loading, disabled }} />
       <SectionNav />
-      <div id="sec-chart" className="sec-anchor" />
-      <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} />
-      <div className="grid-2" style={{ marginTop: 16 }}>
-        <div className="stack">
-          <div id="sec-summary" className="sec-anchor" />
-          <SummaryCard code={code} summary={summary} />
-          <RelatedNews code={code} name={stock?.stockName} />
+      {/* 휴대폰에서는 순서를 바꿈 (11/13 사용자 눈으로 써 보기: "왜 떨어졌지?"의 답인 AI 요약이 화면 하나를 다 차지하는
+          차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사. 넓은 화면은 그대로 (CSS .stock-flow) */}
+      <div className="stock-flow">
+        <div className="sf-chart">
+          <div id="sec-chart" className="sec-anchor" />
+          <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} />
         </div>
-        <div className="stack">
-          <SentimentCard summary={summary} />
-          <div id="sec-mention" className="sec-anchor" />
-          <MentionCard code={code} />
-          {summary.data?.generatedAt && (
-            <p className="status-line">요약 갱신 {relativeTime(summary.data.generatedAt)}</p>
-          )}
+        <div className="grid-2 sf-grid">
+          <div className="stack sf-stack">
+            <div className="sf-summary">
+              <div id="sec-summary" className="sec-anchor" />
+              <SummaryCard code={code} summary={summary} />
+            </div>
+            <div className="sf-news">
+              <RelatedNews code={code} name={stock?.stockName} />
+            </div>
+          </div>
+          <div className="stack sf-stack">
+            <div className="sf-sent">
+              <SentimentCard summary={summary} />
+            </div>
+            <div className="sf-mention stack">
+              <div id="sec-mention" className="sec-anchor" />
+              <MentionCard code={code} />
+              {summary.data?.generatedAt && (
+                <p className="status-line">요약 갱신 {relativeTime(summary.data.generatedAt)}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       <div style={{ marginTop: 16 }} id="sec-board" className="sec-anchor-box">

@@ -59,21 +59,34 @@ function usePerStock(codes, fetcher, tag) {
  * 11/12 사용자: "가장 많이 다룬 소식은 삼양식품인데 기사가 가장 많은 종목은 NAVER? 이게 뭔 소리야"
  * → 순위 두 개(소식별·종목별)를 한 문장에 넣지 않음. 소식 순위는 바로 아래 '가장 많이 다룬 소식' 칸이 말하고,
  *   여기서는 오늘 전체 양 + 종목 쪽 사실만. 종목 순위는 기사 수(여러 소식 합계)라서 소식 순위와 다를 수 있음 */
+// 11/13 사용자 눈으로 써 보기: 첫 문장이 '뉴스 92건, 묶으면 76개' 같은 숫자라 "그래서 오늘 무슨 일?"에 답하지 않음
+// → 이슈 종목이 오르고 내린 수 + 가장 크게 움직인 종목을 먼저 (사실만: 기사 때문이라고 말하지 않음), 건수는 뒤에 짧게
 function headline(newsCount, storyCount, issues, quotes) {
   const parts = [];
-  if (newsCount) parts.push(`오늘 뉴스 ${newsCount}건이 나왔고, 같은 소식끼리 묶으면 ${storyCount}개예요.`);
   if (issues.length) {
-    const top = issues[0];
-    const q = quotes[top.stockCode];
-    parts.push(`종목별로는 ${top.stockName} 기사가 ${top.articleCount}건으로 가장 많아요${q && q.changeRate != null ? `(주가 ${fmtRate(q.changeRate)})` : ''}.`);
-    const rated = issues.map((i) => quotes[i.stockCode]).filter((x) => x && x.changeRate != null);
+    const rated = issues.map((i) => ({ i, q: quotes[i.stockCode] })).filter((x) => x.q && x.q.changeRate != null);
     if (rated.length === issues.length) {
-      const up = rated.filter((x) => x.changeRate > 0).length;
-      const down = rated.filter((x) => x.changeRate < 0).length;
-      parts.push(`이슈 종목 ${issues.length}개 중 ${up}개가 오르고 ${down}개가 내렸어요.`);
+      const up = rated.filter((x) => x.q.changeRate > 0).length;
+      const down = rated.filter((x) => x.q.changeRate < 0).length;
+      parts.push(`오늘 기사가 많은 종목 ${issues.length}개 중 ${up}개가 오르고 ${down}개가 내렸어요.`);
+      const big = rated.reduce((a, b) => (Math.abs(b.q.changeRate) > Math.abs(a.q.changeRate) ? b : a));
+      if (Math.abs(big.q.changeRate) >= 3) {
+        parts.push(`가장 크게 움직인 종목은 ${big.i.stockName}${iEyo(big.i.stockName)}(${fmtRate(big.q.changeRate)}).`);
+      }
+    } else {
+      const top = issues[0];
+      parts.push(`오늘 기사가 가장 많은 종목은 ${top.stockName}${iEyo(top.stockName)}(${top.articleCount}건).`);
     }
   }
+  if (newsCount) parts.push(`종목과 연결한 뉴스는 ${newsCount}건(같은 소식 ${storyCount}개)이에요.`);
   return parts.join(' ');
+}
+
+/** 이름 뒤 '이에요/예요' (받침 있으면 '이에요'). 영문으로 끝나면(NAVER 등) 읽는 소리를 몰라 '예요' */
+function iEyo(name) {
+  const c = String(name).trim().slice(-1).charCodeAt(0) - 0xac00;
+  if (c < 0 || c > 11171) return '예요';
+  return c % 28 ? '이에요' : '예요';
 }
 
 function BriefSection({ issues, quotes, quoteLoading, priceOff, summaries, buzz, feed }) {

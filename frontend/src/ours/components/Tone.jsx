@@ -111,6 +111,25 @@ export function storyCounts(story) {
 
 const TONE_TEXT = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·나쁜 내용 함께' };
 
+/** 여러 기사를 모았을 때 한마디 (홈 카드·종목 화면 같은 기준). 11/13 사용자 눈으로: 좋은 1 · 중립 3 · 나쁜 0 인데
+ *  '좋은 소식이 더 많아요'라고 나와 과장됨 → 중립이 좋은+나쁜보다 많으면 '대부분 중립' */
+export function leanOf(pos = 0, neu = 0, neg = 0) {
+  if (neu > pos + neg) return { kind: 'neutral', text: '대부분 중립이에요' };
+  if (pos > neg) return { kind: 'pos', text: '좋은 소식이 더 많아요' };
+  if (neg > pos) return { kind: 'neg', text: '나쁜 소식이 더 많아요' };
+  return { kind: 'mixed', text: '좋은·나쁜 소식이 비슷해요' };
+}
+
+/** "AI가 읽은 기사 n건: 모두 나쁜 소식" / "…: 좋은 2 · 나쁜 1 · 중립 2" — 세 수의 합이 n 이 되게 (11/13 사용자 눈으로 써 보기:
+ *  'AI가 판단한 2건 중 좋은 0 · 나쁜 2' 바로 밑에 '오늘 기사 4건'이 있어 2와 4가 헷갈리고, 중립이 빠져 합이 안 맞았음) */
+export function toneCountText(pos = 0, neu = 0, neg = 0) {
+  const n = pos + neu + neg;
+  if (!n) return '';
+  if (pos === n) return `AI가 읽은 기사 ${n}건: 모두 좋은 소식`;
+  if (neg === n) return `AI가 읽은 기사 ${n}건: 모두 나쁜 소식`;
+  return `AI가 읽은 기사 ${n}건: 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 중립 ${neu}` : ''}`;
+}
+
 export default function Tone({ article, focusCode, tone, withName = true, counts }) {
   const t = tone !== undefined ? tone : toneOf(article, focusCode);
   if (!t) return null;
@@ -126,9 +145,7 @@ export default function Tone({ article, focusCode, tone, withName = true, counts
         {TONE_TEXT[t.kind]}
       </span>
       {n >= 2 && (
-        <span className="tone-count num">
-          AI가 판단한 {n}건 중 좋은 {counts.pos} · 나쁜 {counts.neg}
-        </span>
+        <span className="tone-count num">{toneCountText(counts.pos, counts.neu, counts.neg)}</span>
       )}
     </span>
   );
