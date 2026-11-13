@@ -5,6 +5,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-rou
 import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
 import LivePill from '../components/LivePill';
+import { useNetStatus } from '../lib/netStatus';
 import SearchBox from '../components/SearchBox';
 import AuthModal from '../components/AuthModal';
 import { useFocusTrap } from '../lib/focusTrap';
@@ -142,6 +143,26 @@ function useNavCollapsed() {
   return [collapsed, toggleNav];
 }
 
+/** 서버 연결 띠: 끊기면 한 번만 크게, 다시 연결되면 '새로 불러오기' (카드마다 반복되던 긴 오류 대신) */
+function NetBanner() {
+  const { offline, recovered } = useNetStatus();
+  if (!offline && !recovered) return null;
+  return (
+    <div className={`net-banner ${offline ? 'off' : 'on'}`} role="status">
+      {offline ? (
+        <span>서버와 연결이 끊겼어요. 다시 연결되는지 10초마다 확인하고 있어요.</span>
+      ) : (
+        <>
+          <span>다시 연결됐어요.</span>
+          <button type="button" className="btn btn-sm btn-secondary" onClick={() => window.location.reload()}>
+            새로 불러오기
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Shell() {
   const { dark, toggle } = useTheme();
   const { toasts, dismissToast } = useSession();
@@ -240,6 +261,7 @@ export default function Shell() {
         )}
 
         <main id="main" className="content" tabIndex={-1}>
+          <NetBanner />
           <Outlet />
         </main>
 

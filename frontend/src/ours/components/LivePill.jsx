@@ -1,9 +1,20 @@
 // 수집 상태 알약 (V7 "실시간 매칭 · 시각"을 우리 말로): 살아 있으면 초록 점이 깜박, 멈췄으면 노랑
 import { useStatus, isLive } from '../lib/useStatus';
 import { relativeTime, shortTime } from '../lib/format';
+import { useNetStatus } from '../lib/netStatus';
 
 export default function LivePill({ className = '' }) {
   const { data, error } = useStatus();
+  const { offline } = useNetStatus();
+  if (offline) {
+    // 연결이 끊긴 동안 옛 시각을 '정상'처럼 보이지 않게
+    return (
+      <span className={`live-pill off ${className}`}>
+        <i aria-hidden="true" />
+        연결 끊김
+      </span>
+    );
+  }
   if (error && !data) return null;
   if (!data) return <span className={`live-pill skeleton ${className}`} style={{ width: 150 }} aria-hidden="true" />;
   const live = isLive(data);

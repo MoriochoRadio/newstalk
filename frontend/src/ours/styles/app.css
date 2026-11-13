@@ -4071,3 +4071,24 @@ html {
   font-weight: 600;
   margin-right: 4px;
 }
+
+/* 서버 연결 띠 (11/13 일반 사용자 눈으로: 끊기면 카드마다 같은 긴 오류가 반복됐음 → 맨 위 한 번만) */
+.net-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.net-banner.off {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.net-banner.on {
+  background: var(--good-soft);
+  color: var(--good);
+}

@@ -107,7 +107,7 @@ export default function NewsPage() {
   const tab = TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'all';
   const q = params.get('q') || '';
   const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : '';
-  const sort = params.get('sort') === 'relevance' ? 'relevance' : 'latest';
+  const sort = params.get('sort') === 'relevance' && tab !== 'disclosure' ? 'relevance' : 'latest'; // 공시 탭은 늘 최신순
   const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
   const [draft, setDraft] = useState(q);
   const qRef = useRef(null);
@@ -150,7 +150,7 @@ export default function NewsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">뉴스·공시</h1>
-          <p className="page-sub">AI가 종목과 연결한 기사와 전자공시예요.</p>
+          <p className="page-sub hide-mobile">AI가 종목과 연결한 기사와 전자공시예요.</p>
         </div>
       </div>
 
@@ -194,7 +194,10 @@ export default function NewsPage() {
                 총 {total.toLocaleString('ko-KR')}건
               </span>
             )}
-            <Segmented label="정렬" size="sm" options={SORTS} value={sort} onChange={(k) => update({ sort: k === 'latest' ? '' : k })} />
+            {/* 공시는 관련도 점수가 없음(회사가 낸 자기 서류, docs/api.md) → 공시 탭에선 정렬을 감춤 (11/13 사용자 눈으로) */}
+            {tab !== 'disclosure' && (
+              <Segmented label="정렬" size="sm" options={SORTS} value={sort} onChange={(k) => update({ sort: k === 'latest' ? '' : k })} />
+            )}
           </div>
         </div>
 

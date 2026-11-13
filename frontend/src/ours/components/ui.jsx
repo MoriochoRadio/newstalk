@@ -1,7 +1,9 @@
 // 작은 화면 조각: 스켈레톤·빈 화면·오류·페이지 번호·묶음 선택·등락 표시
+import { useEffect } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Inbox, RotateCw } from 'lucide-react';
 import { dirClass, fmtPrice, fmtRate } from '../lib/format';
 import { errorText } from '../lib/errors';
+import { isNetworkError, markOffline } from '../lib/netStatus';
 
 export function SkeletonRows({ rows = 4, compact = false }) {
   return (
@@ -31,10 +33,14 @@ export function Empty({ icon: Icon = Inbox, title, desc, action }) {
 }
 
 export function ErrorBox({ error, onRetry, text }) {
+  const network = isNetworkError(error);
+  useEffect(() => {
+    if (network) markOffline(); // 맨 위 띠가 한 번 자세히 알림 → 여기는 짧게
+  }, [network]);
   return (
-    <div className="inline-error" role="alert">
+    <div className="inline-error" role={network ? undefined : 'alert'}>
       <AlertCircle className="icon-sm" aria-hidden="true" />
-      <span style={{ flex: 1 }}>{text || errorText(error)}</span>
+      <span style={{ flex: 1 }}>{text || (network ? '불러오지 못했어요.' : errorText(error))}</span>
       {onRetry && (
         <button type="button" className="btn btn-sm btn-ghost" onClick={onRetry}>
           <RotateCw className="icon-sm" aria-hidden="true" />

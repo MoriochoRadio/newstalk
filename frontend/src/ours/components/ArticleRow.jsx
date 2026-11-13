@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { groupStories } from '../lib/stories';
 import { relativeTime } from '../lib/format';
+import { explainDisclosure } from '../lib/disclosureGlossary';
 import Tone, { TitleText, toneOf, toneRowClass } from './Tone';
 
 export const SAME_NEWS_TIP = '같은 종목·24시간 안·제목이 비슷한 기사를 같은 소식으로 묶은 수예요. 묶음은 틀릴 수 있어요.';
@@ -127,7 +128,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
       {(a.isDisclosure || tone) && (
         <div className="feed-kicker-line">
           {a.isDisclosure && (
-            <span className="feed-kicker">
+            <span className="feed-kicker" title={explainDisclosure(a.disclosureType) || undefined}>
               공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
             </span>
           )}

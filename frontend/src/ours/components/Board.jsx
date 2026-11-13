@@ -1,7 +1,7 @@
 // 종목 토론 (F-20): 글·댓글 쓰기, 내 글·댓글 지우기(확인 후), 공감 1번(다시 누르면 취소)
 // V7 에 없던 댓글 화면을 붙임 (GET·POST /api/posts/{id}/comments, DELETE /api/comments/{id})
 // 실패하면 쓰던 글을 지우지 않고 서버 문장을 그대로 보여 줌
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, MessageCircle, PenLine, Trash2 } from 'lucide-react';
 import { boardApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
@@ -46,7 +46,9 @@ function PostForm({ stockCode, onDone }) {
       <label className="sr-only" htmlFor="post-title">
         제목
       </label>
-      <input id="post-title" className="input" autoComplete="off" placeholder="제목" maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
+      {/* 글쓰기를 누르면 바로 제목칸으로 (11/13 사용자 눈으로: 열려도 커서가 없어 한 번 더 눌러야 했음). 사용자가 연 폼이라 autoFocus */}
+      {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+      <input id="post-title" className="input" autoFocus autoComplete="off" placeholder="제목" maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
       <label className="sr-only" htmlFor="post-content">
         내용
       </label>
@@ -245,6 +247,14 @@ export default function Board({ stockCode, stockName }) {
   const [writing, setWriting] = useState(false);
   const posts = useApi((signal) => boardApi.posts(stockCode, { page, size: PAGE_SIZE }, { signal }), [stockCode, page]);
   const items = posts.data?.items || [];
+  // 글을 올리면 폼이 사라져 포커스가 화면 맨 앞으로 튐 → 새 목록의 첫 글(방금 쓴 글) 제목으로 (11/13 사용자 눈으로)
+  const listRef = useRef(null);
+  const focusNew = useRef(false);
+  useEffect(() => {
+    if (!focusNew.current || !posts.data) return;
+    focusNew.current = false;
+    listRef.current?.querySelector('.post-title')?.focus();
+  }, [posts.data]);
 
   return (
     <section className="card" aria-labelledby="board-title">
@@ -256,7 +266,7 @@ export default function Board({ stockCode, stockName }) {
           type="button"
           className="btn btn-secondary btn-sm"
           aria-expanded={writing}
-          onClick={() => (user ? setWriting((w) => !w) : requireLogin('토론 글은 로그인하면 쓸 수 있어요.'))}
+          onClick={() => (user ? setWriting((w) => !w) : requireLogin('토론 글은 로그인하면 쓸 수 있어요.', () => setWriting(true)))}
         >
           <PenLine className="icon-sm" aria-hidden="true" />
           {writing ? '쓰기 닫기' : '글쓰기'}
@@ -267,6 +277,7 @@ export default function Board({ stockCode, stockName }) {
         <PostForm
           stockCode={stockCode}
           onDone={() => {
+            focusNew.current = true;
             setWriting(false);
             if (page === 1) posts.reload();
             else setPage(1);
@@ -279,7 +290,7 @@ export default function Board({ stockCode, stockName }) {
         <Empty icon={MessageCircle} title={`${stockName} 토론 글이 아직 없어요`} desc="첫 글을 남겨 보세요." />
       )}
       {items.length > 0 && (
-        <ul>
+        <ul ref={listRef}>
           {items.map((p) => (
             <Post key={p.postId} post={p} onRemoved={posts.reload} />
           ))}

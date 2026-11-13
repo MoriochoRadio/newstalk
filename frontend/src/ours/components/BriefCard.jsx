@@ -79,7 +79,8 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
             <p className="brief-note">AI 요약이 아직 없어 주요 기사 제목을 보여 드려요.</p>
           </>
         ) : (
-          <p className="brief-note">오늘 요약할 기사가 아직 없어요.</p>
+          // 기사 수가 있는데 '기사가 없어요'라 하면 모순 (11/13: 요약·기사 목록을 못 받았을 때 '기사 7건' 옆에 이렇게 나옴)
+          <p className="brief-note">{articleCount ? '아직 AI 요약이 없어요.' : '오늘 요약할 기사가 아직 없어요.'}</p>
         )}
       </div>
 
