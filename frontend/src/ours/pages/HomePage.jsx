@@ -1,31 +1,33 @@
-// 홈 = 한 화면 대시보드 (11/13 피드백: "메인은 스크롤 없이 깔끔하게, 시각화가 맨 처음, 글은 줄이고 나머지는 눌러서 다른 화면")
-// 1) 맨 위: 오늘 시장 지도(이슈 12종목: 크기 = 기사 수, 색 = 등락률) 크게 + 옆: 내 관심 종목(로그인) 또는 많이 오른·내린
-// 2) 가장 많이 다룬 소식: 1위만 요약, 2~7위는 제목만
-// 3) 더 보기 버튼 → 뉴스·종목 화면 (화제 종목 카드·이슈 순위·보도량은 종목·뉴스 화면에서)
+// 홈 = 뉴스 대시보드 (11/13 피드백 2차: "뉴스 중심이니 뉴스 상태를 메인에 크게 한눈에", "시장 지도는 따로 큰 화면으로")
+// 1) 맨 위: 오늘 뉴스 한눈에 — 뉴스 지도(소식 칸: 크기 = 기사 수, 색 = 좋은/나쁜 소식) + 오늘 뉴스 수·좋은/나쁜 링·시간대 보도량
+// 2) 로그인: 내 관심 종목 한 줄 (링·등락)
+// 3) 가장 많이 다룬 소식: 1위만 요약, 2~7위는 제목만
+// 4) 바로 가기: 시장 지도(/map)·종목·소식 전체
 // 이전 홈(세 칸 띠·화제 종목 카드·그 밖의 소식·소식 종류·보도량·이슈 순위)은 브랜치 test/fe-ours-1113-before-dashboard
 // 말은 조심스럽게: 호재·악재·예측·"때문에" 금지. 등락률은 어제 종가 대비 값
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, LayoutGrid, LogIn, Star } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Newspaper, Star, TrendingUp } from 'lucide-react';
 import { stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { fmtRate, todayLabel } from '../lib/format';
-import { loadTodayFeed, pickWhy } from '../lib/todayFeed';
+import { hourlyCounts, loadTodayFeed } from '../lib/todayFeed';
 import { groupStories } from '../lib/stories';
 import TopStories, { rankStories } from '../components/TopStories';
 import { usePerStock } from '../components/HotStocks';
-import Movers from '../components/Movers';
-import MarketMap, { MapLegend } from '../components/MarketMap';
+import { NewsMap, NewsPulse } from '../components/NewsMap';
 import LivePill from '../components/LivePill';
 import { ToneRing, leanOf } from '../components/Tone';
-import { PriceCell, SkeletonRows } from '../components/ui';
+import { SkeletonRows } from '../components/ui';
+import { dirClass } from '../lib/format';
 
-const MAP_LIMIT = 12; // 시장 지도 종목 수 (시세 요청 10개씩 2번)
+const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
 const TOP_N = 7; // 1위(요약) + 2~7위(제목만)
-const WATCH_N = 6; // 옆 칸 관심 종목 수
+const WATCH_N = 8; // 관심 종목 한 줄
+const MAP_STORIES = 12; // 뉴스 지도 칸 수 (18칸은 제목이 다 잘림)
 
 /** 화면 낭독기용 한 줄 (눈에는 지도가 말함). 데이터로 만든 문장, LLM 아님. 사실만: 기사 때문이라고 말하지 않음 */
 function headline(newsCount, storyCount, issues, quotes) {
@@ -56,98 +58,43 @@ function iEyo(name) {
   return c % 28 ? '이에요' : '예요';
 }
 
-function MapCard({ issues, quotes, quoteLoading, priceOff, feed }) {
-  const items = issues.data?.items || [];
-  const tiles = items.map((it) => ({
-    code: it.stockCode,
-    name: it.stockName,
-    articleCount: it.articleCount,
-    eventCount: it.eventCount,
-    disclosureCount: it.disclosureCount,
-    rate: quotes[it.stockCode]?.changeRate ?? null,
-    why: feed.data ? pickWhy(feed.data.items, it.stockCode) : null,
-  }));
-  return (
-    <section className="card dash-map" aria-labelledby="map-title">
-      <div className="card-head">
-        <h2 className="card-title" id="map-title">
-          <LayoutGrid className="icon" aria-hidden="true" />
-          오늘 시장 지도
-        </h2>
-        <Link to="/stocks" className="link">
-          종목 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
-        </Link>
-      </div>
-      {issues.loading && !issues.data && <div className="skeleton dash-map-box" />}
-      {items.length > 0 && <MarketMap tiles={tiles} priceReady={!priceOff && !quoteLoading} height={360} />}
-      {items.length > 0 && <MapLegend priceReady={!priceOff} />}
-    </section>
-  );
-}
-
-/** 옆 칸: 내 관심 종목 (로그인) — 종목 · 오늘 좋은/나쁜 소식 링 · 시세 */
-function WatchPanel({ quotes, quoteLoading, priceOff }) {
+/** 내 관심 종목 한 줄 (로그인): 종목 · 오늘 좋은/나쁜 소식 링 · 등락 — 가로로 (11/13: 관심 종목이 아래에 묻혀 불편) */
+function WatchStrip({ quotes }) {
   const { watchlist } = useSession();
   const list = watchlist.items.slice(0, WATCH_N);
   const tones = usePerStock(
     list.map((w) => w.stockCode),
-    (code, signal) => stockApi.summary(code, {}, { signal }).then((s) => s?.sentiment || null),
+    (code, signal) => stockApi.summary(code, {}, { signal }).then((x) => x?.sentiment || null),
     'tone'
   );
   return (
-    <section className="card dash-side" aria-labelledby="watch-title">
-      <div className="card-head">
-        <h2 className="card-title" id="watch-title">
-          <Star className="icon" aria-hidden="true" />
-          내 관심 종목
-        </h2>
-        <Link to="/watchlist" className="link">
-          {watchlist.items.length > list.length ? `${watchlist.items.length - list.length}개 더` : '관리'}
-          <ChevronRight className="icon-sm" aria-hidden="true" />
-        </Link>
-      </div>
-      <ul className="watch-rows">
+    <section className="watch-strip" aria-labelledby="watch-title">
+      <h2 className="ws-head" id="watch-title">
+        <Star className="icon-sm" aria-hidden="true" />내 관심 종목
+      </h2>
+      <ul>
         {list.map((w) => {
           const t = tones[w.stockCode];
           const pos = t?.positiveCount || 0;
           const neg = t?.negativeCount || 0;
           const neu = t?.neutralCount || 0;
+          const q = quotes[w.stockCode];
           return (
             <li key={w.stockCode}>
-              <Link to={`/stocks/${w.stockCode}`} className="watch-row">
-                <span className="wr-ring" title={pos || neg ? leanOf(pos, neu, neg).text : '오늘 판단한 기사가 아직 없어요'}>
-                  {pos || neg ? <ToneRing pos={pos} neu={neu} neg={neg} size={18} /> : <span className="wr-dot" />}
-                </span>
-                <span className="wr-name">{w.stockName}</span>
-                <span className="wr-count num">기사 {w.todayArticleCount}</span>
-                {!priceOff &&
-                  (quotes[w.stockCode] ? (
-                    <PriceCell quote={quotes[w.stockCode]} stacked={false} />
-                  ) : quoteLoading ? (
-                    <span className="skeleton" style={{ display: 'inline-block', width: 90, height: 16 }} />
-                  ) : null)}
+              <Link to={`/stocks/${w.stockCode}`} className="ws-chip" title={pos || neg ? leanOf(pos, neu, neg).text : '오늘 판단한 기사가 아직 없어요'}>
+                {pos || neg ? <ToneRing pos={pos} neu={neu} neg={neg} size={18} /> : <span className="wr-dot" />}
+                <span className="ws-name">{w.stockName}</span>
+                {q && q.changeRate != null && <b className={`num ${dirClass(q.changeRate)}`}>{fmtRate(q.changeRate)}</b>}
               </Link>
             </li>
           );
         })}
+        <li>
+          <Link to="/watchlist" className="ws-chip ws-more">
+            관리 <ChevronRight className="icon-sm" aria-hidden="true" />
+          </Link>
+        </li>
       </ul>
-    </section>
-  );
-}
-
-function LoginNudge() {
-  const { user, checking, openAuth } = useSession();
-  if (checking || user) return null;
-  return (
-    <section className="card nudge">
-      <Star className="icon" aria-hidden="true" />
-      <p>
-        <b>내 관심 종목을 여기에</b>
-      </p>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openAuth('login')}>
-        <LogIn className="icon-sm" aria-hidden="true" />
-        로그인
-      </button>
     </section>
   );
 }
@@ -164,7 +111,10 @@ export default function HomePage() {
   const watchCodes = hasWatch ? watchlist.items.slice(0, WATCH_N).map((w) => w.stockCode) : [];
   const storyCodes = topStories.flatMap((st) => st.lead.relatedStocks.filter((s) => s.role === 'MAIN').map((s) => s.code));
   const { quotes, loading: quoteLoading, disabled: priceOff } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
-  const newsCount = feed.data ? feed.data.items.filter((a) => !a.isDisclosure).length : 0;
+  const newsArticles = feed.data ? feed.data.items.filter((a) => !a.isDisclosure) : [];
+  const newsCount = newsArticles.length;
+  const mapStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_STORIES) : []), [feed.data]);
+  const hours = useMemo(() => (feed.data ? hourlyCounts(feed.data.items) : []), [feed.data]);
 
   return (
     <>
@@ -177,19 +127,33 @@ export default function HomePage() {
         <LivePill className="mobile-pill" />
       </div>
 
-      <div className="dash-top">
-        <MapCard issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} feed={feed} />
-        <div className="dash-side-col">
-          {hasWatch ? (
-            <WatchPanel quotes={quotes} quoteLoading={quoteLoading} priceOff={priceOff} />
-          ) : (
-            <>
-              <Movers issues={issueItems} quotes={quotes} disabled={priceOff} loading={quoteLoading} top={3} title="오늘 많이 오른·내린" />
-              <LoginNudge />
-            </>
-          )}
+      <section className="card news-hero" aria-labelledby="hero-title">
+        <div className="card-head">
+          <h2 className="card-title" id="hero-title">
+            <Newspaper className="icon" aria-hidden="true" />
+            오늘 뉴스 한눈에
+          </h2>
+          <span className="nm-legend" aria-hidden="true">
+            <span><i className="nm-pos" />좋은 소식</span>
+            <span><i className="nm-neg" />나쁜 소식</span>
+            <span><i className="nm-none" />판단 없음</span>
+            <span className="hide-mobile">칸 크기 = 기사 수</span>
+          </span>
         </div>
-      </div>
+        {feed.loading && !feed.data ? (
+          <div className="hero-grid">
+            <div className="skeleton" style={{ height: 380, borderRadius: 'var(--radius)' }} />
+            <SkeletonRows rows={4} />
+          </div>
+        ) : (
+          <div className="hero-grid">
+            <NewsMap stories={mapStories} />
+            <NewsPulse articles={newsArticles} storyCount={storyCount} hours={hours} complete={feed.data?.complete} total={feed.data?.total} />
+          </div>
+        )}
+      </section>
+
+      {hasWatch && <WatchStrip quotes={quotes} />}
 
       {feed.loading && !feed.data ? (
         <div className="front-page front-dash">
@@ -212,7 +176,34 @@ export default function HomePage() {
           }
         />
       )}
-      <p className="home-foot">AI 요약은 기사 글을 정리한 것이에요. 등락률은 어제 종가와 비교한 지금 값이고, 기사와 주가의 관계를 뜻하지 않아요.</p>
+
+      <nav className="home-links" aria-label="더 보기">
+        <Link to="/map" className="home-link">
+          <LayoutGrid className="icon" aria-hidden="true" />
+          <span>
+            <b>시장 지도</b>
+            <small>오늘 기사가 많은 30종목의 등락</small>
+          </span>
+          <ChevronRight className="icon-sm" aria-hidden="true" />
+        </Link>
+        <Link to="/stocks" className="home-link">
+          <TrendingUp className="icon" aria-hidden="true" />
+          <span>
+            <b>종목</b>
+            <small>오늘 화제 종목·이슈 순위</small>
+          </span>
+          <ChevronRight className="icon-sm" aria-hidden="true" />
+        </Link>
+        <Link to="/news?period=today" className="home-link">
+          <Newspaper className="icon" aria-hidden="true" />
+          <span>
+            <b>오늘 소식 전체</b>
+            <small>뉴스·공시 {(feed.data?.total || 0).toLocaleString('ko-KR')}건</small>
+          </span>
+          <ChevronRight className="icon-sm" aria-hidden="true" />
+        </Link>
+      </nav>
+      <p className="home-foot">AI 요약과 좋은·나쁜 소식은 AI가 기사 글을 읽고 나눈 것이에요. 등락률은 어제 종가와 비교한 지금 값이고, 기사와 주가의 관계를 뜻하지 않아요.</p>
     </>
   );
 }

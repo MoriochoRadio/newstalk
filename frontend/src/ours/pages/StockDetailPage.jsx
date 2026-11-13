@@ -95,7 +95,7 @@ function StockHeader({ code, info, quote, quoteState }) {
  *  '~다.' 로 끝나는 곳에서만 나눔 (숫자 속 마침표 '1.5배'는 안 나눔). 한 문장이면 그대로 */
 function SummaryText({ text }) {
   const lines = String(text).split(/(?<=다\.)\s+/).map((x) => x.trim()).filter(Boolean);
-  if (lines.length < 2) return <p style={{ fontSize: 15, lineHeight: 1.7 }}>{text}</p>;
+  if (lines.length < 2) return <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7 }}>{text}</p>;
   return (
     <ul className="summary-list">
       {lines.map((line, i) => (

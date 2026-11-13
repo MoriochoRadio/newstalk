@@ -2,7 +2,7 @@
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
-import { CandlestickChart, Home, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
+import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import { useNetStatus } from '../lib/netStatus';
@@ -13,6 +13,7 @@ import { useFocusTrap } from '../lib/focusTrap';
 const NAV = [
   { to: '/', label: '홈', icon: Home, end: true },
   { to: '/news', label: '뉴스·공시', icon: Newspaper },
+  { to: '/map', label: '시장 지도', icon: LayoutGrid },
   { to: '/stocks', label: '종목', icon: CandlestickChart },
   { to: '/watchlist', label: '관심 종목', icon: Star },
 ];

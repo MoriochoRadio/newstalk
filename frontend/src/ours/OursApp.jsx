@@ -15,6 +15,7 @@ import HomePage from './pages/HomePage';
 import NewsPage from './pages/NewsPage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import StocksPage from './pages/StocksPage';
+import MapPage from './pages/MapPage';
 import StockDetailPage from './pages/StockDetailPage';
 import WatchlistPage from './pages/WatchlistPage';
 import SearchPage from './pages/SearchPage';
@@ -28,6 +29,7 @@ export default function OursApp() {
           <Route index element={<HomePage />} />
           <Route path="news" element={<NewsPage />} />
           <Route path="news/:id" element={<NewsDetailPage />} />
+          <Route path="map" element={<MapPage />} />
           <Route path="stocks" element={<StocksPage />} />
           <Route path="stocks/:code" element={<StockDetailPage />} />
           <Route path="watchlist" element={<WatchlistPage />} />
