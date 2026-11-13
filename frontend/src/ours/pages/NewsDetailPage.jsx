@@ -222,13 +222,13 @@ function NewsDetail({ id }) {
   const summaryIsTitle = a.isDisclosure ? a.disclosurePending : a.summary.length === 1 && a.summary[0] === a.title;
 
   return (
-    <article className="article-page">
+    <article className="article-page ad-grid">
       <button type="button" className="back-btn" onClick={back}>
         <ArrowLeft className="icon" aria-hidden="true" />
         뒤로
       </button>
 
-      <header className="card">
+      <header className="card ad-head">
         <div className="article-kicker">
           <span className="badge">{a.isDisclosure ? '전자공시' : a.sourceType === 'SNS' ? 'SNS' : '뉴스'}</span>
           <ArticleTags article={a} detail />
@@ -256,7 +256,7 @@ function NewsDetail({ id }) {
         </div>
       </header>
 
-      <section className="card" aria-labelledby="sum-title">
+      <section className="card ad-sum" aria-labelledby="sum-title">
         <div className="card-head">
           <h2 className="card-title" id="sum-title">
             {summaryIsTitle ? '내용' : 'AI 요약'}
@@ -285,7 +285,7 @@ function NewsDetail({ id }) {
         )}
       </section>
 
-      <section className="card" aria-labelledby="link-title">
+      <section className="card ad-link" aria-labelledby="link-title">
         <div className="card-head">
           <h2 className="card-title" id="link-title">
             연결 지도 <span className="count num">종목 {a.relatedStocks.length}</span>
@@ -295,7 +295,7 @@ function NewsDetail({ id }) {
       </section>
 
       {a.sameNewsCount >= 2 && (
-        <section className="card" aria-labelledby="same-title">
+        <section className="card ad-same" aria-labelledby="same-title">
           <div className="card-head">
             <h2 className="card-title" id="same-title">
               같은 소식 <span className="count num">{a.sameNewsCount}건</span>
@@ -330,7 +330,7 @@ function NewsDetail({ id }) {
       </p>
 
       {a.relatedSns.length > 0 && (
-        <section className="card" aria-labelledby="sns-title">
+        <section className="card ad-sns" aria-labelledby="sns-title">
           <div className="card-head">
             <h2 className="card-title" id="sns-title">
               같은 시간대 SNS
