@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { squarify } from './MarketMap';
 import { ToneRing, countsOf, toneOfStory } from './Tone';
-import HourStrip from './HourStrip';
+import { TOPICS } from '../lib/digest';
 
 const GAP = 4;
 
@@ -26,6 +26,16 @@ function useWidth(ref) {
 
 const TONE_WORD = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·나쁜 함께' };
 
+/** 칸에 넣을 한두 낱말 (11/13 피드백: 칸마다 기사 제목 전체라 글이 많아 한눈에 안 들어옴)
+ *  AI 가 뽑은 핵심 키워드 첫 번째 → 없으면 소식 종류(실적·수주·계약…) → 없으면 비움. 제목 전체는 마우스를 올리면 */
+function storyWord(st) {
+  const all = [st.lead, ...(st.others || [])];
+  const k = all.find((a) => a.keywords?.length)?.keywords[0];
+  if (k) return k;
+  const text = `${st.lead.title} ${(st.lead.summary || []).join(' ')}`;
+  return TOPICS.find((t) => t.words.some((w) => text.includes(w)))?.label || '';
+}
+
 export function NewsMap({ stories, height = 380 }) {
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
@@ -43,30 +53,29 @@ export function NewsMap({ stories, height = 380 }) {
           const w = r.w - GAP;
           const h = r.h - GAP;
           const main = (a.relatedStocks || []).find((x) => x.role === 'MAIN') || a.relatedStocks?.[0];
-          const big = w >= 220 && h >= 140;
-          const showStock = h >= 56 && w >= 90;
-          // 칸 높이에 들어가는 줄 수만 (안쪽 여백 20 + 종목 줄 24, 줄 높이 ≈ 글씨 × 1.4). 넘치면 줄이 반쯤 잘려 보였음
-          const lineH = big ? 27 : 24;
-          const lines = Math.floor((h - 20 - (showStock ? 26 : 0)) / lineH);
+          const big = w >= 200 && h >= 130;
+          const word = storyWord(st);
+          // 칸: 종목 이름(크게) + 한두 낱말 + 기사 수. 글자 크기는 칸 크기에 맞춤
+          // 이름이 칸 너비를 넘지 않게 (휴대폰 '삼성바이오로…' 잘림): 한글 한 자 ≈ 1em
+          const nameLen = Math.max(2, (main?.name || '').length);
+          const nameSize = Math.round(Math.max(13, Math.min(30, Math.sqrt(w * h) / 8, (w - 28) / (nameLen * 0.95))));
+          const showWord = word && h >= 60 && w >= 80;
+          const showCount = h >= 90 && w >= 90;
           return (
             <li key={a.id} className="nm-cell" style={{ left: r.x, top: r.y, width: w, height: h }}>
               <Link
                 to={`/news/${a.id}`}
-                className={`nm-tile nm-${tone?.kind || 'none'}`}
-                aria-label={`${a.title}. 오늘 기사 ${st.size || 1}건${tone ? `, ${tone.name}에 ${TONE_WORD[tone.kind]}` : ''}`}
+                className={`nm-tile nm-${tone?.kind || 'none'} ${big ? 'big' : ''}`}
+                aria-label={`${main ? `${main.name}: ` : ''}${a.title}. 오늘 기사 ${st.size || 1}건${tone ? `, ${tone.name}에 ${TONE_WORD[tone.kind]}` : ''}`}
                 title={a.title}
               >
-                {showStock && main && (
-                  <span className="nm-stock">
+                {main && (
+                  <span className="nm-name" style={{ fontSize: nameSize }}>
                     {main.name}
-                    <b className="num"> · 기사 {st.size || 1}</b>
                   </span>
                 )}
-                {w >= 60 && lines >= 1 && (
-                  <span className={`nm-title ${big ? 'big' : ''}`} style={{ WebkitLineClamp: lines }}>
-                    {a.title}
-                  </span>
-                )}
+                {showWord && <span className="nm-word">{word}</span>}
+                {showCount && <span className="nm-count num">기사 {st.size || 1}</span>}
               </Link>
             </li>
           );
@@ -77,7 +86,7 @@ export function NewsMap({ stories, height = 380 }) {
 }
 
 /** 옆 칸: 오늘 뉴스 상태 숫자 */
-export function NewsPulse({ articles, storyCount, hours, complete, total }) {
+export function NewsPulse({ articles, storyCount, topics = [] }) {
   const tone = countsOf(
     (articles || [])
       .filter((a) => !a.titleOnly && !a.disclosurePending)
@@ -110,10 +119,20 @@ export function NewsPulse({ articles, storyCount, hours, complete, total }) {
           </li>
         </ul>
       </div>
-      <div className="np-hours">
-        <span className="np-k">시간대별 보도량</span>
-        <HourStrip rows={hours} complete={complete} total={total} />
-      </div>
+      {/* 시간대별 보도량은 뺌 (11/13 피드백: 투자자는 몇 시에 기사가 많았는지 궁금하지 않음) → 오늘 무슨 일이 많았나 */}
+      {topics.length > 0 && (
+        <div className="np-topics">
+          <span className="np-k">오늘 많이 나온 소식</span>
+          <ul>
+            {topics.slice(0, 3).map((t) => (
+              <li key={t.label}>
+                <span>{t.label}</span>
+                <b className="num">{t.count}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

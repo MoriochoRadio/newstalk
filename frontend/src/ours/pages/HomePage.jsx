@@ -14,7 +14,8 @@ import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { fmtRate, todayLabel } from '../lib/format';
-import { hourlyCounts, loadTodayFeed } from '../lib/todayFeed';
+import { loadTodayFeed } from '../lib/todayFeed';
+import { topicMix } from '../components/TopicMix';
 import { groupStories } from '../lib/stories';
 import TopStories, { rankStories } from '../components/TopStories';
 import { usePerStock } from '../components/HotStocks';
@@ -114,7 +115,7 @@ export default function HomePage() {
   const newsArticles = feed.data ? feed.data.items.filter((a) => !a.isDisclosure) : [];
   const newsCount = newsArticles.length;
   const mapStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_STORIES) : []), [feed.data]);
-  const hours = useMemo(() => (feed.data ? hourlyCounts(feed.data.items) : []), [feed.data]);
+  const topics = useMemo(() => (feed.data ? topicMix(groupStories(newsArticles)) : []), [feed.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -148,7 +149,7 @@ export default function HomePage() {
         ) : (
           <div className="hero-grid">
             <NewsMap stories={mapStories} />
-            <NewsPulse articles={newsArticles} storyCount={storyCount} hours={hours} complete={feed.data?.complete} total={feed.data?.total} />
+            <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} />
           </div>
         )}
       </section>
