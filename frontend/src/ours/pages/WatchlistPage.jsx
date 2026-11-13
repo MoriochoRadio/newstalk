@@ -1,8 +1,8 @@
 // 관심 종목: 표(종목·현재가·등락·오늘 기사·최근 기사·빼기) + 종목 담기 + 관심 종목 소식(서버 페이지)
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LogIn, Star, X } from 'lucide-react';
-import { watchlistApi } from '../../api';
+import { LogIn, Plus, Star, X } from 'lucide-react';
+import { stockApi, watchlistApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
@@ -12,6 +12,7 @@ import { dirClass, fmtPrice, fmtRate, marketKo, relativeTime } from '../lib/form
 import SearchBox from '../components/SearchBox';
 import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, SkeletonRows } from '../components/ui';
+import { ToneRing, leanOf } from '../components/Tone';
 
 const NEWS_SIZE = 10;
 
@@ -47,6 +48,63 @@ function WatchNews({ count }) {
   );
 }
 
+/** 담은 종목마다 오늘 좋은·나쁜 소식 수 (종목 요약 API 의 감성 수). 11/13 페르소나 준호: 표에 기사 수만 있어
+ *  '내 종목 오늘 괜찮나?'를 알려면 아래 기사를 하나씩 읽어야 했음 → 기사 수 옆에 링 */
+function useWatchTones(codes) {
+  const [tones, setTones] = useState({});
+  const key = codes.join(',');
+  useEffect(() => {
+    if (!key) return undefined;
+    const controller = new AbortController();
+    key.split(',').forEach((code) => {
+      stockApi
+        .summary(code, {}, { signal: controller.signal })
+        .then((s) => setTones((prev) => ({ ...prev, [code]: s?.sentiment || null })))
+        .catch(() => {});
+    });
+    return () => controller.abort();
+  }, [key]);
+  return tones;
+}
+
+/** 빈 관심 종목에서 바로 담기: 오늘 기사가 많은 종목 6개 (11/13 페르소나 수아: 주식 초보는 무엇을 담을지도 모름) */
+function QuickPicks({ onPick }) {
+  const issues = useApi((signal) => stockApi.issues({ limit: 6 }, { signal }), []);
+  const items = issues.data?.items || [];
+  if (!items.length) return null;
+  return (
+    <div className="quick-picks">
+      <p className="link-label" style={{ marginTop: 0 }}>
+        오늘 기사가 많은 종목
+      </p>
+      <div className="tags">
+        {items.map((s) => (
+          <button key={s.stockCode} type="button" className="chip" onClick={() => onPick(s)}>
+            <Plus className="icon-sm" aria-hidden="true" />
+            {s.stockName}
+            <span className="sr-only"> 관심 종목에 담기</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WatchTone({ t, count }) {
+  const pos = t?.positiveCount || 0;
+  const neg = t?.negativeCount || 0;
+  const neu = t?.neutralCount || 0;
+  if (!pos && !neg) return <span className="num">{count}건</span>;
+  const lean = leanOf(pos, neu, neg);
+  return (
+    <span className="wl-tone num" title={`${lean.text} · 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 중립 ${neu}` : ''}`}>
+      <ToneRing pos={pos} neu={neu} neg={neg} size={18} />
+      {count}건
+      <span className="sr-only">, {lean.text} (좋은 소식 {pos}, 나쁜 소식 {neg})</span>
+    </span>
+  );
+}
+
 export default function WatchlistPage() {
   useTitle('관심 종목');
   const { user, checking, openAuth, watchlist, watchCodes, toggleWatch, reloadWatchlist } = useSession();
@@ -61,6 +119,7 @@ export default function WatchlistPage() {
     else titleRef.current?.focus();
   };
   const { quotes, loading: quoteLoading, disabled } = useQuotes(items.map((w) => w.stockCode));
+  const tones = useWatchTones(items.map((w) => w.stockCode));
 
   if (checking) {
     return (
@@ -116,7 +175,12 @@ export default function WatchlistPage() {
         </h2>
         {watchlist.error && <ErrorBox error={watchlist.error} onRetry={reloadWatchlist} />}
         {!watchlist.loaded && <SkeletonRows rows={3} compact />}
-        {watchlist.loaded && items.length === 0 && <Empty icon={Star} title="담은 종목이 없어요" desc="위 검색창에서 종목을 찾아 담아요." />}
+        {watchlist.loaded && items.length === 0 && (
+          <>
+            <Empty icon={Star} title="담은 종목이 없어요" desc="위 검색창에서 찾거나, 오늘 기사가 많은 종목을 눌러 바로 담아요." />
+            <QuickPicks onPick={(s) => toggleWatch(s.stockCode, s.stockName)} />
+          </>
+        )}
         {items.length > 0 && (
           <div className="table-wrap">
             <table className="table">
@@ -169,7 +233,9 @@ export default function WatchlistPage() {
                           )}
                         </td>
                       )}
-                      <td className="r">{w.todayArticleCount}건</td>
+                      <td className="r">
+                        <WatchTone t={tones[w.stockCode]} count={w.todayArticleCount} />
+                      </td>
                       <td className="r hide-mobile muted">{w.lastMatchedAt ? relativeTime(w.lastMatchedAt) : '없음'}</td>
                       <td className="r">
                         <button type="button" className="icon-btn" aria-label={`${w.stockName} 관심 종목에서 빼기`} title="관심 종목에서 빼기" data-remove={w.stockCode} onClick={() => removeAt(i)}>

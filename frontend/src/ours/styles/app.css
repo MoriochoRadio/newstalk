@@ -4271,3 +4271,17 @@ html {
 .home-head > div:first-child {
   flex: 1;
 }
+
+/* 관심 종목 표: 오늘 기사 수 옆 좋은·나쁜 소식 링 (11/13 페르소나 준호) */
+.wl-tone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.quick-picks {
+  padding: 0 16px 16px;
+  text-align: center;
+}
+.quick-picks .tags {
+  justify-content: center;
+}

@@ -80,7 +80,8 @@ function ToneBand({ article }) {
                 </span>
               ))}
         </p>
-        <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용을 읽고 나눈 판단이에요. 주가가 오르거나 내린다는 예측은 아니에요.</p>
+        {/* 11/13 준호(글 안 읽음): 두 줄 → 한 줄. 뜻(AI 판단 · 주가 예측 아님)은 그대로 */}
+        <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용으로 나눈 판단 · 주가 예측 아님</p>
       </div>
     </div>
   );
