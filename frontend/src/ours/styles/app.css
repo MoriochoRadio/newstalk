@@ -4043,8 +4043,9 @@ html {
   .stock-flow .sf-stack {
     display: contents;
   }
-  .sf-summary { order: 1; }
-  .sf-sent { order: 2; }
+  /* 11/13 준호(글 안 읽음): 1초짜리 답인 좋은/나쁜 소식 링을 요약 글보다 먼저 */
+  .sf-sent { order: 1; }
+  .sf-summary { order: 2; }
   .sf-chart { order: 3; }
   .sf-news { order: 4; }
   .sf-mention { order: 5; }
@@ -4120,4 +4121,110 @@ html {
 /* 화면이 바뀌면 초점을 본문(main)으로 옮김(Shell) → 본문 전체에 테두리는 그리지 않음 (누르는 것이 아니라 영역) */
 #main:focus {
   outline: none;
+}
+
+/* ===== 홈 '한눈에 보기' 띠 (11/13 페르소나 준호: 글 대신 숫자·색·링) ===== */
+.glance {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.glance-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: var(--card-border);
+  box-shadow: var(--shadow-card);
+}
+.glance-link {
+  color: inherit;
+  text-decoration: none;
+}
+.glance-link:hover {
+  background: var(--surface-hover);
+}
+.glance-k {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.glance-v {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.glance-sep {
+  margin: 0 4px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+.glance-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.glance-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.glance-bar i {
+  display: block;
+  min-width: 2px;
+}
+.glance-bar .up-bg { background: var(--up); }
+.glance-bar .down-bg { background: var(--down); }
+.glance-bar .flat-bg { background: var(--line-strong); }
+.glance-tone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.glance-tone-n {
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.glance-tone-n b {
+  font-size: var(--fs-sm);
+}
+@media (min-width: 769px) {
+  .glance {
+    max-width: 640px;
+  }
+}
+
+/* 휴대폰에서 글 줄이기 (11/13 페르소나 준호: 1위 카드만 글 9줄 → 아무것도 안 읽고 끔)
+   요약 2줄, 다른 언론 목록·칸 설명 줄·부가 숫자는 감춤. 넓은 화면은 그대로 */
+@media (max-width: 768px) {
+  .story-big .story-summary {
+    -webkit-line-clamp: 2;
+  }
+  .story-big .story-others,
+  .home-head ~ * .section-sub,
+  .section-head .section-sub,
+  .story-card .tone-count {
+    display: none;
+  }
+}
+
+/* 화제 종목 카드도 휴대폰에선 요약 2줄, 링 옆 부가 숫자는 감춤 (11/13 페르소나 준호) */
+@media (max-width: 768px) {
+  .brief-summary {
+    -webkit-line-clamp: 2;
+  }
+  .brief-tone .num.muted {
+    display: none;
+  }
 }

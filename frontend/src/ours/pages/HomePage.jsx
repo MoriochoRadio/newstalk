@@ -21,6 +21,7 @@ import { StoryFeed } from '../components/ArticleRow';
 import TopStories, { rankStories } from '../components/TopStories';
 import TopicMix, { topicMix } from '../components/TopicMix';
 import BriefCard from '../components/BriefCard';
+import MarketGlance from '../components/MarketGlance';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import HourStrip from '../components/HourStrip';
 import LivePill from '../components/LivePill';
@@ -389,7 +390,11 @@ export default function HomePage() {
           <p className="eyebrow num">{todayLabel()}</p>
           <h1 className="page-title">오늘의 뉴스 브리핑</h1>
           {topStories.length ? (
-            <p className="lead">{lead}</p>
+            <>
+              {/* 문장은 화면 낭독기용, 눈에는 숫자·색·링 띠 (11/13 페르소나 준호: 글을 안 읽는 사람) */}
+              <p className="sr-only">{lead}</p>
+              <MarketGlance issues={issueItems} quotes={quotes} articles={feed.data?.items?.filter((a) => !a.isDisclosure)} priceOff={priceOff} />
+            </>
           ) : feed.loading ? (
             <div className="skeleton sk-line" style={{ width: 320, marginTop: 10 }} />
           ) : null}
