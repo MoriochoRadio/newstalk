@@ -8,7 +8,7 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { dirClass, fmtAmount, fmtPrice, fmtRate, relativeTime, shortTime } from '../lib/format';
+import { dirClass, fmtAmount, fmtPrice, fmtRate, marketKo, relativeTime, shortTime } from '../lib/format';
 import { errorText } from '../lib/errors';
 import { StoryFeed } from '../components/ArticleRow';
 import PriceChart from '../components/PriceChart';
@@ -64,7 +64,7 @@ function StockHeader({ code, info, quote, quoteState }) {
         </div>
         <p className="stock-sub num">
           <span>{code}</span>
-          {info?.market && <span className="badge">{info.market}</span>}
+          {info?.market && <span className="badge">{marketKo(info.market)}</span>}
           {info?.sector && <span>{info.sector}</span>}
         </p>
       </div>

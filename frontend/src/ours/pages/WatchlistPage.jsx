@@ -8,7 +8,7 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { dirClass, fmtPrice, fmtRate, relativeTime } from '../lib/format';
+import { dirClass, fmtPrice, fmtRate, marketKo, relativeTime } from '../lib/format';
 import SearchBox from '../components/SearchBox';
 import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, SkeletonRows } from '../components/ui';
@@ -150,7 +150,7 @@ export default function WatchlistPage() {
                         </Link>
                         <div className="muted num" style={{ fontSize: 'var(--fs-xs)' }}>
                           {w.stockCode}
-                          {w.market ? ` · ${w.market}` : ''}
+                          {w.market ? ` · ${marketKo(w.market)}` : ''}
                         </div>
                       </td>
                       {!disabled && (

@@ -7,7 +7,7 @@ import { FileText, Search, X } from 'lucide-react';
 import { searchApi, stockApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useDebounced } from '../lib/hooks';
-import { shortTime } from '../lib/format';
+import { marketKo, shortTime } from '../lib/format';
 import { errorText } from '../lib/errors';
 
 /** 검색어와 같은 부분을 굵게 */
@@ -225,7 +225,7 @@ export default function SearchBox({
                             <Highlight text={opt.item.stockName} q={debounced} />
                           </div>
                           <div className="opt-sub num">
-                            {opt.item.stockCode} · {opt.item.market || '시장 정보 없음'}
+                            {opt.item.stockCode} · {marketKo(opt.item.market) || '시장 정보 없음'}
                             {opt.item.matchedTheme ? ` · 테마: ${opt.item.matchedTheme}` : ''}
                           </div>
                         </div>

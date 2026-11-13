@@ -4228,3 +4228,42 @@ html {
     display: none;
   }
 }
+
+/* 보조지표 켜고 끄기 (11/13 페르소나 상훈) */
+.chart-ind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+}
+.ind-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ind-btn:hover {
+  background: var(--surface-hover);
+}
+.ind-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.ind-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* 보조지표 칸이 늘면 차트도 키움 (칸마다 약 90px) — 가격 칸이 납작해지지 않게. 바깥 상자 높이를 바꿔야 아래 글과 안 겹침 */
+.chart-box[data-ind='1'] { height: 450px; }
+.chart-box[data-ind='2'] { height: 540px; }
+@media (max-width: 768px) {
+  .chart-box[data-ind='1'] { height: 390px; }
+  .chart-box[data-ind='2'] { height: 480px; }
+}

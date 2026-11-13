@@ -117,6 +117,61 @@ function movingAverage(rows, n) {
   return out;
 }
 
+/* ===== 보조지표 (11/13 페르소나 '상훈': 차트를 열심히 보는 사용자는 이동평균만으론 부족 — MACD·RSI 를 켜고 끔) =====
+ * 받은 봉의 종가로 화면에서 계산 (서버 변경 없음). 일반적인 기본값: MACD(12, 26, 9), RSI(14, Wilder 평균) */
+function ema(values, n) {
+  const k = 2 / (n + 1);
+  const out = new Array(values.length).fill(null);
+  let prev = null;
+  for (let i = 0; i < values.length; i += 1) {
+    if (i < n - 1) continue;
+    prev = prev == null ? values.slice(i - n + 1, i + 1).reduce((a, b) => a + b, 0) / n : values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
+export function macd(rows, fast = 12, slow = 26, sig = 9) {
+  const closes = rows.map((r) => r.close);
+  const f = ema(closes, fast);
+  const s = ema(closes, slow);
+  const line = closes.map((_, i) => (f[i] != null && s[i] != null ? f[i] - s[i] : null));
+  const start = line.findIndex((v) => v != null);
+  const signal = new Array(rows.length).fill(null);
+  if (start >= 0) ema(line.slice(start), sig).forEach((v, j) => (signal[start + j] = v));
+  return rows.map((r, i) => ({ time: r.t, macd: line[i], signal: signal[i], hist: line[i] != null && signal[i] != null ? line[i] - signal[i] : null }));
+}
+
+export function rsi(rows, n = 14) {
+  const out = rows.map((r) => ({ time: r.t, value: null }));
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i < rows.length; i += 1) {
+    const d = rows[i].close - rows[i - 1].close;
+    const g = Math.max(d, 0);
+    const l = Math.max(-d, 0);
+    if (i <= n) {
+      gain += g / n;
+      loss += l / n;
+      if (i < n) continue;
+    } else {
+      gain = (gain * (n - 1) + g) / n;
+      loss = (loss * (n - 1) + l) / n;
+    }
+    out[i].value = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+  }
+  return out;
+}
+
+const IND_KEY = 'snm_chart_ind';
+const readInd = () => {
+  try {
+    return { macd: false, rsi: false, ...JSON.parse(localStorage.getItem(IND_KEY) || '{}') };
+  } catch {
+    return { macd: false, rsi: false };
+  }
+};
+
 const EMPTY = { key: null, items: [], error: null, more: false, cursor: null, tried: 0 };
 
 /**
@@ -193,6 +248,19 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(null);
   const [hover, setHover] = useState(null); // 십자선이 가리키는 봉의 시각
+  const [ind, setInd] = useState(readInd); // 보조지표 켜고 끔 (이 브라우저에 기억)
+  const toggleInd = (k) =>
+    setInd((p) => {
+      const next = { ...p, [k]: !p[k] };
+      try {
+        localStorage.setItem(IND_KEY, JSON.stringify(next));
+      } catch {
+        /* 저장 못 해도 이번 화면에선 동작 */
+      }
+      return next;
+    });
+  const indRef = useRef({ macd: null, rsi: null });
+  const hiLoRef = useRef([]);
   const boxRef = useRef(null);
   const chartRef = useRef(null);
   const dataRef = useRef(data);
@@ -397,6 +465,71 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     }
   }, [data, key, unit, range.bars]);
 
+  // 보조지표 칸: 켜면 맨 아래에 칸을 만들고, 끄면 칸까지 지움. 일·주봉에서만 (분봉은 하루치라 의미가 작음)
+  useEffect(() => {
+    const ref = chartRef.current;
+    if (!ref) return;
+    const { chart } = ref;
+    const c = ref.colors;
+    const cur = indRef.current;
+    const want = { macd: ind.macd && hasMa(unit), rsi: ind.rsi && hasMa(unit) };
+    const drop = (series) => {
+      const idx = series[0].getPane().paneIndex();
+      const before = chart.panes().length;
+      series.forEach((s) => chart.removeSeries(s));
+      if (chart.panes().length === before) chart.removePane(idx); // 빈 칸이 저절로 지워지지 않았을 때만
+    };
+    if (!want.macd && cur.macd) {
+      drop([cur.macd.hist, cur.macd.line, cur.macd.signal]);
+      cur.macd = null;
+    }
+    if (!want.rsi && cur.rsi) {
+      drop([cur.rsi.line]);
+      cur.rsi = null;
+    }
+    const lineOpt = { lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+    if (want.macd && !cur.macd) {
+      const p = chart.panes().length;
+      const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, p);
+      const line = chart.addSeries(LineSeries, { ...lineOpt, color: c.ma[20] }, p);
+      const signal = chart.addSeries(LineSeries, { ...lineOpt, color: c.ma[5] }, p);
+      chart.panes()[p].setStretchFactor(1.3);
+      cur.macd = { hist, line, signal };
+    }
+    if (want.rsi && !cur.rsi) {
+      const p = chart.panes().length;
+      const line = chart.addSeries(LineSeries, { ...lineOpt, color: c.ma[60] }, p);
+      [70, 30].forEach((v) => line.createPriceLine({ price: v, color: c.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }));
+      chart.panes()[p].setStretchFactor(1);
+      cur.rsi = { line };
+    }
+    const list = rowsRef.current;
+    if (cur.macd) {
+      const m = macd(list);
+      cur.macd.hist.setData(m.filter((x) => x.hist != null).map((x) => ({ time: x.time, value: x.hist, color: `${x.hist >= 0 ? c.up : c.down}88` })));
+      cur.macd.line.setData(m.filter((x) => x.macd != null).map((x) => ({ time: x.time, value: x.macd })));
+      cur.macd.signal.setData(m.filter((x) => x.signal != null).map((x) => ({ time: x.time, value: x.signal })));
+    }
+    if (cur.rsi) cur.rsi.line.setData(rsi(list).filter((x) => x.value != null));
+  }, [ind, data, key, unit]);
+
+  // 고른 기간의 최고가·최저가 가로 점선 (지지·저항을 가늠하는 출발점. 직접 선 긋기 도구는 없음)
+  useEffect(() => {
+    const ref = chartRef.current;
+    if (!ref) return;
+    hiLoRef.current.forEach((l) => ref.candles.removePriceLine(l));
+    hiLoRef.current = [];
+    const list = rowsRef.current;
+    const span = range.bars ? list.slice(-range.bars) : list;
+    if (isIntraday(unit) || span.length < 2) return;
+    const hi = Math.max(...span.map((r) => r.high));
+    const lo = Math.min(...span.map((r) => r.low));
+    hiLoRef.current = [
+      ref.candles.createPriceLine({ price: hi, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '기간 최고' }),
+      ref.candles.createPriceLine({ price: lo, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '기간 최저' }),
+    ];
+  }, [data, key, unit, rangeKey, range.bars]);
+
   // 같은 일봉 안에서 기간만 바꾸면(1개월↔1년) 다시 받지 않고 보이는 범위만 바꿈. 모자라면 왼쪽 끝에서 이전 데이터를 이어 받음
   useEffect(() => {
     const ref = chartRef.current;
@@ -425,6 +558,11 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   }
   const bar = idx >= 0 ? rows[idx] : null;
   const prev = idx > 0 ? rows[idx - 1] : null;
+  // 보조지표 값 줄 (십자선이 가리키는 봉)
+  const indAt = {
+    macd: ind.macd && hasMa(unit) && bar ? macd(rows)[idx] : null,
+    rsi: ind.rsi && hasMa(unit) && bar ? rsi(rows)[idx]?.value ?? null : null,
+  };
   // 장중의 오늘 일봉은 아직 종가가 아님 → "종" 대신 "현재" (11/13: 장중에 '종 27,650'이 위 현재가와 달라 헷갈림)
   const live = bar && idx === rows.length - 1 && unit === 'day' && bar.t === kstDate(new Date().toISOString()) && tradingNow();
   const diffRate = bar && prev && prev.close ? ((bar.close - prev.close) / prev.close) * 100 : null;
@@ -479,19 +617,19 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           <>
             <span className="muted">{formatTime(bar.t)}</span>
             <span>
-              <span className="k">시</span>
+              <span className="k">시가</span>
               <b>{fmt(bar.open)}</b>
             </span>
             <span>
-              <span className="k">고</span>
+              <span className="k">고가</span>
               <b className="up">{fmt(bar.high)}</b>
             </span>
             <span>
-              <span className="k">저</span>
+              <span className="k">저가</span>
               <b className="down">{fmt(bar.low)}</b>
             </span>
             <span>
-              <span className="k">{live ? '현재' : '종'}</span>
+              <span className="k">{live ? '현재' : '종가'}</span>
               <b>{fmt(bar.close)}</b>
               {diffRate != null && (
                 <span className={diffRate > 0 ? 'up' : diffRate < 0 ? 'down' : 'flat'} style={{ marginLeft: 4 }}>
@@ -515,19 +653,36 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
             MA.map((m) => (
               <span key={m.n}>
                 <i style={{ background: colors?.ma[m.n] || MA_FALLBACK[m.color] }} />
-                이동평균 {m.n} {maAt(m.n) != null ? fmt(maAt(m.n)) : '–'}
+                {m.n}{unit === 'week' ? '주' : unit === 'month' ? '개월' : '일'} 평균 {maAt(m.n) != null ? fmt(maAt(m.n)) : '–'}
               </span>
             ))}
           {showMarks && (dayCounts || articles) && (
             <span>
               <i className="news-dot" />
-              {unit === 'day' ? '맨 아래 막대 = 그날 기사 수 (최근 30일)' : '맨 아래 막대 = 5분마다 기사 수 (최근 기사 100건)'}
+              {unit === 'day' ? '기사 수 막대 = 그날 기사 수 (최근 30일)' : '기사 수 막대 = 5분마다 기사 수 (최근 기사 100건)'}
             </span>
           )}
+          {hasMa(unit) && ind.macd && indAt.macd && (
+            <span>
+              MACD(12,26,9) {fmt(indAt.macd.macd)} · 시그널 {fmt(indAt.macd.signal)}
+            </span>
+          )}
+          {hasMa(unit) && ind.rsi && indAt.rsi != null && <span>RSI(14) {Math.round(indAt.rsi)}</span>}
+        </div>
+      )}
+      {hasMa(unit) && (
+        <div className="chart-ind" role="group" aria-label="보조지표">
+          <span className="muted">보조지표</span>
+          <button type="button" className="ind-btn" aria-pressed={ind.macd} onClick={() => toggleInd('macd')} title="MACD: 짧은 평균과 긴 평균의 차이로 흐름이 바뀌는지 보는 지표 (12·26·9)">
+            MACD
+          </button>
+          <button type="button" className="ind-btn" aria-pressed={ind.rsi} onClick={() => toggleInd('rsi')} title="RSI: 최근 14봉의 오른 폭과 내린 폭 비율. 70 위는 많이 오른 편, 30 아래는 많이 내린 편">
+            RSI
+          </button>
         </div>
       )}
 
-      <div className="chart-box">
+      <div className="chart-box" data-ind={hasMa(unit) ? (ind.macd ? 1 : 0) + (ind.rsi ? 1 : 0) : 0}>
         <div ref={boxRef} className="chart-canvas" role="img" aria-label={chartLabel} />
         {loading && (
           <div className="chart-skeleton" role="status">

@@ -110,3 +110,7 @@ export function hasBatchim(word) {
 
 /** "삼성전자예요" · "NHN이에요" */
 export const iyeyo = (word) => `${word}${hasBatchim(word) ? '이에요' : '예요'}`;
+
+/** 시장 이름을 한글로 (11/13 페르소나 수아: 주식 초보는 KOSPI 보다 '코스피'가 익숙) */
+const MARKET_KO = { KOSPI: '코스피', KOSDAQ: '코스닥', KONEX: '코넥스' };
+export const marketKo = (m) => (m ? MARKET_KO[m] || m : '');
