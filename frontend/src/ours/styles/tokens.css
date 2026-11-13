@@ -240,40 +240,10 @@
   }
 }
 
-/* ===== 시안 비교 (11/12, "토스 같다" 피드백): 강조색 하나 + 어두운 화면 바탕 톤만 바꿈. 나머지는 v2 그대로 =====
-   E = 파랑은 그대로 + 어두운 화면만 중립 회색 (11/12 사용자: '파랑이 제일 좋다')
-   A = 지금(토스 파랑 + 푸른 검정) · B = 잉크 네이비 + 중립 회색 · C = 청록(틸) + 중립 회색 · D = 뉴스 주황 + 중립 회색
-   <html data-variant="b|c|d"> (없으면 A). 글자색(accent-text)은 바탕 대비 4.5:1 이상으로 고름 */
-:root[data-variant='b'] {
-  --accent: #23466e;
-  --accent-strong: #1b3858;
-  --accent-soft: #e8eef6;
-  --accent-text: #23466e;
-  --bar-news: #23466e;
-  --mark-soft: #e8eef6;
-}
-:root[data-variant='c'] {
-  --accent: #0f8a7e;
-  --accent-strong: #0b6b62;
-  --accent-soft: #e2f4f1;
-  --accent-text: #0b6b62;
-  --bar-news: #0f8a7e;
-  --mark-soft: #dcf2ee;
-}
-:root[data-variant='d'] {
-  --accent: #d9590f;
-  --accent-strong: #b8470a;
-  --accent-soft: #fdeee3;
-  --accent-text: #b04408;
-  --bar-news: #d9590f;
-  --mark-soft: #fde9da;
-}
+/* ===== 시안 E (11/12, "토스 같다" 피드백): 파랑은 그대로 + 어두운 화면만 중립 회색 (사용자: '파랑이 제일 좋다') ===== */
 
-/* 어두운 화면: B·C·D 는 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
-:root[data-variant='e'][data-theme='dark'],
-:root[data-variant='b'][data-theme='dark'],
-:root[data-variant='c'][data-theme='dark'],
-:root[data-variant='d'][data-theme='dark'] {
+/* 어두운 화면: 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
+:root[data-variant='e'][data-theme='dark'] {
   --bg: #121212;
   --surface: #1c1c1c;
   --surface-2: #222222;
@@ -289,40 +259,10 @@
   --heat-flat: #2c2c2c;
   --heat-none: #262626;
 }
-:root[data-variant='b'][data-theme='dark'] {
-  --text-on-accent: #0d1a2a; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
-  --accent: #7ea6d8;
-  --accent-strong: #3f6aa3;
-  --accent-soft: rgba(126, 166, 216, 0.15);
-  --accent-text: #9dbde6;
-  --bar-news: #7ea6d8;
-  --mark-soft: rgba(126, 166, 216, 0.2);
-}
-:root[data-variant='c'][data-theme='dark'] {
-  --text-on-accent: #062421; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
-  --accent: #2cc1b0;
-  --accent-strong: #138a7e;
-  --accent-soft: rgba(44, 193, 176, 0.15);
-  --accent-text: #5fd6c8;
-  --bar-news: #2cc1b0;
-  --mark-soft: rgba(44, 193, 176, 0.2);
-}
-:root[data-variant='d'][data-theme='dark'] {
-  --text-on-accent: #2a1205; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
-  --accent: #f08a45;
-  --accent-strong: #c25a14;
-  --accent-soft: rgba(240, 138, 69, 0.15);
-  --accent-text: #f6a56d;
-  --bar-news: #f08a45;
-  --mark-soft: rgba(240, 138, 69, 0.2);
-}
 
 @media (prefers-color-scheme: dark) {
-  /* (운영체제 다크 설정을 따를 때도 같은 값) B·C·D·E 는 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
-  :root[data-variant='e']:not([data-theme='light']),
-  :root[data-variant='b']:not([data-theme='light']),
-  :root[data-variant='c']:not([data-theme='light']),
-  :root[data-variant='d']:not([data-theme='light']) {
+  /* (운영체제 다크 설정을 따를 때도 같은 값) */
+  :root[data-variant='e']:not([data-theme='light']) {
     --bg: #121212;
     --surface: #1c1c1c;
     --surface-2: #222222;
@@ -338,39 +278,10 @@
     --heat-flat: #2c2c2c;
     --heat-none: #262626;
   }
-  :root[data-variant='b']:not([data-theme='light']) {
-    --text-on-accent: #0d1a2a; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
-    --accent: #7ea6d8;
-    --accent-strong: #3f6aa3;
-    --accent-soft: rgba(126, 166, 216, 0.15);
-    --accent-text: #9dbde6;
-    --bar-news: #7ea6d8;
-    --mark-soft: rgba(126, 166, 216, 0.2);
-  }
-  :root[data-variant='c']:not([data-theme='light']) {
-    --text-on-accent: #062421; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
-    --accent: #2cc1b0;
-    --accent-strong: #138a7e;
-    --accent-soft: rgba(44, 193, 176, 0.15);
-    --accent-text: #5fd6c8;
-    --bar-news: #2cc1b0;
-    --mark-soft: rgba(44, 193, 176, 0.2);
-  }
-  :root[data-variant='d']:not([data-theme='light']) {
-    --text-on-accent: #2a1205; /* 밝은 강조색 위 글자는 어둡게 (흰 글자는 대비 부족) */
-    --accent: #f08a45;
-    --accent-strong: #c25a14;
-    --accent-soft: rgba(240, 138, 69, 0.15);
-    --accent-text: #f6a56d;
-    --bar-news: #f08a45;
-    --mark-soft: rgba(240, 138, 69, 0.2);
-  }
 }
 
-/* ===== 완성 시안 비교 2차 (11/12 저녁): 파랑은 지키고 '모양'까지 바꿔 봄 =====
-   토스 느낌 = 파랑 + 푸른 회색 + 크게 둥근 카드 + 부드러운 그림자 + 넓은 여백의 '조합' → 조합을 바꿈
-   <html data-variant="e" data-shape="sharp|soft|flat" data-nav="ink"> (VariantSwitch 가 시안별로 정함) */
-
+/* ===== 최종 G (11/12 밤): 파랑 강조 + 중립 회색 + 덜 둥근 카드(soft) + 남색 사이드바(ink) =====
+   OursApp.jsx 가 <html data-variant="e" data-shape="soft" data-nav="ink"> 를 정함. 다른 시안(b·c·d, sharp·flat)은 11/13 지움 */
 /* 기본(토스 원본) 값 — 아래 모양 토큰을 쓰는 곳이 바뀌지 않게 */
 :root {
   --card-border: 0 solid transparent;
@@ -393,30 +304,11 @@
   --heat-none: #f0f0f2;
 }
 
-/* 모양: 단단한 금융 단말기 — 덜 둥글게, 그림자 대신 1px 선 */
-:root[data-shape='sharp'] {
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 10px;
-  --shadow-card: none;
-  --card-border: 1px solid var(--line);
-}
-
 /* 모양: 부드럽지만 덜 둥글게 (토스 18px → 12px) */
 :root[data-shape='soft'] {
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 14px;
-}
-
-/* 모양: 지면형 — 바탕과 카드가 같은 색, 칸은 선으로만 나눔 (뉴스 지면처럼) */
-:root[data-shape='flat'] {
-  --radius-sm: 4px;
-  --radius: 4px;
-  --radius-lg: 6px;
-  --shadow-card: none;
-  --card-border: 1px solid var(--line);
-  --bg: var(--surface);
 }
 
 /* 사이드바: 남색 (밝은 화면에서도 왼쪽 메뉴만 어둡게 — 업무용 단말기 느낌). 글자 대비 9:1 · 보조 5.4:1 */

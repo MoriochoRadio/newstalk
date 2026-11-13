@@ -66,6 +66,13 @@ function WatchMini() {
 export default function StocksPage() {
   useTitle('종목');
   const navigate = useNavigate();
+  // 줄 어디를 눌러도 종목 화면으로 (키보드는 줄 안의 종목 이름 링크). 글자를 고르는 중이면 이동 안 함, Ctrl·⌘·가운데 클릭은 새 탭
+  const openRow = (e, code) => {
+    if (window.getSelection?.().toString()) return;
+    const path = `/stocks/${code}`;
+    if (e.ctrlKey || e.metaKey || e.button === 1) window.open(path, '_blank', 'noopener');
+    else navigate(path);
+  };
   const issues = useApi((signal) => stockApi.issues({ limit: LIMIT }, { signal }), []);
   const items = issues.data?.items || [];
   const { quotes, loading: quoteLoading, disabled } = useQuotes(items.map((i) => i.stockCode));
@@ -134,7 +141,7 @@ export default function StocksPage() {
                   {items.map((it) => {
                     const q = quotes[it.stockCode];
                     return (
-                      <tr key={it.stockCode} onClick={() => navigate(`/stocks/${it.stockCode}`)} style={{ cursor: 'pointer' }}>
+                      <tr key={it.stockCode} onClick={(e) => openRow(e, it.stockCode)} style={{ cursor: 'pointer' }}>
                         <td className="rank">{it.rank}</td>
                         <td>
                           <Link to={`/stocks/${it.stockCode}`} style={{ fontWeight: 600 }} onClick={(e) => e.stopPropagation()}>

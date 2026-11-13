@@ -173,6 +173,7 @@ function Post({ post, onRemoved }) {
   const [commentCount, setCommentCount] = useState(post.commentCount);
   const body = useApi((signal) => boardApi.post(post.postId, { signal }), [post.postId], { enabled: open });
   const mine = user?.loginId === post.authorLoginId;
+  const detailId = `post-${post.postId}-detail`; // 펼침 버튼 두 개가 여는 곳 (낭독기가 버튼과 내용을 이어 읽음)
 
   const toggleLike = async () => {
     if (!user) {
@@ -200,26 +201,28 @@ function Post({ post, onRemoved }) {
 
   return (
     <li className="post">
-      <button type="button" className="post-title" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="post-title" aria-expanded={open} aria-controls={detailId} onClick={() => setOpen((o) => !o)}>
         {post.title}
       </button>
       <div className="post-meta">
         <span>{post.authorLoginId}</span>
         <span className="num">{relativeTime(post.createdAt)}</span>
       </div>
-      {open && (
-        <div className="post-body">
-          {body.loading && !body.data && <div className="skeleton sk-line" style={{ width: '60%' }} />}
-          {body.error && <ErrorBox error={body.error} onRetry={body.reload} />}
-          {body.data?.content}
-        </div>
-      )}
+      <div id={detailId}>
+        {open && (
+          <div className="post-body">
+            {body.loading && !body.data && <div className="skeleton sk-line" style={{ width: '60%' }} />}
+            {body.error && <ErrorBox error={body.error} onRetry={body.reload} />}
+            {body.data?.content}
+          </div>
+        )}
+      </div>
       <div className="post-actions">
         <button type="button" className="btn btn-sm btn-ghost like-btn" aria-pressed={like.liked} onClick={toggleLike}>
           <Heart className="icon-sm" aria-hidden="true" />
           공감 <span className="num">{like.count}</span>
         </button>
-        <button type="button" className="btn btn-sm btn-ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <button type="button" className="btn btn-sm btn-ghost" aria-expanded={open} aria-controls={detailId} onClick={() => setOpen((o) => !o)}>
           <MessageCircle className="icon-sm" aria-hidden="true" />
           댓글 <span className="num">{commentCount}</span>
         </button>
