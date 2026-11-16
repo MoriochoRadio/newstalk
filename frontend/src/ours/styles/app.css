@@ -1521,7 +1521,7 @@ a.feed-title:hover {
 }
 
 .mention-chart .bar-news {
-  fill: var(--accent);
+  fill: var(--bar-news);
 }
 
 .mention-chart .bar-sns {
@@ -4274,8 +4274,8 @@ html {
 .chart-box[data-ind='1'] { height: 450px; }
 .chart-box[data-ind='2'] { height: 540px; }
 @media (max-width: 768px) {
-  .chart-box[data-ind='1'] { height: 390px; }
-  .chart-box[data-ind='2'] { height: 480px; }
+  .chart-box[data-ind='1'] { height: 430px; }
+  .chart-box[data-ind='2'] { height: 520px; }
 }
 /* PC: 머리 영역 칸이 내용만큼만 줄어 띠가 작게 나옴 → 남는 폭을 차지 (띠는 최대 640px) */
 .home-head > div:first-child {
@@ -5225,5 +5225,79 @@ html {
 }
 .chip.focus.chip-main {
   box-shadow: inset 0 0 0 1.5px var(--text);
+}
+
+/* ===== 11/16 두 번째 리뷰 ===== */
+/* 1) 어두운 화면: 지금 종목 칩의 '주인공' 글자가 흰 바탕에 흰 글자 (focus 규칙이 #fff 로 덮음) */
+.chip.focus.chip-main .role {
+  color: var(--surface);
+}
+/* 2) 휴대폰 종목 화면: 이슈 순위 표가 화면 밖으로 잘리고 이름이 한 글자씩 꺾임 */
+@media (max-width: 768px) {
+  .sl-grid {
+    align-items: stretch;
+  }
+  .sl-grid > *,
+  .sl-grid .card {
+    min-width: 0;
+  }
+  .sl-rank td:nth-child(2) a {
+    display: inline-block;
+    max-width: 8.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+}
+/* 8) 쪽 번호: '›' 가 혼자 다음 줄로 넘어감 */
+.pager {
+  flex-wrap: nowrap;
+}
+@media (max-width: 480px) {
+  .pager button {
+    min-width: 32px;
+    padding: 0 4px;
+  }
+}
+/* 14) 휴대폰 종목 화면 바로 가기 줄: 옆으로 더 있다는 표시(오른쪽 끝 흐림) */
+@media (max-width: 768px) {
+  .sec-nav {
+    -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+    mask-image: linear-gradient(to right, #000 85%, transparent);
+    padding-right: 32px;
+  }
+}
+/* 관심 종목 빼기(×): 누르는 자리 넓게 */
+.wl-table .icon-btn,
+.table .icon-btn {
+  min-width: 40px;
+  min-height: 40px;
+}
+/* 7) 휴대폰 차트: 위 설명 8줄이 차트를 눌러서 → 값 줄만 남기고 범례·아래 설명 숨김, 차트 높이 키움 */
+@media (max-width: 768px) {
+  .chart-legend,
+  .chart-foot {
+    display: none;
+  }
+  .chart-box {
+    height: 340px;
+  }
+}
+/* 10) 휴대폰 검색 결과 종목 칩: 한 줄 가로 넘기기 */
+@media (max-width: 768px) {
+  .sr-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .sr-chips > * {
+    flex: none;
+  }
+}
+/* 3) 이슈 순위 기사 수 막대도 보라 (기사 수 = 보라로 통일, 파랑은 가격 '내림'만) */
+.count-bar span {
+  background: var(--bar-news);
 }
 

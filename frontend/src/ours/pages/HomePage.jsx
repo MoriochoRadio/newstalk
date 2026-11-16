@@ -227,7 +227,6 @@ export default function HomePage() {
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>
       </nav>
-      <p className="home-foot">AI 요약과 좋은·나쁜 소식은 AI가 기사 글을 읽고 나눈 것이에요. 등락률은 어제 종가와 비교한 지금 값이고, 기사와 주가의 관계를 뜻하지 않아요.</p>
     </>
   );
 }

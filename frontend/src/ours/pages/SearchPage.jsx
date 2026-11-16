@@ -73,15 +73,19 @@ export default function SearchPage() {
         {stocks.error && <ErrorBox error={stocks.error} onRetry={stocks.reload} />}
         {stocks.data && stockItems.length === 0 && <p className="sub">맞는 종목이 없어요.</p>}
         {stockItems.length > 0 && (
-          <div className="tags">
+          <div className="tags sr-chips">
             {stockItems.map((s) => (
               <Link key={s.stockCode} to={`/stocks/${s.stockCode}`} className="chip">
                 {s.stockName}
                 {/* 모두 같은 테마면 테마는 위에 한 번만 → 칩이 짧아져 휴대폰에서 한 줄에 여럿 (11/13: 칩 12개가 한 줄씩 차지해 기사가 한참 아래) */}
-                <span className="role num">
-                  {s.stockCode}
-                  {s.matchedTheme && !sameTheme ? ` · 테마 ${s.matchedTheme}` : ''}
-                </span>
+                {/* 휴대폰은 종목코드를 숨겨 칩을 짧게 (11/16 리뷰: 칩 12개가 9줄로 쌓여 첫 화면을 다 차지) */}
+                {(s.matchedTheme && !sameTheme) ? (
+                  <span className="role num">
+                    <span className="hide-mobile">{s.stockCode} · </span>테마 {s.matchedTheme}
+                  </span>
+                ) : (
+                  <span className="role num hide-mobile">{s.stockCode}</span>
+                )}
               </Link>
             ))}
             {stocks.data.totalCount > stockItems.length && <span className="chip-more">외 {stocks.data.totalCount - stockItems.length}종목</span>}

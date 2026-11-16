@@ -89,6 +89,8 @@ const readColors = () => {
     down: pick('--down-chart', '#3182f6'),
     text: pick('--text-3', '#636e7b'),
     grid: pick('--line', '#e5e8eb'),
+    labelBg: pick('--surface-3', '#e9ecef'),
+    ink: pick('--text', '#191f28'),
     ma: Object.fromEntries(MA.map((m) => [m.n, pick(m.color, MA_FALLBACK[m.color])])),
   };
 };
@@ -241,7 +243,8 @@ function tradingNow(now = new Date()) {
 }
 
 export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null, moves = null, liveQuote = null }) {
-  const [rangeKey, setRangeKey] = useState('3m');
+  // 기본 1개월 (11/16 리뷰 두 번: 3개월이면 기사 수 칸(최근 30일)의 왼쪽 2/3가 비어 데이터가 빠진 것처럼 보였음)
+  const [rangeKey, setRangeKey] = useState('1m');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
   const unit = range.unit;
   const [data, setData] = useState(EMPTY);
@@ -536,8 +539,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const hi = Math.max(...span.map((r) => r.high));
     const lo = Math.min(...span.map((r) => r.low));
     hiLoRef.current = [
-      ref.candles.createPriceLine({ price: hi, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '기간 최고' }),
-      ref.candles.createPriceLine({ price: lo, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '기간 최저' }),
+      ref.candles.createPriceLine({ price: hi, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, axisLabelColor: ref.colors.labelBg, axisLabelTextColor: ref.colors.ink, title: '기간 최고' }),
+      ref.candles.createPriceLine({ price: lo, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, axisLabelColor: ref.colors.labelBg, axisLabelTextColor: ref.colors.ink, title: '기간 최저' }),
     ];
   }, [data, key, unit, rangeKey, range.bars]);
 

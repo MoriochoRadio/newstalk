@@ -17,6 +17,7 @@ import Board from '../components/Board';
 import { ToneRing, leanOf } from '../components/Tone';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { useBack } from './NewsDetailPage';
+import { dropPriceSentences } from '../lib/priceSentence';
 
 const NEWS_SIZE = 10;
 const MENTION_PERIODS = [
@@ -93,7 +94,8 @@ function StockHeader({ code, info, quote, quoteState }) {
 
 /** 종합 요약을 문장마다 한 줄씩 (11/13 사용자 눈으로: 8줄짜리 한 덩어리라 휴대폰에서 훑어 읽기 어려웠음).
  *  '~다.' 로 끝나는 곳에서만 나눔 (숫자 속 마침표 '1.5배'는 안 나눔). 한 문장이면 그대로 */
-function SummaryText({ text }) {
+function SummaryText({ text: raw }) {
+  const text = dropPriceSentences(raw);
   const lines = String(text).split(/(?<=다\.)\s+/).map((x) => x.trim()).filter(Boolean);
   if (lines.length < 2) return <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7 }}>{text}</p>;
   return (
@@ -331,7 +333,6 @@ function BigMovesCard({ moves, level, onLevel }) {
           {open ? '접기' : `모든 날 보기 (${items.length}번)`}
         </button>
       ) : null}
-      {items.length > 0 && <p className="card-note">그날 이 종목과 연결된 기사예요. 주가가 움직인 이유라는 뜻은 아니에요.</p>}
     </section>
   );
 }

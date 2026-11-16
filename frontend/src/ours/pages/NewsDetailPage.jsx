@@ -2,7 +2,7 @@
 // 부품 출처: V7 ArticleDetail (연결 이유·근거 원문·사실 종류 배지, "기사 때문에 움직였다는 뜻 아님" 안내, 같은 소식)
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Info, Quote } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Quote } from 'lucide-react';
 import { articleApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
@@ -14,7 +14,8 @@ import { ArticleTags, SAME_NEWS_TIP, sourceText } from '../components/ArticleRow
 import { TONE_TIP, ToneRing, countsOf } from '../components/Tone';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 
-const FACT_BADGE = { FACT: 'badge-ok', PLAN: 'badge-accent', FORECAST: 'badge-warn', RUMOR: 'badge-warn' };
+// 사실 종류 표시는 좋은·나쁜 소식 색(초록·호박)과 가격 색(파랑)을 쓰지 않음 (11/16 리뷰: '일어난 일'이 초록이라 좋은 소식처럼 보임)
+const FACT_BADGE = { FACT: '', PLAN: '', FORECAST: 'badge-outline', RUMOR: 'badge-outline' };
 
 /** 브라우저 기록이 있으면 뒤로, 바로 들어온 주소면 목록으로 */
 export function useBack(fallback) {
@@ -331,11 +332,6 @@ function NewsDetail({ id }) {
           <p className="card-note">{SAME_NEWS_TIP}</p>
         </section>
       )}
-
-      <p className="note page-foot-note">
-        <Info className="icon-sm" aria-hidden="true" />
-        시세는 어제 종가 대비 지금 값이에요. {a.isDisclosure ? '공시' : '기사'} 때문에 움직였다는 뜻이 아니에요.
-      </p>
 
       {a.relatedSns.length > 0 && (
         <section className="card ad-sns" aria-labelledby="sns-title">

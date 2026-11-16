@@ -7,6 +7,7 @@ import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import { BUZZ_TIP } from '../lib/buzz';
 import Sparkline from './Sparkline';
 import { TONE_TIP, ToneRing, leanOf, toneCountText } from './Tone';
+import { dropPriceSentences } from '../lib/priceSentence';
 
 /** 오늘 이 종목 기사들의 좋은·나쁜 소식 비율 (서버가 센 값, 링 = 시그니처) */
 function BriefTone({ sentiment: t }) {
@@ -23,7 +24,7 @@ function BriefTone({ sentiment: t }) {
 
 export default function BriefCard({ rank, code, name, quote, quoteLoading, priceOff, summary, digest, buzz, firstAt, articleCount, compact = false }) {
   const cls = dirClass(quote?.changeRate);
-  const text = summary?.newsSummary || '';
+  const text = dropPriceSentences(summary?.newsSummary || '');
   const tags = [
     ...(digest?.disclosureTypes || []).map((t) => ({ key: `d-${t}`, label: `공시 · ${t}`, kind: 'accent' })),
     ...(digest?.topics || []).map((t) => ({ key: `t-${t.label}`, label: `${t.label} ${t.count}`, kind: '' })),

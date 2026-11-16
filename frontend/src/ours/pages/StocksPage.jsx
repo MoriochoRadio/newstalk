@@ -137,7 +137,7 @@ export default function StocksPage() {
                       소식
                     </th>
                     {!disabled && (
-                      <th scope="col" className="r">
+                      <th scope="col" className="r hide-mobile">
                         현재가
                       </th>
                     )}
@@ -182,7 +182,7 @@ export default function StocksPage() {
                           </span>
                         </td>
                         <td className="r hide-mobile">{it.eventCount ?? '–'}</td>
-                        {!disabled && <td className="r">{q ? fmtPrice(q.price) : quoteLoading ? '' : '–'}</td>}
+                        {!disabled && <td className="r hide-mobile">{q ? fmtPrice(q.price) : quoteLoading ? '' : '–'}</td>}
                         {!disabled && <td className={`r change ${dirClass(q?.changeRate)}`}>{q ? fmtRate(q.changeRate) : ''}</td>}
                       </tr>
                     );

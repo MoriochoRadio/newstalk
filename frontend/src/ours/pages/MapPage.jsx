@@ -85,7 +85,6 @@ export default function MapPage() {
           <div style={{ marginTop: 16 }}>
             <Movers issues={items} quotes={quotes} disabled={disabled} loading={loading} top={5} title={`${items.length}종목 중 많이 오른·내린`} />
           </div>
-          <p className="home-foot">칸 크기는 오늘 기사 수, 색은 어제 종가와 비교한 지금 등락률이에요. 기사와 주가의 관계를 뜻하지 않아요.</p>
         </>
       )}
     </>

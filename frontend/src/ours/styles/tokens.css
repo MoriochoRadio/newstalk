@@ -112,7 +112,7 @@
   --buzz-solid: #6d28d9;
 
   /* v2: 시간대별 보도량 */
-  --bar-news: #3182f6;
+  --bar-news: var(--buzz-solid); /* 기사 수 막대 = 보라 (11/16 리뷰: 파랑이면 '내림'으로 읽힘, 차트의 기사 수 막대와 같은 색) */
   --bar-disclosure: #9aa4b2;
 }
 
@@ -171,7 +171,7 @@
     --buzz: #c9b2ff;
     --buzz-soft: rgba(167, 139, 250, 0.16);
     --buzz-solid: #7c3aed;
-    --bar-news: #4a90f7;
+    --bar-news: var(--buzz-solid); /* 기사 수 막대 = 보라 (11/16 리뷰: 파랑이면 '내림'으로 읽힘, 차트의 기사 수 막대와 같은 색) */
     --bar-disclosure: #6b7380;
   }
 }
@@ -229,7 +229,7 @@
   --buzz: #c9b2ff;
   --buzz-soft: rgba(167, 139, 250, 0.16);
   --buzz-solid: #7c3aed;
-  --bar-news: #4a90f7;
+  --bar-news: var(--buzz-solid); /* 기사 수 막대 = 보라 (11/16 리뷰: 파랑이면 '내림'으로 읽힘, 차트의 기사 수 막대와 같은 색) */
   --bar-disclosure: #6b7380;
 }
 

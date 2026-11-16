@@ -40,7 +40,7 @@ export function ArticleTags({ article: a, detail = false }) {
   }
   if (a.disclosureCorrection) {
     tags.push(
-      <span key="c" className="badge badge-warn" title={CORRECTION_TIP}>
+      <span key="c" className="badge" title={CORRECTION_TIP}>
         정정 공시
       </span>
     );

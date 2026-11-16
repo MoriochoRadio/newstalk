@@ -293,6 +293,9 @@ export default function Shell() {
         <footer className="footer">
           AI가 뉴스·공시를 읽고 종목과 연결한 정보예요. 틀릴 수 있고 투자 권유가 아니며, 투자 판단과 책임은 본인에게 있어요.
           <br />
+          {/* 화면마다 따로 있던 같은 안내(홈·시장 지도·글 화면·크게 움직인 날)를 여기 한 곳으로 (11/16 리뷰 12번) */}
+          등락률은 어제 종가와 비교한 지금 값이에요. 시세와 기사를 나란히 보여 줄 뿐, 기사 때문에 주가가 움직였다는 뜻이 아니에요.
+          <br />
           시세 한국투자증권(KIS) · 공시 금융감독원 전자공시(DART) · 차트 TradingView Lightweight Charts
         </footer>
       </div>

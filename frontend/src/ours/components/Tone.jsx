@@ -36,6 +36,8 @@ export function toneOf(article, focusCode) {
   if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS') return null;
   const stocks = article.relatedStocks || [];
   const s = (focusCode && stocks.find((x) => x.code === focusCode)) || stocks.find((x) => x.role === 'MAIN') || stocks[0];
+  // '함께 언급'만 된 종목에는 목록에서 좋은·나쁜 표시를 안 붙임 (11/16 리뷰: 은행원 수기 글이 SK하이닉스에 '나쁜 소식'으로 보임). 글 화면 카드에는 그대로
+  if (s && s.role !== 'MAIN') return null;
   const v = s?.sentiment || null;
   if (v !== 'POSITIVE' && v !== 'NEGATIVE') return null;
   const kind = v === 'POSITIVE' ? 'pos' : 'neg';
