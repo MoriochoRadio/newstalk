@@ -12,7 +12,7 @@ import { dirClass, fmtPrice, fmtRate, marketKo, relativeTime } from '../lib/form
 import SearchBox from '../components/SearchBox';
 import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, SkeletonRows } from '../components/ui';
-import { ToneRing, leanOf } from '../components/Tone';
+import { leanOf } from '../components/Tone';
 
 const NEWS_SIZE = 10;
 
@@ -99,9 +99,10 @@ function WatchTone({ t, count }) {
   const lean = leanOf(pos, neu, neg);
   return (
     <span className="wl-tone num" title={`${lean.text} · 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 판단 없음 ${neu}` : ''}`}>
-      <ToneRing pos={pos} neu={neu} neg={neg} size={18} />
       {count}건
-      <span className="sr-only">, {lean.text} (좋은 소식 {pos}, 나쁜 소식 {neg})</span>
+      {/* 글자 없는 링 → 글자 (홈 카드와 같게, 11/16 3차 리뷰) */}
+      {pos > 0 && <b className="good">좋은 {pos}</b>}
+      {neg > 0 && <b className="bad">나쁜 {neg}</b>}
     </span>
   );
 }

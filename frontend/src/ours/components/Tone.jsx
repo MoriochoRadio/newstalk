@@ -111,7 +111,8 @@ export function countsOf(sentiments) {
 /** 같은 소식 묶음의 판단 수 (주인공 종목 기준, 제목만 확인한 기사 제외) */
 export function storyCounts(story) {
   const all = [story.lead, ...(story.others || [])].filter((x) => !x.titleOnly && !x.disclosurePending);
-  return countsOf(all.map((x) => (x.relatedStocks.find((s) => s.role === 'MAIN') || x.relatedStocks[0])?.sentiment));
+  // 시세 기사는 '판단 없음'으로 셈 (목록 배지 toneOf 와 같은 규칙: '주가 급변' 칸이 초록으로 칠해졌음 — 11/16 3차 리뷰)
+  return countsOf(all.map((x) => (x.priceMoveTitle ? 'NEUTRAL' : (x.relatedStocks.find((s) => s.role === 'MAIN') || x.relatedStocks[0])?.sentiment)));
 }
 
 const TONE_TEXT = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·나쁜 내용 함께' };

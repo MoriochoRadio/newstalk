@@ -126,6 +126,18 @@ const readoutTime = (t) => {
 // 거래량: '9,684,123' → '968만 주' (값 줄은 정확히 읽을 일이 적고 크기만 보면 됨. 1만 주 아래는 그대로)
 const volText = (v) => (v == null ? '–' : v >= 1e8 ? `${(v / 1e8).toFixed(2)}억 주` : v >= 1e4 ? `${Math.round(v / 1e4).toLocaleString('ko-KR')}만 주` : `${Math.round(v).toLocaleString('ko-KR')}주`);
 
+// 일봉 기사 수에는 앞 휴일 기사가 합쳐짐 → '이날'이 아니라 '11월 14~16일' (11/16 3차 리뷰: 같은 화면 '오늘 15건'과 27건이 안 맞음)
+function dayRangeLabel(prevT, t) {
+  if (typeof t !== 'string' || typeof prevT !== 'string') return '이날';
+  const start = new Date(`${prevT}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() + 1);
+  const s = start.toISOString().slice(0, 10);
+  if (s >= t) return '이날';
+  const [, sm, sd] = s.split('-').map(Number);
+  const [, em, ed] = t.split('-').map(Number);
+  return sm === em ? `${sm}월 ${sd}~${ed}일` : `${sm}월 ${sd}일~${em}월 ${ed}일`;
+}
+
 /** 종가 단순 이동평균. 앞쪽 n-1 개는 값 없음 */
 function movingAverage(rows, n) {
   const out = [];
@@ -816,7 +828,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           {barNews ? (
             <>
               <span className="badge badge-outline num">
-                {unit === 'day' ? `이날 기사 ${barNews.count}건` : `이 봉 기사 ${barNews.count}건`}
+                {unit === 'day' ? `${dayRangeLabel(prev?.t, bar.t)} 기사 ${barNews.count}건` : `이 봉 기사 ${barNews.count}건`}
               </span>
               {barNews.items[0] && <Link to={`/news/${barNews.items[0].id}`}>{barNews.items[0].title}</Link>}
             </>

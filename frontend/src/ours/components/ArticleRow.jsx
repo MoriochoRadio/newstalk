@@ -124,6 +124,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
   // 펼침 단추('같은 소식 다른 기사 n건')가 있으면 '같은 소식 n건' 칩은 뺌 — 2건·1건이 다른 숫자처럼 보였음 (11/16 리뷰 9번)
   const tags = ArticleTags({ article: a }).filter((t) => !(others.length > 0 && t.key === 's'));
   const tone = toneOf(a, focusCode, toneCodes);
+  const latestIso = [a, ...others].map((x) => x.publishedAtIso).filter(Boolean).sort().pop() || a.publishedAtIso;
   return (
     <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>
       {(a.isDisclosure || tone) && (
@@ -158,8 +159,10 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
         )}
         <div className="feed-meta">
           <span>{sourceText(a)}</span>
-          <time className="dot num" dateTime={a.publishedAtIso || undefined}>
-            {relativeTime(a.publishedAtIso)}
+          {/* 같은 소식 묶음은 대표가 첫 보도(더 오래됨)라 목록이 '2시간 전 → 4시간 전 → 2시간 전'으로 섞여 보였음
+              → 줄 자리(최신순)와 맞게 묶음의 가장 최근 시각 (11/16 3차 리뷰) */}
+          <time className="dot num" dateTime={latestIso || undefined}>
+            {relativeTime(latestIso)}
           </time>
         </div>
       </div>

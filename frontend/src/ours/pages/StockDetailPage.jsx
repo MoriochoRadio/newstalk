@@ -95,6 +95,8 @@ function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePa
             {priceNews?.length > 0 && (
               <p className="price-news">
                 <span className="k">오늘 주가 기사 {priceNews.length}건</span>
+                {/* 기사 시각: 장 초반 '-2%' 기사가 지금 -7% 아래 붙어 지금 값처럼 읽혔음 (11/16 3차 리뷰) */}
+                <span className="k num">{shortTime(priceNews[0].publishedAtIso)}</span>
                 <Link to={`/news/${priceNews[0].id}`}>{priceNews[0].title}</Link>
               </p>
             )}
@@ -339,7 +341,10 @@ function BigMovesCard({ moves, level, onLevel }) {
                       {top.title}
                     </Link>
                   ) : (
-                    <span className="muted">{m.articleCount > 0 ? '그날은 주가를 다룬 기사만 있어요' : '그날 연결된 기사 없음'}</span>
+                    <span className="muted">
+                      {/* 서버는 날마다 3건만 줌 → 전부 받은 경우에만 '시세 기사만'이라고 말함 (11/16 3차 코드 리뷰) */}
+                      {m.articleCount === 0 ? '그날 연결된 기사 없음' : m.articleCount <= (m.articles?.length || 0) ? '그날은 주가를 다룬 기사만 있어요' : '앞쪽 기사는 주가를 다룬 기사예요'}
+                    </span>
                   )}
                 </span>
                 {m.articleCount > 0 && <span className="move-count num">기사 {m.articleCount}건</span>}
@@ -445,10 +450,11 @@ function SectionNav({ hide }) {
     const seen = new Map();
     const io = new IntersectionObserver(
       (entries) => {
-        entries.forEach((e) => seen.set(e.target.id, e.isIntersecting ? e.boundingClientRect.top : null));
+        entries.forEach((e) => seen.set(e.target.id, e.isIntersecting));
         // 화면 위치(top)가 가장 위인 구역: 휴대폰은 CSS order 로 순서를 바꿔 배열 순서와 화면 순서가 다름 (11/16 디자이너 2차 리뷰)
-        const visible = SECTIONS.map((x) => [x.id, seen.get(x.id)])
-          .filter(([, top]) => top != null)
+        // top 은 지금 다시 잼 (들어올 때 잰 값은 스크롤하면 낡음 — 11/16 3차 코드 리뷰)
+        const visible = SECTIONS.filter((x) => seen.get(x.id))
+          .map((x) => [x.id, document.getElementById(x.id)?.getBoundingClientRect().top ?? Infinity])
           .sort((a, b) => a[1] - b[1]);
         if (visible.length) setCurrent(visible[0][0]);
       },
@@ -491,7 +497,14 @@ function StockDetail({ code }) {
   // 실시간 시세가 올 때마다 이 화면이 다시 그려짐 → 받은 데이터가 그대로면 같은 배열을 넘겨 차트가 다시 계산하지 않게 (11/16 2차 코드 리뷰)
   const dayCounts = useMemo(() => (days.data ? (days.data.items || []).map((p) => ({ date: String(p.time).slice(0, 10), count: p.totalCount })) : null), [days.data]);
   const recentArticles = useMemo(() => (recent.data ? (recent.data.items || []).map(toUiArticle) : null), [recent.data]);
-  const priceNews = useMemo(() => recentArticles?.filter((a) => a.priceMoveTitle && a.daysAgo === 0), [recentArticles]);
+  // 이 종목이 중심 종목인 오늘 시세 기사만, 최신순 (함께 언급된 다른 종목 기사가 섞였음 — 11/16 3차 코드 리뷰)
+  const priceNews = useMemo(
+    () =>
+      recentArticles
+        ?.filter((a) => a.priceMoveTitle && a.daysAgo === 0 && a.relatedStocks.some((s) => s.code === code && s.role === 'MAIN'))
+        .sort((x, y) => String(y.publishedAtIso).localeCompare(String(x.publishedAtIso))),
+    [recentArticles, code]
+  );
   // 실시간 멈춤: 멈추면 방송(SSE)을 끊고 멈춘 순간의 값을 그대로 보여 줌 (WCAG 2.2.2)
   const [paused, setPaused] = useState(false);
   const { quotes, loading, disabled } = useQuotes([code], { live: !paused });

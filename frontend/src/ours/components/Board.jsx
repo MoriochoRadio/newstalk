@@ -251,9 +251,11 @@ export default function Board({ stockCode, stockName }) {
   const items = posts.data?.items || [];
   // 2쪽 이후의 마지막 글을 지우면 빈 쪽이 남음 → 앞쪽으로 (11/16 코드 리뷰)
   useEffect(() => {
-    // 받는 중에는 옛 쪽의 빈 결과가 남아 있어 두 쪽을 건너뛰었음 → 다 받은 뒤에만 (11/16 2차 코드 리뷰)
-    if (!posts.loading && posts.data && items.length === 0 && page > 1) setPage((p) => Math.max(1, p - 1));
-  }, [posts.loading, posts.data, items.length, page]);
+    // 전체 글 수로 마지막 쪽을 계산해 바로 그 쪽으로: 한 쪽씩 앞으로 가면 옛 빈 결과로 두 번 돌아 두 쪽을 건너뛰었음 (11/16 3차 코드 리뷰)
+    if (!posts.data) return;
+    const last = Math.max(1, Math.ceil((posts.data.totalCount || 0) / PAGE_SIZE));
+    if (page > last) setPage(last);
+  }, [posts.data, page]);
   // 글을 올리면 폼이 사라져 포커스가 화면 맨 앞으로 튐 → 새 목록의 첫 글(방금 쓴 글) 제목으로 (11/13 사용자 눈으로)
   const listRef = useRef(null);
   const focusNew = useRef(false);

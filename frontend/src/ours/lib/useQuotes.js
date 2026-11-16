@@ -12,7 +12,9 @@ const CHUNK = 10;
 
 const cache = new Map(); // code → { q, at }
 const inflight = new Set();
-const failedAt = new Map(); // code → 실패 시각 (1분 동안 다시 부르지 않고 '–')
+const failedAt = new Map(); // code → 실패 시각 (15초 동안 다시 부르지 않고 '–')
+// 실패는 15초 뒤 다시: 1분 동안 빈칸으로 남아 고장처럼 보였음 (11/16 3차 리뷰). 받은 값은 그대로 1분
+const FAIL_RETRY_MS = 15_000;
 const listeners = new Set();
 let disabled = false;
 
@@ -47,7 +49,7 @@ const isFresh = (c, now) => {
   const e = cache.get(c);
   if (e && now - e.at < REFRESH_MS) return true;
   const f = failedAt.get(c);
-  return Boolean(f && now - f < REFRESH_MS);
+  return Boolean(f && now - f < FAIL_RETRY_MS);
 };
 
 export function useQuotes(codes, { live = false } = {}) {
@@ -67,7 +69,7 @@ export function useQuotes(codes, { live = false } = {}) {
       fetchCodes(list.filter((c) => !isFresh(c, now)));
     };
     run();
-    const timer = setInterval(run, REFRESH_MS);
+    const timer = setInterval(run, FAIL_RETRY_MS); // 신선한 값은 건너뛰므로 실제 호출은 실패·1분 지난 종목만
     return () => clearInterval(timer);
   }, [key]);
 
