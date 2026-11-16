@@ -80,7 +80,7 @@ export function NewsMap({ stories, height = 380 }) {
                 {showWord && <span className="nm-word">{word}</span>}
                 {showCount && (
                   <span className="nm-count num">
-                    기사 <b>{st.size || 1}</b>
+                    기사 <b>{st.size || 1}</b>건
                   </span>
                 )}
               </Link>

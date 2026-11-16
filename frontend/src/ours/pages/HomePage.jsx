@@ -143,13 +143,13 @@ export default function HomePage() {
         <div className="card-head">
           <h2 className="card-title" id="hero-title">
             <Newspaper className="icon" aria-hidden="true" />
-            오늘 뉴스 한눈에
+            오늘 많이 보도된 소식
           </h2>
           <span className="nm-legend" aria-hidden="true">
             <span><i className="nm-pos" />좋은 소식</span>
             <span><i className="nm-neg" />나쁜 소식</span>
             <span><i className="nm-none" />판단 없음</span>
-            <span className="hide-mobile">칸 하나 = 소식 하나 · 크기 = 그 소식 기사 수</span>
+            <span className="hide-mobile">칸 = 소식 하나 · 크기 = 같은 소식을 쓴 기사 수</span>
           </span>
         </div>
         {feed.error && !feed.data ? (

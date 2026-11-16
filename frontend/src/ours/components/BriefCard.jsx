@@ -25,10 +25,13 @@ function BriefTone({ sentiment: t }) {
 export default function BriefCard({ rank, code, name, quote, quoteLoading, priceOff, summary, digest, buzz, firstAt, articleCount, compact = false }) {
   const cls = dirClass(quote?.changeRate);
   const text = dropPriceSentences(summary?.newsSummary || '');
+  // '실적 3 · 외국인·기관 2' 꼬리표가 무슨 숫자인지 몰랐음 (11/16 사용자) → 큰 카드는 '오늘 나온 소식' 막대 그림, 작은 카드는 '실적 소식 3개'
+  const topics = (digest?.topics || []).slice(0, 3);
+  const topicMax = Math.max(1, ...topics.map((t) => t.count));
   const tags = [
     ...(digest?.disclosureTypes || []).map((t) => ({ key: `d-${t}`, label: `공시 · ${t}`, kind: 'accent' })),
-    ...(digest?.topics || []).map((t) => ({ key: `t-${t.label}`, label: `${t.label} ${t.count}`, kind: '' })),
-  ].slice(0, compact ? 2 : 4);
+    ...(compact ? topics.map((t) => ({ key: `t-${t.label}`, label: `${t.label} 소식 ${t.count}개`, kind: '' })) : []),
+  ].slice(0, compact ? 2 : 3);
   const count = articleCount ?? digest?.newsCount ?? 0;
 
   return (
@@ -86,7 +89,23 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
       {/* 요약을 받는 동안 좋은·나쁜 줄 자리를 미리 (11/16 화면 밀림 측정: 받은 뒤 카드가 커져 아래 카드가 50px씩 밀림) */}
       {summary === undefined ? <div className="skeleton sk-line" style={{ width: '42%', height: 22 }} /> : <BriefTone sentiment={summary?.sentiment} />}
 
-      {digest === null && !compact && <div className="skeleton sk-line" style={{ width: '30%', height: 26 }} />}
+      {digest === null && !compact && <div className="skeleton sk-line" style={{ width: '60%', height: 64 }} />}
+      {!compact && topics.length > 0 && (
+        <div className="brief-topics">
+          <span className="bt-k">오늘 나온 소식 종류</span>
+          <ul>
+            {topics.map((t) => (
+              <li key={t.label}>
+                <span className="bt-label">{t.label}</span>
+                <span className="bt-bar" aria-hidden="true">
+                  <i style={{ width: `${(t.count / topicMax) * 100}%` }} />
+                </span>
+                <span className="bt-n num">{t.count}개</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {tags.length > 0 && (
         <div className="tags brief-tags">
           {tags.map((t) => (

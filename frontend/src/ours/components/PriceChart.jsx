@@ -14,16 +14,52 @@ import { quoteApi } from '../../api';
 import { errorText } from '../lib/errors';
 import { fmtRate } from '../lib/format';
 import { Segmented } from './ui';
+import { marketState } from '../lib/market';
 
 // 기간 버튼: 봉 단위는 기간에서 정함 (bars = 처음 보여 줄 봉 수, 거래일 기준). 오늘 = 5분봉, 5년 = 주봉
+// 봉 단위 (11/16 사용자: '1개월' 기본이 불편, 보통 1분·5분·1시간·일로 봄) → 기간 대신 증권 앱처럼 봉 단위로 고름.
+// 기간은 끌기·휠로 넓히고 줄임. bars: 처음에 보여 줄 봉 수(없으면 받은 것 전부). 1시간봉은 서버에 없어 30분봉 두 개를 합침
 const RANGES = [
-  { key: 'today', label: '오늘', unit: '5m' },
-  { key: '1m', label: '1개월', unit: 'day', bars: 22 },
-  { key: '3m', label: '3개월', unit: 'day', bars: 65 },
-  { key: '6m', label: '6개월', unit: 'day', bars: 130 },
-  { key: '1y', label: '1년', unit: 'day', bars: 250 },
-  { key: '5y', label: '5년', unit: 'week' },
+  { key: '1m', label: '1분', unit: '1m', bars: 120 },
+  { key: '5m', label: '5분', unit: '5m' },
+  { key: '30m', label: '30분', unit: '30m', minBars: 40 },
+  { key: '60m', label: '1시간', unit: '60m', minBars: 30 },
+  { key: 'day', label: '일', unit: 'day', bars: 65 },
+  { key: 'week', label: '주', unit: 'week', bars: 78 },
+  { key: 'month', label: '월', unit: 'month' },
 ];
+const UNIT_KEY = 'snm_chart_unit';
+const HIDE_MOVE_MARKS = true;
+// 처음 단위: 지난번 고른 것, 없으면 장중엔 5분봉·그 밖엔 일봉
+function initialUnit() {
+  try {
+    const saved = localStorage.getItem(UNIT_KEY);
+    if (RANGES.some((r) => r.key === saved)) return saved;
+  } catch {
+    // 저장소를 못 쓰면 기본값
+  }
+  return marketState().key === 'open' ? '5m' : 'day';
+}
+/** 서버에 묻는 단위 (1시간봉은 30분봉으로 받아 합침) */
+const apiUnit = (unit) => (unit === '60m' ? '30m' : unit);
+/** 30분봉 → 1시간봉: 같은 시(時)끼리 시가=첫 봉, 종가=마지막 봉, 고가·저가=최고·최저, 거래량=합 */
+function toHourly(items) {
+  const out = [];
+  for (const it of items || []) {
+    const t = String(it.time);
+    const hourKey = t.slice(0, 13);
+    const last = out[out.length - 1];
+    if (last && last.hourKey === hourKey) {
+      last.high = Math.max(last.high, it.high);
+      last.low = Math.min(last.low, it.low);
+      last.close = it.close;
+      last.volume += it.volume;
+    } else {
+      out.push({ ...it, hourKey, time: `${hourKey}:00:00${t.slice(19)}` });
+    }
+  }
+  return out.map(({ hourKey, ...rest }) => rest); // eslint-disable-line no-unused-vars
+}
 const MA = [
   { n: 5, color: '--ma5' },
   { n: 20, color: '--ma20' },
@@ -61,10 +97,10 @@ async function fetchIntradayDay(stockCode, unit, date, tried, signal) {
   let day = date;
   let count = tried;
   while (count < MAX_INTRADAY_DAYS) {
-    const res = await quoteApi.chart(stockCode, unit, { date: day ?? undefined }, { signal });
+    const res = await quoteApi.chart(stockCode, apiUnit(unit), { date: day ?? undefined }, { signal });
     count += 1;
     const answered = res.date || day;
-    if (res.items?.length) return { items: res.items, date: answered, tried: count };
+    if (res.items?.length) return { items: unit === '60m' ? toHourly(res.items) : res.items, date: answered, tried: count };
     day = prevWeekday(answered);
   }
   return { items: [], date: day, tried: count };
@@ -275,8 +311,16 @@ function tradingNow(now = new Date()) {
 
 export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null, moves = null, liveQuote = null }) {
   // 기본 1개월 (11/16 리뷰 두 번: 3개월이면 기사 수 칸(최근 30일)의 왼쪽 2/3가 비어 데이터가 빠진 것처럼 보였음)
-  const [rangeKey, setRangeKey] = useState('1m');
-  const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
+  const [rangeKey, setRangeKeyState] = useState(initialUnit);
+  const setRangeKey = (k) => {
+    setRangeKeyState(k);
+    try {
+      localStorage.setItem(UNIT_KEY, k);
+    } catch {
+      // 기억 못 해도 이번 화면은 그대로
+    }
+  };
+  const range = RANGES.find((r) => r.key === rangeKey) || RANGES[4];
   const unit = range.unit;
   const [data, setData] = useState(EMPTY);
   const [reloadN, setReloadN] = useState(0); // 차트를 못 받았을 때 '다시 시도' (11/16 코드 리뷰: 기간을 바꿔도 같은 일봉이라 다시 안 받았음)
@@ -428,13 +472,20 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     setLoadingMore(false);
     setMoreError(null);
     setHover(null);
+    // 30분·1시간봉은 하루가 13·7봉뿐이라 굵은 막대 몇 개만 보였음 → 처음부터 며칠을 이어 받아 minBars 개 이상 (11/16)
+    const minBars = RANGES.find((r) => r.unit === unit)?.minBars || 0;
     const first = isIntraday(unit)
-      ? fetchIntradayDay(stockCode, unit, null, 0, controller.signal).then((r) => ({
-          items: r.items,
-          cursor: r.date,
-          tried: r.tried,
-          more: r.items.length > 0 && r.tried < MAX_INTRADAY_DAYS,
-        }))
+      ? fetchIntradayDay(stockCode, unit, null, 0, controller.signal).then(async (r) => {
+          let { items, date: cursor, tried } = r;
+          while (minBars && items.length > 0 && items.length < minBars && tried < MAX_INTRADAY_DAYS) {
+            const o = await fetchIntradayDay(stockCode, unit, prevWeekday(cursor), tried, controller.signal);
+            tried = o.tried;
+            if (!o.items.length) break;
+            items = mergeOlder(o.items, items);
+            cursor = o.date;
+          }
+          return { items, cursor, tried, more: items.length > 0 && tried < MAX_INTRADAY_DAYS };
+        })
       : quoteApi.chart(stockCode, unit, {}, { signal: controller.signal }).then((res) => {
           const items = res.items || [];
           return {
@@ -604,7 +655,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   useEffect(() => {
     const ref = chartRef.current;
     if (!ref?.moveMarks) return;
-    if (unit !== 'day' || !moves?.length) {
+    // 캔들 위 ▲▼ 는 뜻을 알기 어려웠음 (11/16 사용자: '중간중간 화살표는 뭐지?') → 차트에는 그리지 않고 '크게 움직인 날' 카드에서만
+    if (HIDE_MOVE_MARKS || unit !== 'day' || !moves?.length) {
       ref.moveMarks.setMarkers([]);
       return;
     }
@@ -664,7 +716,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   const last = span[span.length - 1];
   const chartLabel =
     first && last && first.close
-      ? `${stockName} 주가 차트, ${range.label}. ${unit === 'day' && last.t === kstDate(new Date().toISOString()) && tradingNow() ? '현재' : '마지막 종가'} ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(spanHi)}원, 최저 ${fmt(spanLo)}원`
+      ? `${stockName} 주가 차트, ${range.label}봉. ${unit === 'day' && last.t === kstDate(new Date().toISOString()) && tradingNow() ? '현재' : '마지막 종가'} ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(spanHi)}원, 최저 ${fmt(spanLo)}원`
       : `${stockName} 주가 차트`;
   const maAt = (n) => {
     if (!hasMa(unit) || idx < n - 1) return null;
@@ -701,7 +753,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
         <h2 className="card-title" id="chart-title">
           주가 차트
         </h2>
-        <Segmented label="기간" size="sm" options={RANGES} value={rangeKey} onChange={setRangeKey} />
+        <Segmented label="봉 단위" size="sm" options={RANGES} value={rangeKey} onChange={setRangeKey} />
       </div>
 
       <div className="chart-readout" aria-live="off">
@@ -762,10 +814,10 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           {showMarks && (dayCounts || articles) && (
             <span>
               <i className="news-dot" />
-              {unit === 'day' ? '기사 수 막대 = 그날 기사 수 (최근 30일)' : '기사 수 막대 = 5분마다 기사 수 (최근 기사 100건)'}
+              {unit === 'day' ? '기사 수 막대 = 그날 기사 수 (최근 30일)' : `기사 수 막대 = ${range.label}마다 기사 수 (최근 기사 100건)`}
             </span>
           )}
-          {unit === 'day' && moves?.length > 0 && (
+          {!HIDE_MOVE_MARKS && unit === 'day' && moves?.length > 0 && (
             <a href="#big-moves" className="move-legend">
               <span className="up">▲</span>
               <span className="down">▼</span> 크게 움직인 날
