@@ -23,9 +23,9 @@ import HomeSummary from '../components/HomeSummary';
 import { NewsMap, NewsPulse } from '../components/NewsMap';
 import WordCloud from '../components/WordCloud';
 import CapMap, { CapLegend } from '../components/CapMap';
-import MarketMap from '../components/MarketMap';
-import { pickWhy } from '../lib/todayFeed';
+import HomeKpi from '../components/HomeKpi';
 import { limitOf } from '../components/ui';
+import { pickWhy } from '../lib/todayFeed';
 import { marketTerms } from '../lib/marketTerms';
 import StoryBoard from '../components/StoryBoard';
 import LivePill from '../components/LivePill';
@@ -33,7 +33,7 @@ import { leanOf } from '../components/Tone';
 import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
 import { dirClass } from '../lib/format';
 
-const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
+const MAP_LIMIT = 30; // 이슈 종목 수 (낭독기 문장 + 종목 지도 대신용)
 const TOP_N = 5; // 1~5위 제목 목록 (11/13 피드백: 순위만, 여백 없이)
 const WATCH_N = 8; // 관심 종목 한 줄
 const MAP_STORIES = 8; // 많이 보도된 소식 목록 줄 수 (11/16 저녁 지도 → 큼직한 목록)
@@ -182,7 +182,7 @@ export default function HomePage() {
     });
     return out;
   }, [feed.data, capMap.data, variant]);
-  const terms = useMemo(() => (feed.data && variant === 'cloud' ? marketTerms(groupStories(feed.data.items.filter((a) => !a.isDisclosure))) : []), [feed.data, variant]);
+  const terms = useMemo(() => (feed.data && (variant === 'cloud' || variant === 'stock') ? marketTerms(groupStories(feed.data.items.filter((a) => !a.isDisclosure))) : []), [feed.data, variant]);
   const topics = useMemo(() => (feed.data ? topicMix(groupStories(newsArticles)) : []), [feed.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -248,43 +248,40 @@ export default function HomePage() {
           <>
             {variant === 'stock' ? (
               <>
+                {/* ① 오늘 숫자 띠 (증권 앱 지수 띠처럼) */}
+                <HomeKpi articles={newsArticles} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
+                {/* ② 종목 지도: 시가총액 지도. 서버가 아직 모르면(백엔드 브랜치 합치기 전) 같은 모양으로 '오늘 기사 많은 종목'(크기 = 기사 수) */}
                 {capMap.data?.items?.length ? (
                   <>
                     <CapMap items={capMap.data.items} news={capNews} />
                     <CapLegend />
                   </>
-                ) : capMap.error ? (
-                  // 서버가 아직 종목 지도 API 를 모를 때(백엔드 브랜치 합치기 전): 예전 화제 종목 지도로 대신
+                ) : capMap.error || issueItems.length ? (
                   <>
-                    <p className="hs-sub" style={{ marginBottom: 8 }}>
-                      시가총액 지도는 새 서버가 필요해요 · 지금은 오늘 기사 많은 종목 지도로 보여요
-                    </p>
-                    <MarketMap
-                      tiles={issueItems.map((it) => ({
-                        code: it.stockCode,
-                        name: it.stockName,
-                        articleCount: it.articleCount,
-                        eventCount: it.eventCount,
-                        disclosureCount: it.disclosureCount,
-                        rate: quotes[it.stockCode]?.changeRate ?? null,
-                        limit: limitOf(quotes[it.stockCode]),
+                    <CapMap
+                      items={issueItems.map((it) => ({
+                        stockCode: it.stockCode,
+                        stockName: it.stockName,
+                        sector: '',
+                        marketCap: it.articleCount,
+                        changeRate: quotes[it.stockCode]?.changeRate ?? null,
+                        priceLimit: { up: 'UPPER', down: 'LOWER' }[limitOf(quotes[it.stockCode])] ?? null,
                       }))}
-                      priceReady
-                      height={420}
+                      news={Object.fromEntries(issueItems.map((it) => [it.stockCode, { count: it.articleCount, top: feed.data ? pickWhy(newsArticles, it.stockCode) : null }]))}
+                      height={460}
                     />
+                    <CapLegend size="오늘 기사 수 (시가총액 지도는 새 서버를 켜면 보여요)" grouped={false} />
                   </>
                 ) : (
                   <div className="skeleton" style={{ height: 520, borderRadius: 'var(--radius)' }} />
                 )}
-                <div style={{ marginTop: 14 }}>
-                  <HomeSummary
-                    articles={newsArticles}
-                    storyCount={storyCount}
-                    disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length}
-                    topics={topics}
-                    issues={issueItems}
-                  />
-                </div>
+                {/* ③ 오늘 많이 나온 말: '많이 나온 주제 · 소식 n개' 숫자 칸 대신 단어 구름 (11/16 사용자) */}
+                {terms.length > 0 && (
+                  <div className="home-words">
+                    <h3 className="hs-k">오늘 기사에 많이 나온 말</h3>
+                    <WordCloud terms={terms} height={240} />
+                  </div>
+                )}
               </>
             ) : variant === 'map' ? (
               <div className="hero-grid">
@@ -310,7 +307,7 @@ export default function HomePage() {
       {hasWatch && <WatchStrip quotes={quotes} />}
 
       {/* 2) 자세히: 많이 보도된 소식을 큼직한 목록으로 (지도·카드판 대신 — 긴 제목이 다 읽히게) */}
-      {variant === 'map' && feed.data && (
+      {(variant === 'map' || variant === 'stock') && feed.data && (
         <TopStories
           stories={topStories}
           quotes={quotes}
@@ -322,7 +319,7 @@ export default function HomePage() {
           }
         />
       )}
-      {variant !== 'map' && !(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
+      {variant !== 'map' && variant !== 'stock' && !(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
         <section className="card" aria-labelledby="rank-title">
           <div className="card-head">
             <h2 className="card-title" id="rank-title">

@@ -57,10 +57,10 @@ export default function CapMap({ items, news = {}, height = 520 }) {
   const layout = useMemo(() => {
     if (!width || !items.length) return [];
     // 휴대폰처럼 좁으면 시가총액 상위 30개만 (60개면 칸이 너무 잘아 이름이 다 잘림)
-    const list0 = width < 520 ? [...items].sort((a, b) => b.marketCap - a.marketCap).slice(0, 30) : items;
+    const list0 = width < 520 ? [...items].sort((a, b) => b.marketCap - a.marketCap).slice(0, 20) : items; // 휴대폰은 상위 20개
     const bySector = new Map();
     list0.forEach((it) => {
-      const k = it.sector || '기타';
+      const k = it.sector ?? '기타';
       if (!bySector.has(k)) bySector.set(k, []);
       bySector.get(k).push(it);
     });
@@ -73,7 +73,7 @@ export default function CapMap({ items, news = {}, height = 520 }) {
     const secRects = squarify(sectors.map((s) => s.list.reduce((t, x) => t + weight(x.marketCap), 0)), width, height);
     return secRects.map((r) => {
       const s = sectors[r.i];
-      const showHead = r.h >= HEAD + 30 && r.w >= 60;
+      const showHead = Boolean(s.name) && r.h >= HEAD + 30 && r.w >= 60;
       const top = showHead ? HEAD : 0;
       const inner = squarify(s.list.map((x) => weight(x.marketCap)), Math.max(0, r.w - GAP), Math.max(0, r.h - top - GAP));
       return { ...r, name: s.name, showHead, tiles: inner.map((t) => ({ ...t, it: s.list[t.i] })) };
@@ -98,7 +98,10 @@ export default function CapMap({ items, news = {}, height = 520 }) {
               const showName = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
               const rateSize = Math.max(10, Math.round(nameSize * 0.72));
               const showRate = showName && h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44;
-              const showNews = n > 0 && showRate && h >= nameSize * 1.2 + rateSize * 1.25 + 26 && w >= 60;
+              const newsSize = Math.max(12, Math.min(16, Math.round(nameSize * 0.6)));
+              const showNews = n > 0 && showRate && h >= nameSize * 1.2 + rateSize * 1.25 + newsSize * 1.6 + 10 && w >= 64;
+              // 숫자 동그라미는 이름과 안 겹칠 때만 (이름이 가운데라 양옆에 24px 씩 남아야) — 휴대폰에서 이름을 가렸음
+              const showBadge = n > 0 && !showNews && w >= 22 && h >= 18 && (!showName || w - len * nameSize >= 48);
               const limit = it.priceLimit === 'UPPER' ? ' 상한가' : it.priceLimit === 'LOWER' ? ' 하한가' : '';
               const label = `${it.stockName}, ${sec.name}, 시가총액 ${capText(it.marketCap)}, ${fmtRate(it.changeRate)}${limit}, 오늘 기사 ${n}건`;
               return (
@@ -122,8 +125,17 @@ export default function CapMap({ items, news = {}, height = 520 }) {
                         {limit}
                       </span>
                     )}
-                    {showNews && <span className="cm-news num">기사 {n}</span>}
-                    {n > 0 && !showNews && <i className="cm-dot" aria-hidden="true" />}
+                    {showNews && (
+                      <span className="cm-news num" style={{ fontSize: newsSize }}>
+                        기사 {n}건
+                      </span>
+                    )}
+                    {showBadge && (
+                      <b className="cm-nbadge num" aria-hidden="true">
+                        {n}
+                      </b>
+                    )}
+                    {n > 0 && !showNews && !showBadge && <i className="cm-dot" aria-hidden="true" />}
                   </Link>
                 </li>
               );
@@ -146,7 +158,7 @@ export default function CapMap({ items, news = {}, height = 520 }) {
 }
 
 /** 색 범례 + 읽는 법 */
-export function CapLegend() {
+export function CapLegend({ size = '시가총액', grouped = true }) {
   return (
     <div className="cm-legend" aria-hidden="true">
       <span className="cm-scale">
@@ -158,7 +170,10 @@ export function CapLegend() {
         <i className="cm-u2">+1%</i>
         <i className="cm-u3">+3%</i>
       </span>
-      <span>크기 = 시가총액 · 묶음 = 업종 · '기사 n' = 오늘 연결된 기사 수 (점 = 기사 있음)</span>
+      <span>
+        크기 = {size}
+        {grouped ? ' · 묶음 = 업종' : ''} · '기사 n건'·동그라미 숫자 = 오늘 이 종목 기사 수
+      </span>
     </div>
   );
 }
