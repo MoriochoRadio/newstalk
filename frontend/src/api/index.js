@@ -118,6 +118,8 @@ export const quoteApi = {
   /** 과거 급등·급락 이력 (F-17): 하루 등락률 ±threshold% 이상인 날(최신부터) + 그날 연결된 글 3개. period 3m·6m·1y */
   bigMoves: (stockCode, { period = '1y', threshold = 5 } = {}, options) =>
     retryIfBusy(() => apiGet(`/api/quotes/${stockCode}/big-moves`, { period, threshold }, options), options?.signal),
+  /** 종목 지도(시가총액 지도): 코스피·코스닥 시총 상위 각 30개 + 업종·등락률 (백엔드 fix/be-quote-limit 부터) */
+  marketMap: (options) => retryIfBusy(() => apiGet('/api/quotes/market-map', undefined, options), options?.signal),
   /** 실시간 방송(SSE) 주소. 최대 5종목 (docs/api.md 시세). 듣는 쪽은 hooks/useQuoteStream.js */
   streamUrl: (codes) => apiUrl(`/api/quotes/stream?codes=${encodeURIComponent(codes.join(','))}`),
 };

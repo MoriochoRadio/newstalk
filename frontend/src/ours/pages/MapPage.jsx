@@ -2,7 +2,7 @@
 // 오늘 기사가 많은 30종목: 칸 크기 = 오늘 기사 수, 색 = 어제 종가 대비 등락률 (빨강 오름·파랑 내림, 국내 관례)
 // 색과 크기는 사실 두 개를 나란히 보여 줄 뿐 — 기사 때문에 움직였다는 뜻이 아님 (아래 안내)
 import { useEffect, useState } from 'react';
-import { stockApi } from '../../api';
+import { quoteApi, stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
@@ -10,7 +10,8 @@ import { todayLabel } from '../lib/format';
 import { loadTodayFeed, pickWhy } from '../lib/todayFeed';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import Movers from '../components/Movers';
-import { Empty, ErrorBox, limitOf } from '../components/ui';
+import { Empty, ErrorBox, Segmented, limitOf } from '../components/ui';
+import CapMap, { CapLegend } from '../components/CapMap';
 import { Link } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 
@@ -35,6 +36,19 @@ export default function MapPage() {
   const items = issues.data?.items || [];
   const { quotes, loading, disabled } = useQuotes(items.map((i) => i.stockCode));
   const height = useMapHeight();
+  // 지도 두 가지 (11/16 저녁): 시가총액 지도(FINVIZ 방식, 코스피·코스닥 시총 상위) / 오늘 기사 많은 종목 지도. 서버가 시총 지도를 모르면 기사 지도만
+  const [mode, setMode] = useState('cap');
+  const capMap = useApi((signal) => quoteApi.marketMap({ signal }), []);
+  const capReady = Boolean(capMap.data?.items?.length);
+  const showCap = mode === 'cap' && capReady;
+  const capNews = {};
+  if (feed.data && capReady) {
+    const news = feed.data.items.filter((a) => !a.isDisclosure);
+    capMap.data.items.forEach((it) => {
+      const n = news.filter((a) => a.relatedStocks.some((s) => s.code === it.stockCode)).length;
+      if (n) capNews[it.stockCode] = { count: n, top: pickWhy(news, it.stockCode) };
+    });
+  }
   // 칸마다 대표 제목: 같은 기사가 두 칸에 나오면 뒤 칸은 그 종목의 다른 기사로 (11/16 리뷰 14번: 삼성전자·SK하이닉스 칸 제목이 같았음)
   const usedWhy = new Set();
   const whyOf = (code) => {
@@ -60,15 +74,36 @@ export default function MapPage() {
         <div>
           <p className="eyebrow num">{todayLabel()}</p>
           <h1 className="page-title">시장 지도</h1>
-          {/* 홈 '오늘 많이 보도된 소식'은 소식 하나가 칸 하나, 여기는 종목 하나가 칸 하나 (그 종목 오늘 기사를 모두 더함) — 11/16 사용자 질문 */}
-          <p className="page-sub">오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률</p>
+          <p className="page-sub">
+            {showCap
+              ? '코스피·코스닥 시가총액 상위 · 크기 = 시가총액 · 색 = 오늘 등락률 · 칸 안 = 오늘 기사 수'
+              : '오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률'}
+          </p>
         </div>
+        {capReady && (
+          <Segmented
+            label="지도 고르기"
+            size="sm"
+            options={[
+              { key: 'cap', label: '시가총액' },
+              { key: 'news', label: '기사 많은 종목' },
+            ]}
+            value={mode}
+            onChange={setMode}
+          />
+        )}
       </div>
       <section className="card map-page" aria-label={`오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>
         {issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}
         {issues.loading && !issues.data && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
-        {items.length > 0 && <MarketMap tiles={tiles} priceReady={!disabled && !loading} height={height} />}
-        {items.length > 0 && <MapLegend priceReady={!disabled} />}
+        {showCap && (
+          <>
+            <CapMap items={capMap.data.items} news={capNews} height={height} />
+            <CapLegend />
+          </>
+        )}
+        {!showCap && items.length > 0 && <MarketMap tiles={tiles} priceReady={!disabled && !loading} height={height} />}
+        {!showCap && items.length > 0 && <MapLegend priceReady={!disabled} />}
         {/* 오늘 기사에 나온 종목이 없을 때(자정 직후·수집 멈춤): 빈 칸 대신 (11/16 QA) */}
         {issues.data && items.length === 0 && (
           <Empty

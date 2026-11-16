@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, LayoutGrid, Newspaper, Star, TrendingUp } from 'lucide-react';
-import { stockApi } from '../../api';
+import { quoteApi, stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
@@ -22,6 +22,10 @@ import { usePerStock } from '../components/HotStocks';
 import HomeSummary from '../components/HomeSummary';
 import { NewsMap, NewsPulse } from '../components/NewsMap';
 import WordCloud from '../components/WordCloud';
+import CapMap, { CapLegend } from '../components/CapMap';
+import MarketMap from '../components/MarketMap';
+import { pickWhy } from '../lib/todayFeed';
+import { limitOf } from '../components/ui';
 import { marketTerms } from '../lib/marketTerms';
 import StoryBoard from '../components/StoryBoard';
 import LivePill from '../components/LivePill';
@@ -40,6 +44,7 @@ const VARIANTS = [
   { key: 'map', label: '뉴스 지도' },
   { key: 'list', label: '요약 + 목록' },
   { key: 'cloud', label: '단어 구름' },
+  { key: 'stock', label: '종목 지도' },
 ];
 const VARIANT_KEY = 'snm_home_variant';
 function useHomeVariant() {
@@ -165,6 +170,18 @@ export default function HomePage() {
   const [variant, setVariant] = useHomeVariant();
   const tileStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_TILES) : []), [feed.data]);
   const mapStories = tileStories.slice(0, MAP_STORIES);
+  // 시안 '종목 지도': 시가총액 지도 + 칸마다 오늘 기사 수 (11/16 저녁 사용자: FINVIZ 지도처럼)
+  const capMap = useApi((signal) => quoteApi.marketMap({ signal }), [variant], { enabled: variant === 'stock' });
+  const capNews = useMemo(() => {
+    if (!feed.data || variant !== 'stock') return {};
+    const out = {};
+    const news = feed.data.items.filter((a) => !a.isDisclosure);
+    (capMap.data?.items || []).forEach((it) => {
+      const n = news.filter((a) => a.relatedStocks.some((s) => s.code === it.stockCode)).length;
+      if (n) out[it.stockCode] = { count: n, top: pickWhy(news, it.stockCode) };
+    });
+    return out;
+  }, [feed.data, capMap.data, variant]);
   const terms = useMemo(() => (feed.data && variant === 'cloud' ? marketTerms(groupStories(feed.data.items.filter((a) => !a.isDisclosure))) : []), [feed.data, variant]);
   const topics = useMemo(() => (feed.data ? topicMix(groupStories(newsArticles)) : []), [feed.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -189,7 +206,7 @@ export default function HomePage() {
         <div className="card-head">
           <h2 className="card-title" id="hero-title">
             <Newspaper className="icon" aria-hidden="true" />
-            {variant === 'map' ? '오늘 뉴스 한눈에' : variant === 'cloud' ? '오늘 시장, 단어로 한눈에' : '오늘 한눈에'}
+            {variant === 'map' ? '오늘 뉴스 한눈에' : variant === 'cloud' ? '오늘 시장, 단어로 한눈에' : variant === 'stock' ? '오늘 시장 지도' : '오늘 한눈에'}
           </h2>
           {variant === 'map' && (
             <span className="nm-legend" aria-hidden="true">
@@ -229,7 +246,47 @@ export default function HomePage() {
           <div className="skeleton" style={{ height: 150, borderRadius: 'var(--radius)' }} />
         ) : (
           <>
-            {variant === 'map' ? (
+            {variant === 'stock' ? (
+              <>
+                {capMap.data?.items?.length ? (
+                  <>
+                    <CapMap items={capMap.data.items} news={capNews} />
+                    <CapLegend />
+                  </>
+                ) : capMap.error ? (
+                  // 서버가 아직 종목 지도 API 를 모를 때(백엔드 브랜치 합치기 전): 예전 화제 종목 지도로 대신
+                  <>
+                    <p className="hs-sub" style={{ marginBottom: 8 }}>
+                      시가총액 지도는 새 서버가 필요해요 · 지금은 오늘 기사 많은 종목 지도로 보여요
+                    </p>
+                    <MarketMap
+                      tiles={issueItems.map((it) => ({
+                        code: it.stockCode,
+                        name: it.stockName,
+                        articleCount: it.articleCount,
+                        eventCount: it.eventCount,
+                        disclosureCount: it.disclosureCount,
+                        rate: quotes[it.stockCode]?.changeRate ?? null,
+                        limit: limitOf(quotes[it.stockCode]),
+                      }))}
+                      priceReady
+                      height={420}
+                    />
+                  </>
+                ) : (
+                  <div className="skeleton" style={{ height: 520, borderRadius: 'var(--radius)' }} />
+                )}
+                <div style={{ marginTop: 14 }}>
+                  <HomeSummary
+                    articles={newsArticles}
+                    storyCount={storyCount}
+                    disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length}
+                    topics={topics}
+                    issues={issueItems}
+                  />
+                </div>
+              </>
+            ) : variant === 'map' ? (
               <div className="hero-grid">
                 <NewsMap stories={tileStories} variant="stock" />
                 <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />

@@ -5876,3 +5876,74 @@ a.hs-bl:hover { color: var(--accent-text); }
 @media (prefers-reduced-motion: reduce) {
   .wc-word { animation: none; opacity: 1; }
 }
+
+/* ===== 종목 지도(시가총액 지도, FINVIZ 방식) 11/16 저녁 ===== */
+.cap-map { position: relative; border-radius: 12px; overflow: hidden; background: #1b1e24; }
+.cm-sector { position: absolute; box-sizing: border-box; padding: 0; }
+.cm-head {
+  margin: 0;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 700;
+  color: #e9ecf1;
+  background: #262a32;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 2px solid #1b1e24;
+}
+.cm-sector ul { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 0; list-style: none; }
+.cm-sector li { position: absolute; }
+.cm-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  transition: filter 0.12s ease;
+}
+.cm-tile:hover, .cm-tile:focus-visible { filter: brightness(1.18); outline: 2px solid #fff; outline-offset: -2px; z-index: 1; }
+.cm-name { font-weight: 800; line-height: 1.1; white-space: nowrap; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+.cm-rate { font-weight: 700; opacity: 0.95; }
+.cm-news { margin-top: 2px; padding: 1px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.32); font-size: 11px; font-weight: 700; }
+.cm-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+/* 7단계 색 (국내 관례: 오름 빨강·내림 파랑). 흰 글자 대비 4.5:1 이상인 진한 색만 */
+.cm-u3 { background: #c4161c; }
+.cm-u2 { background: #a3262c; }
+.cm-u1 { background: #7a2d33; }
+.cm-0 { background: #414654; }
+.cm-d1 { background: #2d4470; }
+.cm-d2 { background: #1f4fa3; }
+.cm-d3 { background: #1557c9; }
+.cm-na { background: #414654; }
+.cm-tip {
+  position: absolute;
+  z-index: 5;
+  width: 280px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  pointer-events: none;
+}
+.cm-tip b { font-size: var(--fs-sm); }
+.cm-tip-title { margin-top: 4px; color: var(--text-2); }
+.cm-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; font-size: var(--fs-xs); color: var(--text-3); }
+.cm-scale { display: inline-flex; border-radius: 6px; overflow: hidden; }
+.cm-scale i { display: inline-block; min-width: 34px; padding: 2px 4px; color: #fff; font-style: normal; font-size: 11px; text-align: center; }
+@media (max-width: 640px) {
+  .cm-head { font-size: 11px; }
+}
