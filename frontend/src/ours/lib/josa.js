@@ -14,3 +14,7 @@ export function hasFinal(word) {
 
 /** '반도체' → '가', '없는말' → '이' */
 export const iGa = (word) => (hasFinal(word) ? '이' : '가');
+
+/** '반도체' → '와', '삼성' → '과' */
+export const waGwa = (word) => (hasFinal(word) ? '과' : '와');
+

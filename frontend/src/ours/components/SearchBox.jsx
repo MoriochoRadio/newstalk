@@ -9,6 +9,7 @@ import { toUiArticle } from '../../api/adapters';
 import { useDebounced } from '../lib/hooks';
 import { marketKo, shortTime } from '../lib/format';
 import { errorText } from '../lib/errors';
+import { waGwa } from '../lib/josa';
 
 /** 검색어와 같은 부분을 굵게 */
 function Highlight({ text, q }) {
@@ -179,20 +180,24 @@ export default function SearchBox({
           </button>
         )}
       </div>
+      {/* 화면 낭독기 알림은 늘 있는 빈 칸 하나에 글만 바꿔 넣음 (11/16 점검: 알릴 때 새로 생기는 role=status 는 안 읽힐 수 있음 — WAI-ARIA·MDN)
+          결과 개수도 알려 줌: 'n개, 아래 화살표로 고르기' */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {!showPop ? '' : !fresh ? '찾는 중' : res.error ? errorText(res.error) : options.length === 0 ? `‘${debounced}’${waGwa(debounced)} 맞는 결과가 없어요` : `결과 ${options.length}개. 아래 화살표로 고를 수 있어요`}
+      </p>
       {showPop && (
         // 11/12 접근성 점검: listbox 안에는 선택지와 묶음(group)만 — 로딩·안내 글과 '모두 보기' 버튼은 목록 밖
         <div className="search-pop">
           {!fresh && (
-            <div role="status" style={{ padding: 8 }}>
-              <span className="sr-only">찾는 중…</span>
+            <div style={{ padding: 8 }} aria-hidden="true">
               <div className="skeleton sk-line" style={{ width: '60%' }} />
               <div className="skeleton sk-line" style={{ width: '40%' }} />
             </div>
           )}
           {fresh && res.error && <p className="search-group" style={{ color: 'var(--danger)' }}>{errorText(res.error)}</p>}
           {fresh && !res.error && options.length === 0 && (
-            <p role="status" style={{ padding: 12, color: 'var(--text-2)' }}>
-              ‘{debounced}’와 맞는 {mode === 'stock' ? '종목이' : '종목·뉴스가'} 없어요.
+            <p style={{ padding: 12, color: 'var(--text-2)' }}>
+              ‘{debounced}’{waGwa(debounced)} 맞는 {mode === 'stock' ? '종목이' : '종목·뉴스가'} 없어요.
             </p>
           )}
           <div id={listId} role="listbox" aria-label="검색 결과">
