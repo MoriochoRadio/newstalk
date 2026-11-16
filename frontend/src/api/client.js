@@ -58,7 +58,7 @@ function toQuery(params = {}) {
   return text ? `?${text}` : '';
 }
 
-async function request(method, path, { params, body, signal } = {}) {
+async function request(method, path, { params, body, signal } = {}, retried = false) {
   const headers = { Accept: 'application/json' };
   const token = tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -69,7 +69,12 @@ async function request(method, path, { params, body, signal } = {}) {
   const res = await fetch(`${BASE_URL}${path}${toQuery(params)}`, init);
 
   // 만료·위조 토큰이면 로그인이 필요 없는 API도 401 → 토큰을 지우고 알림 (docs/api.md 2절)
-  if (res.status === 401) tokenStore.clear();
+  if (res.status === 401) {
+    tokenStore.clear();
+    // 읽기(GET)는 토큰 없이 한 번 더: 어제 로그인한 사람이 다시 오면 공개 화면(종목 정보 등)까지 '로그인이 필요해요'로 막혔음 (11/16 점검)
+    // 로그인이 꼭 필요한 API 는 다시 401 이 나서 그대로 로그인 안내로 감
+    if (token && method === 'GET' && !retried) return request(method, path, { params, body, signal }, true);
+  }
 
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);

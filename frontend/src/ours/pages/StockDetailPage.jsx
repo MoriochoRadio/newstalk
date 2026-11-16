@@ -40,7 +40,7 @@ function useTick(value) {
   return tick;
 }
 
-function StockHeader({ code, info, quote, quoteState }) {
+function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePause }) {
   const { watchCodes, toggleWatch } = useSession();
   const tick = useTick(quote?.price);
   const watching = watchCodes.has(code);
@@ -80,7 +80,13 @@ function StockHeader({ code, info, quote, quoteState }) {
               {fmtAmount(quote.changeAmount)} ({fmtRate(quote.changeRate)})
             </div>
             <p className="basis num">
-              어제 종가 대비 · {quote.live ? '실시간' : `${shortTime(quote.fetchedAt)} 기준`}
+              어제 종가 대비 · {paused ? `${shortTime(quote.fetchedAt)} 값에서 멈춤` : quote.live ? '실시간' : `${shortTime(quote.fetchedAt)} 기준`}
+              {/* WCAG 2.2.2 저절로 바뀌는 정보는 멈출 수 있어야 함 (이해 문서가 실시간 주가를 예로 듦, 11/16 전문가 기준 점검) */}
+              {onTogglePause && (
+                <button type="button" className="link-btn pause-btn" aria-pressed={paused} onClick={onTogglePause}>
+                  {paused ? '다시 켜기' : '멈추기'}
+                </button>
+              )}
             </p>
           </>
         ) : quoteState.loading ? (
@@ -453,7 +459,12 @@ function StockDetail({ code }) {
   });
   const dayCounts = days.data ? (days.data.items || []).map((p) => ({ date: String(p.time).slice(0, 10), count: p.totalCount })) : null;
   const recentArticles = recent.data ? (recent.data.items || []).map(toUiArticle) : null;
-  const { quotes, loading, disabled } = useQuotes([code], { live: true });
+  // 실시간 멈춤: 멈추면 방송(SSE)을 끊고 멈춘 순간의 값을 그대로 보여 줌 (WCAG 2.2.2)
+  const [paused, setPaused] = useState(false);
+  const { quotes, loading, disabled } = useQuotes([code], { live: !paused });
+  const frozenRef = useRef(null);
+  if (!paused) frozenRef.current = quotes[code] || null;
+  const shownQuote = paused ? frozenRef.current : quotes[code];
   const [moveLevel, setMoveLevel] = useState(5);
   const moves = useApi((signal) => quoteApi.bigMoves(code, { period: '1y', threshold: moveLevel }, { signal }), [code, moveLevel]);
   const stock = info.data?.stockCode === code ? info.data : null;
@@ -481,7 +492,7 @@ function StockDetail({ code }) {
       </button>
       <QuickSwitch code={code} />
       {info.error && <ErrorBox error={info.error} onRetry={info.reload} />}
-      <StockHeader code={code} info={stock} quote={quotes[code]} quoteState={{ loading, disabled }} />
+      <StockHeader code={code} info={stock} quote={shownQuote} quoteState={{ loading, disabled }} paused={paused} onTogglePause={() => setPaused((v) => !v)} />
       <SectionNav />
       {/* 휴대폰에서는 순서를 바꿈 (11/13 사용자 눈으로 써 보기: "왜 떨어졌지?"의 답인 AI 요약이 화면 하나를 다 차지하는
           차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사. 넓은 화면은 그대로 (CSS .stock-flow) */}
@@ -489,7 +500,7 @@ function StockDetail({ code }) {
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
           <Suspense fallback={<section className="card" aria-busy="true"><div className="skeleton" style={{ height: 556, borderRadius: 'var(--radius-sm)' }} /></section>}>
-            <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} liveQuote={quotes[code] || null} />
+            <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} liveQuote={shownQuote || null} />
           </Suspense>
         </div>
         <div className="grid-2 sf-grid">
