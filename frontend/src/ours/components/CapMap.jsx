@@ -96,7 +96,10 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
               // 글자 폭(em): 한글 0.95, 영문·숫자 0.62 ('LG에너지솔루션'을 한글 8자로 쳐서 칸에 안 들어간다고 숨겼음)
               const len = Math.max(2, [...it.stockName].reduce((t, ch) => t + (/[가-힣]/.test(ch) ? 0.95 : 0.62), 0));
               const roomy = w >= 130 && h >= 96; // 큰 칸: 증권 앱 지도처럼 왼쪽 위에 이름·등락, 왼쪽 아래 기사 수
-              const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8)));
+              const newsSize = roomy ? Math.max(14, Math.min(17, Math.round(Math.sqrt(w * h) / 16))) : 12; // 기사 줄 글자 (먼저 정함)
+              // 이름·등락·기사 세 줄이 칸 높이에 들어가게 이름 크기를 맞춤: 이름 1.2 + 등락 0.9 + 기사 줄 + 여백
+              const fitByH = (h - 10 - newsSize * 1.45) / 2.05;
+              const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8, fitByH)));
               // 이름이 칸 너비에 다 들어갈 때만 (잘린 이름 '삼성엔지니…' 대신 빈 칸 + 마우스를 올리면 정보)
               const showName = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
               // 좁고 긴 칸: 한 줄에 안 들어가는 긴 이름(한화에어로스페이스 등)은 두세 줄로 접어서 (빈 칸으로 남던 것 — 11/16)
@@ -104,10 +107,20 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
               const wrapName = !showName && w >= 40 && h >= wrapSize * 3.6 + 8;
               const rateSize = Math.max(10, Math.round(nameSize * 0.72));
               const showRate = showName && h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44;
-              const newsSize = roomy ? Math.max(14, Math.min(18, Math.round(nameSize * 0.66))) : Math.max(12, Math.min(16, Math.round(nameSize * 0.6)));
-              const showNews = n > 0 && showRate && h >= nameSize * 1.2 + rateSize * 1.25 + newsSize * 1.6 + 10 && w >= 64;
-              // 숫자 동그라미는 이름과 안 겹칠 때만 (이름이 가운데라 양옆에 24px 씩 남아야) — 휴대폰에서 이름을 가렸음
-              const showBadge = n > 0 && !showNews && w >= 22 && h >= 18 && (!showName || w - len * nameSize >= 48);
+              // 기사 수 표시 (11/16 사용자: 어떤 칸은 '기사 n건'이 있고 어떤 칸은 없음, 큰 칸만 알약 모양이 없음 → 한 가지 알약으로 통일)
+              // 자리가 되면 '기사 n건', 좁으면 'n건', 기사가 없으면 '기사 없음'. 자리 계산: 이름·등락 줄 높이를 뺀 나머지
+              const digits = String(n).length;
+              const fullW = n > 0 ? newsSize * (2.2 + digits * 0.62 + 0.95) + 20 : newsSize * 3.9 + 20;
+              const shortW = newsSize * (digits * 0.62 + 0.95) + 16;
+              const wrapLines = wrapName ? Math.ceil((len * wrapSize) / Math.max(1, w - 8)) : 0;
+              const usedH = (showName ? nameSize * 1.2 : wrapLines * wrapSize * 1.2) + (showRate ? rateSize * 1.25 : 0);
+              const roomV = h - usedH - 8 >= newsSize * 1.4;
+              const newsText =
+                roomV && fullW <= w - 8 ? (n > 0 ? `기사 ${n}건` : '기사 없음') : roomV && shortW <= w - 8 ? (n > 0 ? `${n}건` : '없음') : null;
+              // 세로 자리가 없으면 오른쪽 위 작은 알약 'n건' (이름과 안 겹칠 때만)
+              const cornerNews = !newsText && n > 0 && w >= shortW + 8 && h >= 22 && (!showName || w - len * nameSize >= shortW * 2 + 8);
+              // 기사가 많을수록 진하게: 없음 회색 · 1~2건 보통 · 3~5건 보라 · 6건 이상 진한 보라
+              const newsLevel = n === 0 ? 0 : n >= 6 ? 3 : n >= 3 ? 2 : 1;
               const limit = it.priceLimit === 'UPPER' ? ' 상한가' : it.priceLimit === 'LOWER' ? ' 하한가' : '';
               const label = `${it.stockName}, ${sec.name}, 시가총액 ${capText(it.marketCap)}, ${fmtRate(it.changeRate)}${limit}, 오늘 기사 ${n}건`;
               return (
@@ -138,17 +151,16 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
                         </span>
                       )}
                     </span>
-                    {showNews && (
-                      <span className="cm-news num" style={{ fontSize: newsSize }}>
-                        기사 {n}건
+                    {newsText && (
+                      <span className={`cm-news cm-n${newsLevel} num`} style={{ fontSize: newsSize }}>
+                        {newsText}
                       </span>
                     )}
-                    {showBadge && (
-                      <b className="cm-nbadge num" aria-hidden="true">
-                        {n}
-                      </b>
+                    {cornerNews && (
+                      <span className={`cm-news cm-news-corner cm-n${newsLevel} num`} aria-hidden="true">
+                        {n}건
+                      </span>
                     )}
-                    {n > 0 && !showNews && !showBadge && <i className="cm-dot" aria-hidden="true" />}
                   </Link>
                 </li>
               );
@@ -185,7 +197,7 @@ export function CapLegend({ size = '시가총액', grouped = true }) {
       </span>
       <span>
         크기 = {size}
-        {grouped ? ' · 묶음 = 업종' : ''} · '기사 n건'·동그라미 숫자 = 오늘 이 종목 기사 수
+        {grouped ? ' · 묶음 = 업종' : ''} · '기사 n건' = 오늘 이 종목 기사 수 (많을수록 진한 보라)
       </span>
     </div>
   );

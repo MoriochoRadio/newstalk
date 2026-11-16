@@ -6282,3 +6282,27 @@ a { text-underline-offset: 3px; }
 .home-variant > span { white-space: nowrap; }
 .home-variant .segmented { flex: none; flex-wrap: nowrap; }
 .home-variant .segmented button { white-space: nowrap; }
+
+/* ===== 지도 칸 기사 수: 알약 한 가지 + 기사 많을수록 진한 보라 (11/16 저녁) ===== */
+.cm-tile .cm-news, .cm-tile.cm-roomy .cm-news {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  opacity: 1;
+}
+.cm-news.cm-n0 { color: var(--text-3); font-weight: 500; }
+.cm-news.cm-n1 { color: var(--text-2); }
+.cm-news.cm-n2 { color: var(--buzz); }
+.cm-news.cm-n3 { color: var(--buzz); font-weight: 800; background: color-mix(in srgb, var(--buzz-solid) 16%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--buzz-solid) 30%, transparent); }
+.cm-news-corner { position: absolute; top: 4px; right: 4px; padding: 0 6px !important; font-size: 11px; }
+
+/* 기사 수 알약 색: 큰 칸(cm-roomy)의 예전 규칙보다 우선 */
+.cap-map .cm-tile .cm-news.cm-n0 { color: var(--text-3); font-weight: 500; }
+.cap-map .cm-tile .cm-news.cm-n1 { color: var(--text-2); }
+.cap-map .cm-tile .cm-news.cm-n2 { color: var(--buzz); }
+.cap-map .cm-tile .cm-news.cm-n3 { color: var(--buzz); font-weight: 800; background: color-mix(in srgb, var(--buzz-solid) 16%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--buzz-solid) 30%, transparent); }
+.cap-map .cm-tile .cm-news { opacity: 1; padding: 2px 9px; }
