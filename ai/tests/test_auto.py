@@ -126,6 +126,61 @@ def test_dart_not_ready():
             pass
 
 
+def test_disclosure_evidence():
+    # 11/13: 공시도 근거 문장 (뉴스와 맞춤). LLM 이 옮긴 문장이 원문에 글자 그대로 있을 때만 저장 — 지어낸 문장을 원문처럼 보이지 않게
+    from hk_llm.steps.dart import pick_evidence
+
+    body = "1. 계약 내용   반도체 장비 공급 2. 계약금액(원) 52,300,000,000 3. 최근 매출액 대비(%) 12.5"
+    assert pick_evidence("2. 계약금액(원) 52,300,000,000", body) == "2. 계약금액(원) 52,300,000,000"
+    assert pick_evidence("계약 내용 반도체 장비 공급", body), "원문의 띄어쓰기가 여러 칸이어도 맞춤"
+    assert pick_evidence("“3. 최근 매출액 대비(%) 12.5”", body), "LLM 이 붙인 따옴표는 뗌"
+    assert pick_evidence("계약금액은 523억원이다", body) is None, "원문에 없는 문장(바꿔 쓴 것)은 버림"
+    assert pick_evidence("12.5", body) is None, "숫자 하나는 근거로 안 봄"
+    assert pick_evidence("", body) is None and pick_evidence(None, body) is None
+
+
+def test_disclosure_evidence_db():
+    # 저장까지: 시험 공시 1건을 넣고 요약(가짜 LLM) 뒤 article_stock.evidence 를 봄. 다른 진짜 공시는 '원문 아직 없음'으로 돌려 안 건드림
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from sqlalchemy import text
+
+    from hk_llm.core.config import KST
+    from hk_llm.core.db import get_engine, to_db
+    from hk_llm.steps import dart
+
+    rcp = "19990104000001"
+    url = f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcp}"
+    body = "단일판매ㆍ공급계약체결 1. 계약금액(원) 52,300,000,000 2. 최근 매출액 대비(%) 12.5"
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM article WHERE url_key = :k"), {"k": url})
+        aid = conn.execute(text("""INSERT INTO article (url_key, url, press, title, published_at, status, summary, sentiment,
+                                                        source_type, channel)
+                                   VALUES (:k, :k, '전자공시', '시험 공급계약', :at, 'DONE', '시험 공급계약', 'NEUTRAL', 'NEWS', 'DART')"""),
+                           {"k": url, "at": to_db(datetime.now(KST))}).lastrowid
+        conn.execute(text("""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason, match_type)
+                             VALUES (:id, '005930', TRUE, 'NEUTRAL', '시험', 'DIRECT')"""), {"id": aid})
+
+    def fetch(key, no):
+        if no != rcp:
+            raise dart.NotReady(no)  # 진짜 공시는 건드리지 않음
+        return body
+
+    answer = SimpleNamespace(summary="요약", evidence="1. 계약금액(원) 52,300,000,000", sentiment="POSITIVE", reason="계약")
+    try:
+        with mock.patch.object(dart, "fetch_document", side_effect=fetch),                 mock.patch.object(dart, "summarize_one", return_value=answer):
+            assert dart.summarize_disclosures(engine, key="x") == 1
+        with engine.connect() as conn:
+            ev = conn.execute(text("SELECT evidence FROM article_stock WHERE article_id = :id"), {"id": aid}).scalar()
+        assert ev == "1. 계약금액(원) 52,300,000,000", ev
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM article_stock WHERE article_id = :id"), {"id": aid})
+            conn.execute(text("DELETE FROM article WHERE article_id = :id"), {"id": aid})
+
+
 def test_sns_rules():
     from hk_llm.core.config import KST
     from hk_llm.steps import sns
@@ -217,6 +272,34 @@ def test_llm_budget():
         assert not called.called, "상한을 넘으면 LLM 을 안 부름"
         s5.USAGE_FILE.write_text("깨진 내용", encoding="utf-8")
         assert s5.spent_today() == 0, "기록 파일이 깨져도 수집은 안 멈춤"
+
+
+def test_llm_usage_db():
+    # 11/13: 하루 비용을 DB(llm_usage_daily, V16)에서 셈 → 컨테이너·내 PC 가 같은 상한. 진짜 오늘 금액은 안 건드리게 지난 날짜로
+    from datetime import date
+
+    from sqlalchemy import text
+
+    from hk_llm.steps import step5_summary as s5
+
+    day = date(1999, 1, 1)
+    with mock.patch.object(s5, "USAGE_STORE", "db"), mock.patch.object(s5, "_today", lambda: day):
+        with s5._engine().begin() as conn:
+            conn.execute(text("DELETE FROM llm_usage_daily WHERE usage_date = :d"), {"d": day})
+        try:
+            assert s5.spent_today() == 0
+            s5._add_usage({"m": {"input_tokens": 1_000_000, "output_tokens": 0}})
+            s5._add_usage({"m": {"input_tokens": 0, "output_tokens": 1_000_000}})  # 두 번째는 같은 줄에 더함
+            assert abs(s5.spent_today() - 1.45) < 1e-6, "두 번 쓴 비용이 한 줄에 합쳐져야 함"
+        finally:
+            with s5._engine().begin() as conn:
+                conn.execute(text("DELETE FROM llm_usage_daily WHERE usage_date = :d"), {"d": day})
+    # DB 가 안 되면 파일로 (수집이 멈추면 안 됨)
+    import pathlib
+    import tempfile
+    with tempfile.TemporaryDirectory() as folder, mock.patch.object(s5, "USAGE_STORE", "db"),             mock.patch.object(s5, "USAGE_FILE", pathlib.Path(folder) / "u.json"),             mock.patch.object(s5, "_db_add", side_effect=RuntimeError("DB 끊김")),             mock.patch.object(s5, "_db_spent", side_effect=RuntimeError("DB 끊김")):
+        s5._add_usage({"m": {"input_tokens": 1_000_000, "output_tokens": 0}})
+        assert abs(s5.spent_today() - 0.20) < 1e-9, "DB 가 안 되면 파일에 적고 파일로 셈"
 
 
 def test_llm_usage_real_chain():
