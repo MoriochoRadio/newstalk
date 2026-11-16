@@ -109,6 +109,8 @@ function Comments({ postId, onCount }) {
       list.reload();
       onCount(-1);
       toast('댓글을 지웠어요.');
+      // 지운 버튼이 사라져 초점이 맨 위로 튀던 것 (11/16 키보드 점검) → 댓글 입력칸으로
+      document.getElementById(`cmt-${postId}`)?.focus();
     } catch (err) {
       if (!handleAuthError(err)) toast(errorText(err), 'error');
     }
@@ -259,7 +261,7 @@ export default function Board({ stockCode, stockName }) {
   return (
     <section className="card" aria-labelledby="board-title">
       <div className="card-head">
-        <h2 className="card-title" id="board-title">
+        <h2 className="card-title" id="board-title" tabIndex={-1}>
           종목 토론 {posts.data && <span className="count num">{posts.data.totalCount}</span>}
         </h2>
         <button
@@ -292,7 +294,15 @@ export default function Board({ stockCode, stockName }) {
       {items.length > 0 && (
         <ul ref={listRef}>
           {items.map((p) => (
-            <Post key={p.postId} post={p} onRemoved={posts.reload} />
+            <Post
+              key={p.postId}
+              post={p}
+              onRemoved={() => {
+                posts.reload();
+                // 지운 글과 함께 초점도 사라져 맨 위로 튀던 것 (11/16 키보드 점검) → 토론 제목으로
+                document.getElementById('board-title')?.focus();
+              }}
+            />
           ))}
         </ul>
       )}
