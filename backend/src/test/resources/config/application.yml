@@ -1,0 +1,7 @@
+# 테스트 전용 덧씌우기 (classpath:/config/ 는 main 의 application.yml 위에 한 번 더 읽힘 → 여기 적은 값만 바뀜)
+# 내 PC: .env 에 TEST_DB_NAME=stocknews_test 를 두면 테스트가 수집기와 다른 DB 를 씀
+#   (11/13: 테스트가 글 표를 비우는 순간 수집기 저장과 부딪혀 가끔 deadlock 으로 실패)
+# CI·TEST_DB_NAME 이 없는 PC: 예전처럼 DB_NAME 그대로
+spring:
+  datasource:
+    url: jdbc:mariadb://${DB_HOST}:${DB_PORT}/${TEST_DB_NAME:${DB_NAME}}

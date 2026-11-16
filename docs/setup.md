@@ -416,6 +416,24 @@ DB를 켠 상태(3절)에서 `backend` 폴더에서:
 - 테스트는 기사 표를 비우고 필요한 기사만 넣은 뒤 **끝나면 전부 되돌림(롤백)**. 내 PC의 예시 기사·계정은 그대로 남음
 - 테스트 코드 위치: `backend/src/test/java/` (API 테스트는 `*ApiTest.java`, 공통 바탕은 `support/ApiTestSupport.java`)
 
+#### (선택) 테스트를 수집기와 다른 DB 에서 돌리기
+
+AI 수집기가 같은 DB 에 5분마다 글을 저장하는 PC 에서는, 테스트가 글 표를 비우는 순간과 부딪혀 가끔 `Deadlock found` 로 실패함 (11/13 겪음, 서비스 버그는 아님). 테스트 전용 DB 를 한 번 만들어 두면 없어짐:
+
+```powershell
+# 1) 테스트용 DB 만들기 (DB 켠 상태, 처음 한 번). 비밀번호는 .env 의 MARIADB_ROOT_PASSWORD
+docker exec -it stock-news-matching-db-1 mariadb -uroot -p
+#    MariaDB 안에서 (<앱계정> = .env 의 DB_USERNAME):
+#    CREATE DATABASE IF NOT EXISTS stocknews_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+#    GRANT ALL PRIVILEGES ON stocknews_test.* TO '<앱계정>'@'%';
+#    exit
+# 2) .env 에 한 줄 추가
+TEST_DB_NAME=stocknews_test
+```
+
+- 첫 테스트 때 Flyway 가 테이블·종목 사전·AI 데이터를 새 DB 에 만듦 (1~2분 더 걸림), 그다음부터는 평소 속도
+- 설정은 `backend/src/test/resources/config/application.yml` (DB 이름만 덧씌움). `TEST_DB_NAME` 이 없으면 예전처럼 `DB_NAME` 을 씀 → CI 는 그대로
+
 ### GitHub에서 자동으로 (CI)
 
 `backend/` 폴더를 바꾼 PR을 올리면 GitHub가 자동으로 MariaDB를 띄우고 같은 테스트를 돌림 (`.github/workflows/backend-ci.yml`).
