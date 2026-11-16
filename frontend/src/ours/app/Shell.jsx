@@ -289,11 +289,13 @@ export default function Shell() {
     let timer = 0;
     const until = performance.now() + 3000;
     // 3초 동안 목록 길이가 바뀔 때마다 다시 맞춤 (돌아오면 목록을 다시 받으며 잠깐 뼈대로 짧아져 맞춘 위치가 0으로 밀렸음)
+    let steady = 0; // 목표에 닿은 채 지난 횟수 (10번 = 0.5초면 일찍 멈춤)
     const tryRestore = () => {
       const room = document.documentElement.scrollHeight - window.innerHeight;
       const want = Math.min(target, Math.max(0, room));
       if (Math.abs(window.scrollY - want) > 2) window.scrollTo({ top: want, left: 0, behavior: 'instant' });
-      if (performance.now() < until) timer = setTimeout(tryRestore, 50);
+      steady = want === target && Math.abs(window.scrollY - target) <= 2 ? steady + 1 : 0;
+      if (steady < 10 && performance.now() < until) timer = setTimeout(tryRestore, 50);
     };
     timer = setTimeout(tryRestore, 0);
     // 사용자가 직접 스크롤·키보드를 쓰면 그만

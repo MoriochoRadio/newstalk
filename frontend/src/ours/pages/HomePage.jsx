@@ -332,7 +332,7 @@ export default function HomePage() {
                       <CapLegend size="오늘 기사 수" grouped={false} />
                     </>
                   ) : (
-                    <div className="skeleton" style={{ height: 340, borderRadius: 'var(--radius)' }} />
+                    <div className="skeleton cap-skeleton" style={{ borderRadius: 'var(--radius)' }} />
                   )}
                 </div>
                 <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
@@ -410,7 +410,7 @@ export default function HomePage() {
           <span>
             <b>오늘 기사·공시 전체</b>
             <small className="num">
-              기사 {newsCount.toLocaleString('ko-KR')} · 공시 {((feed.data?.items || []).length - newsCount).toLocaleString('ko-KR')}
+              {feed.data ? `기사 ${newsCount.toLocaleString('ko-KR')} · 공시 ${(feed.data.items.length - newsCount).toLocaleString('ko-KR')}` : '불러오는 중'}
             </small>
           </span>
           <ChevronRight className="icon-sm" aria-hidden="true" />

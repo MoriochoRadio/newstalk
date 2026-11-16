@@ -73,7 +73,8 @@ function ToneBand({ article }) {
       <div className="tone-band-text">
         {/* 여러 종목이면 좋은·나쁜 소식으로 묶어 한 줄씩 (11/16: "OO에 좋은 소식"이 종목 수만큼 되풀이돼 글이 길었음) */}
         {judged.length === 1 ? (
-          <p className="tone-band-main">{`${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}이에요`}</p>
+          // '○○에 좋은 소식이에요'는 단정으로 읽힘 (11/16 밤 PM) → 누가 그렇게 봤는지 밝힘
+          <p className="tone-band-main">{`AI는 ${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}으로 봤어요`}</p>
         ) : (
           ['POSITIVE', 'NEGATIVE']
             .map((t) => [t, judged.filter((x) => x.sentiment === t)])
@@ -86,7 +87,7 @@ function ToneBand({ article }) {
             ))
         )}
         {/* 11/13 준호(글 안 읽음): 두 줄 → 한 줄. 뜻(AI 판단 · 주가 예측 아님)은 그대로 */}
-        <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용만 보고 판단했어요 · 주가 예측이 아니에요</p>
+        <p className="tone-band-sub">{article.isDisclosure ? '공시' : '기사'} 내용만 본 판단 · 주가 예측이 아니에요</p>
       </div>
     </div>
   );

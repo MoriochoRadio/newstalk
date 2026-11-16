@@ -233,7 +233,7 @@ function SentimentCard({ summary }) {
           {(ratio.neutralCount ?? 0) > 0 && <span>판단 없음 {ratio.neutralCount}건</span>}
           {(ratio.negativeCount ?? 0) > 0 && <span className="tb-neg">나쁜 소식 {ratio.negativeCount}건</span>}
           <span className="muted">
-            AI가 읽은 오늘 {basis === 'event' ? '소식이' : '기사가'} {count}건뿐이라 비율은 보여 주지 않아요
+            AI가 읽은 {basis === 'event' ? '소식' : '기사'} {count}건 · 3건부터 비율을 보여 줘요
           </span>
         </p>
       )}
@@ -244,6 +244,13 @@ function SentimentCard({ summary }) {
             <ToneRing pos={ratio.positiveCount ?? 0} neu={ratio.neutralCount ?? 0} neg={ratio.negativeCount ?? 0} size={36} />
             {(() => {
               const lean = leanOf(ratio.positiveCount ?? 0, ratio.neutralCount ?? 0, ratio.negativeCount ?? 0);
+              // '대부분 판단 없음'이 제목 자리를 차지했음 (11/16 밤 impeccable) → 그때는 판단한 기사 수를 제목으로
+              if (lean.kind === 'neutral')
+                return (
+                  <b className="num">
+                    좋은 소식 <span className="tb-pos">{ratio.positiveCount ?? 0}건</span> · 나쁜 소식 <span className="tb-neg">{ratio.negativeCount ?? 0}건</span>
+                  </b>
+                );
               return <b className={lean.kind === 'pos' ? 'tb-pos' : lean.kind === 'neg' ? 'tb-neg' : ''}>{lean.text}</b>;
             })()}
           </div>
@@ -331,7 +338,7 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
       <div className="card-head">
         <h2 className="card-title" id="moves-title">
           크게 움직인 날
-          {moves.data && <span className="count num">최근 1년 {items.length}번{withNews.length ? ` · 기사 있는 날 ${withNews.length}번` : ''}</span>}
+          {moves.data && <span className="count num">최근 1년 {items.length}일{withNews.length ? ` · 기사 있는 날 ${withNews.length}일` : ''}</span>}
         </h2>
         <Segmented label="등락 기준" size="sm" options={MOVE_LEVELS} value={level} onChange={onLevel} />
       </div>
@@ -361,7 +368,7 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
                 <span className="move-news">
                   {top ? (
                     <>
-                      {!nonPrice && <span className="tag-mini">시세 기사</span>}
+                      {!nonPrice && <span className="tag-mini">주가 기사</span>}
                       <Link to={`/news/${top.articleId}`} className="move-title">
                         {top.title}
                       </Link>
@@ -378,7 +385,7 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
       )}
       {items.length > shown.length || open ? (
         <button type="button" className="story-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          {open ? '접기' : `모든 날 보기 (${items.length}번)`}
+          {open ? '접기' : `모든 날 보기 (${items.length}일)`}
         </button>
       ) : null}
     </section>

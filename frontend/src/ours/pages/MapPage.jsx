@@ -91,7 +91,7 @@ export default function MapPage() {
             시장 지도 <span className="title-date num">{todayLabel()}</span>
           </h1>
           <p className="page-sub">
-            {showCap
+            {showCap || capPending // 시총 지도를 받는 동안에도 같은 부제 (뼈대 위에 '기사 많은 종목' 부제가 나왔음)
               ? `시가총액 상위 ${shownCap.length || CAP_LIMIT}종목 · 색 = 오늘 등락률 · 칸을 누르면 종목 화면`
               : '오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률'}
           </p>

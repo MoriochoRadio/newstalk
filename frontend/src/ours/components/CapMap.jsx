@@ -121,6 +121,14 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
     });
   }, [items, width, height, limit, maxShare, news]);
 
+  // 마우스로 띄운 설명도 Esc 로 닫기 (WCAG 1.4.13 — 예전엔 지도 안에 초점이 있을 때만)
+  useEffect(() => {
+    if (!tip) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setTip(null);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [tip]);
+
   // 실제로 그린 칸 수 (휴대폰은 16) → 시장 지도 화면의 '많이 오른·내린'·부제가 같은 종목을 쓰게 (11/16 밤 3차 리뷰: 지도 16칸인데 목록은 24종목)
   const drawn = layout.reduce((t, sec) => t + sec.tiles.length, 0);
   useEffect(() => {
@@ -157,18 +165,25 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               const fitByH = (h - 10 - newsSize * 1.45) / 2.05;
               const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8, fitByH)));
               // 이름이 칸 너비에 다 들어갈 때만 (잘린 이름 '삼성엔지니…' 대신 빈 칸 + 마우스를 올리면 정보)
-              const showName = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
+              const fitsOneLine = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
               // 좁고 긴 칸: 한 줄에 안 들어가는 긴 이름(한화에어로스페이스 등)은 두세 줄로 접어서 (빈 칸으로 남던 것 — 11/16)
-              const wrapSize = Math.round(Math.max(11, Math.min(14, ((w - 8) * 2.6) / len)));
-              const wrapName = !showName && w >= 40 && h >= wrapSize * 3.6 + 8;
-              const rateSize = Math.max(10, Math.round(nameSize * 0.72));
-              const showRate = showName && h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44;
+              const wrapSize = Math.round(Math.max(12, Math.min(15, ((w - 8) * 2.6) / len)));
+              const wrapLinesFor = Math.ceil((len * wrapSize) / Math.max(1, w - 8));
+              const canWrap = w >= 40 && h >= wrapLinesFor * wrapSize * 1.2 + 8;
+              // 한 줄 이름이 15px 밑이면(긴 이름) 접어서 크게 (11/16 밤 디자이너: 한화에어로스페이스 이름 11px·등락 9px)
+              const showName = fitsOneLine && !(nameSize < 15 && canWrap && wrapSize > nameSize);
+              const wrapName = !showName && canWrap;
+              const rateSize = showName ? Math.max(11, Math.round(nameSize * 0.72)) : Math.max(11, Math.round(wrapSize * 0.85));
+              // 접은 이름 아래에도 등락률 (예전엔 빠져 하나금융지주 칸이 색만으로 등락을 전했음 — impeccable, WCAG 1.4.1)
+              const showRate = showName
+                ? h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44
+                : wrapName && h >= wrapLinesFor * wrapSize * 1.2 + rateSize * 1.25 + 8;
               // 기사 수 표시 (11/16 사용자: 어떤 칸은 '기사 n건'이 있고 어떤 칸은 없음, 큰 칸만 알약 모양이 없음 → 한 가지 알약으로 통일)
               // 자리가 되면 '기사 n건', 좁으면 'n건', 기사가 없으면 '기사 없음'. 자리 계산: 이름·등락 줄 높이를 뺀 나머지
               const digits = String(n).length;
               const fullW = n > 0 ? newsSize * (2.2 + digits * 0.62 + 0.95) + 20 : newsSize * 3.9 + 20;
               const shortW = newsSize * (digits * 0.62 + 0.95) + 16;
-              const wrapLines = wrapName ? Math.ceil((len * wrapSize) / Math.max(1, w - 8)) : 0;
+              const wrapLines = wrapName ? wrapLinesFor : 0;
               const usedH = (showName ? nameSize * 1.2 : wrapLines * wrapSize * 1.2) + (showRate ? rateSize * 1.25 : 0);
               const roomV = h - usedH - 8 >= newsSize * 1.4;
               const newsText =

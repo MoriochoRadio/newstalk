@@ -6409,3 +6409,10 @@ a { text-underline-offset: 3px; }
 .ratio-few { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
 /* 홈 1~5위: 판단 없음도 같은 자리 (3위만 오른쪽 칸이 밀렸음) */
 .st-tone-none { color: var(--text-3); font-weight: 500; }
+
+/* ===== 11/16 밤 3차 리뷰 남은 것 ===== */
+/* 종목 목록 화제 카드: 흐름선이 오기 전엔 '20일' 글자도 숨김 (선 없이 글자만 떠 있었음) */
+.brief-spark:not(:has(svg)) > .muted { visibility: hidden; }
+/* 홈 시가총액 지도 뼈대: 지도와 같은 높이 (휴대폰 지도는 520) */
+.cap-skeleton { height: 340px; }
+@media (max-width: 640px) { .cap-skeleton { height: 520px; } }

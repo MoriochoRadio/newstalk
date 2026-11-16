@@ -173,7 +173,7 @@ export function NewsPulse({ articles, topics = [], disclosureCount = 0 }) {
             {topics.slice(0, 3).map((t) => (
               <li key={t.label}>
                 <span>{t.label}</span>
-                <b className="num">소식 {t.count}개</b>
+                <b className="num">기사 {t.articles ?? t.count}건</b>
               </li>
             ))}
           </ul>
