@@ -59,6 +59,21 @@ class BigMoveServiceTest extends ApiTestSupport {
     }
 
     @Test
+    void 주가_움직임_기사는_뒤로_보내고_표시를_붙임() {
+        LocalDate up = LocalDate.of(2026, 10, 14);
+        List<KisCandle> candles = List.of(day(up.minusDays(1), 100000), day(up, 108000), day(TODAY, 108000));
+        link(insertArticle("특징주 기아 8% 급등", "NEWS", "DONE", up.atTime(10, 0)), KIA, 0.95);
+        link(insertArticle("기아 주가 급등에 개미들 환호", "NEWS", "DONE", up.atTime(10, 30)), KIA, 0.93);
+        link(insertArticle("기아 미국 공장 증설 발표", "NEWS", "DONE", up.atTime(9, 0)), KIA, 0.7);
+
+        BigMoveResponse.Day d = service.build(KIA, candles, BigMovePeriod.ONE_YEAR, 5, TODAY).items().get(0);
+
+        assertThat(d.articles()).extracting(BigMoveResponse.Article::title)
+                .containsExactly("기아 미국 공장 증설 발표", "특징주 기아 8% 급등", "기아 주가 급등에 개미들 환호");
+        assertThat(d.articles()).extracting(BigMoveResponse.Article::priceMoveTitle).containsExactly(false, true, true);
+    }
+
+    @Test
     void 기간_밖의_날과_기준_미만은_빠지고_글은_하루_3개까지() {
         LocalDate old = TODAY.minusMonths(4), recent = TODAY.minusDays(5);
         List<KisCandle> candles = List.of(

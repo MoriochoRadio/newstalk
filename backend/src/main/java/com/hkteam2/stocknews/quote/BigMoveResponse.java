@@ -31,14 +31,16 @@ public record BigMoveResponse(
     ) {
     }
 
-    /** 그날 글. relevance는 화면용 % (0~100), AI가 아직 안 채웠으면 null */
+    /** 그날 글. relevance는 화면용 % (0~100), AI가 아직 안 채웠으면 null.
+     *  priceMoveTitle: 제목이 주가 움직임 기사(특징주·급락 …)인가 — 글 목록 API 와 같은 뜻 (ArticleLabels) */
     public record Article(
             long articleId,
             String title,
             String sourceType,
             String press,
             OffsetDateTime publishedAt,
-            Integer relevance
+            Integer relevance,
+            boolean priceMoveTitle
     ) {
     }
 }

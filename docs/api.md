@@ -264,10 +264,11 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 ```json
 { "stockCode": "005930", "price": 219500, "changeAmount": -9500, "changeRate": -4.15, "direction": "DOWN",
   "open": 220500, "high": 223000, "low": 217000, "accVolume": 7611275,
-  "fetchedAt": "2026-11-03T13:04:55+09:00", "live": true }
+  "fetchedAt": "2026-11-03T13:04:55+09:00", "live": true, "priceLimit": null }
 ```
 
 - `direction`: `UP`(상승·상한) / `DOWN`(하락·하한) / `FLAT`. 화면 색은 상승 빨강, 하락 파랑 (국내 증권 앱 관례)
+- `priceLimit`: 상한가면 `"UPPER"`, 하한가면 `"LOWER"`, 아니면 `null` (KIS 전일 대비 부호 1·4 그대로. 등락률로 어림하지 않음)
 - `live`: `true`면 웹소켓 실시간 값(`fetchedAt` = 마지막 체결 시각), `false`면 몇 초마다 조회한 값
 - 방송(SSE)은 브라우저 `EventSource`로 듣기: `new EventSource('/api/quotes/stream?codes=005930')` → `addEventListener('quote', e => JSON.parse(e.data))`. 끊기면 브라우저가 알아서 다시 연결. 화면을 떠나면 `close()`
 - 생중계 자리: 보는 사람이 있는 종목에 KIS 구독을 돌려씀 (공식 41건, 신규 키는 처음 3일 동안 3건). 자리가 없으면 그 종목은 5초마다 조회값으로 방송
@@ -282,10 +283,10 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
   { "date": "2026-10-29", "close": 61200, "changeAmount": 4300, "changeRate": 7.56, "direction": "UP", "volume": 31200000,
     "articleCount": 4,
     "articles": [ { "articleId": 579, "title": "...", "sourceType": "NEWS", "press": "...",
-                    "publishedAt": "2026-10-29T10:00:00+09:00", "relevance": 92 } ] }
+                    "publishedAt": "2026-10-29T10:00:00+09:00", "relevance": 92, "priceMoveTitle": false } ] }
   ```
 
-  응답 전체는 `{ stockCode, period, threshold, from, to, items: [위 모양] }`. 등락률은 KIS 일봉(수정주가) 종가로 `(그날 종가 − 전날 종가) ÷ 전날 종가`. 글은 **그날 0시~24시 작성**, `DONE`만, 관련도 높은 순 3개(`relevance`는 %, 없으면 `null`이고 뒤로)와 전체 수 `articleCount`. AI가 기사를 모으기 전 날짜는 글이 없는 게 정상. 일봉은 KIS 3번 조회 + 10분 캐시
+  응답 전체는 `{ stockCode, period, threshold, from, to, items: [위 모양] }`. 등락률은 KIS 일봉(수정주가) 종가로 `(그날 종가 − 전날 종가) ÷ 전날 종가`. 글은 **그날 0시~24시 작성**, `DONE`만, 관련도 높은 순 3개(`relevance`는 %, 없으면 `null`이고 뒤로)와 전체 수 `articleCount`. 단 주가 움직임 기사(`priceMoveTitle` true, 글 목록과 같은 뜻)는 뒤로 보냄 — 등락률 옆에서 원인처럼 읽히지 않게. AI가 기사를 모으기 전 날짜는 글이 없는 게 정상. 일봉은 KIS 3번 조회 + 10분 캐시
 - 오류: `503 QUOTE_DISABLED`(시세 꺼짐), `429 QUOTE_BUSY`(KIS 초당 호출 초과), `429 REPLAY_BUSY`(다시 보기 동시 5개 초과), `502 QUOTE_UPSTREAM_ERROR`·`QUOTE_UNREACHABLE`(KIS 오류·연결 실패)
 - 개발 중 확인: `http://localhost:8080/demo.html` 종목 화면의 "시세" 칸
 

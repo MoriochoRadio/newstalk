@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
  * 판단(호재·악재)을 더하지 않고, 이미 있는 제목·출처에서 읽을 수 있는 사실만 꺼냄.
  * 근거와 측정은 docs/decisions.md 2026-11-10 "정보만 제공 표시"
  */
-final class ArticleLabels {
+public final class ArticleLabels {
 
     private ArticleLabels() {
     }
@@ -62,7 +62,7 @@ final class ArticleLabels {
     private static final Pattern[] COMPILED = DISCLOSURE_TYPES.stream()
             .map(p -> Pattern.compile(p[0])).toArray(Pattern[]::new);
 
-    static boolean priceMoveTitle(String title) {
+    public static boolean priceMoveTitle(String title) {
         return title != null && PRICE_MOVE.matcher(title).find();
     }
 

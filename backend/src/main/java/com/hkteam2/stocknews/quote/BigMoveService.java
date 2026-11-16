@@ -11,6 +11,7 @@ import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import com.hkteam2.stocknews.article.ArticleLabels;
 import com.hkteam2.stocknews.common.TimeUtils;
 
 /**
@@ -61,10 +62,15 @@ public class BigMoveService {
 
         List<BigMoveResponse.Day> items = moves.stream().map(m -> {
             List<BigMoveArticleRow> rows = byDay.getOrDefault(m.date(), List.of());
-            List<BigMoveResponse.Article> top = rows.stream().limit(ARTICLES_PER_DAY)
+            // 주가 움직임 기사(…폭락에 개미들 비명)는 뒤로: 등락률 옆에 오면 그 기사 때문에 움직인 것처럼 읽히고,
+            // 큰 등락일엔 이런 기사가 관련도 위쪽을 채워 3건이 모두 시세 기사가 되기 쉬움 (2026-11-16 화면 점검). 같은 종류끼리는 원래 순서
+            List<BigMoveResponse.Article> top = rows.stream()
+                    .sorted(Comparator.comparing((BigMoveArticleRow r) -> ArticleLabels.priceMoveTitle(r.title())))
+                    .limit(ARTICLES_PER_DAY)
                     .map(r -> new BigMoveResponse.Article(r.articleId(), r.title(), r.sourceType(), r.press(),
                             TimeUtils.toKst(r.publishedAt()),
-                            r.relevance() == null ? null : r.relevance().movePointRight(2).intValue()))
+                            r.relevance() == null ? null : r.relevance().movePointRight(2).intValue(),
+                            ArticleLabels.priceMoveTitle(r.title())))
                     .toList();
             return new BigMoveResponse.Day(m.date(), m.close(), m.changeAmount(), m.changeRate(),
                     m.changeAmount() > 0 ? "UP" : "DOWN", m.volume(), rows.size(), top);

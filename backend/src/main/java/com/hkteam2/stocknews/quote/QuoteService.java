@@ -100,7 +100,7 @@ public class QuoteService {
             KisPrice p = kis.inquirePrice(stockCode);
             return new QuoteResponse(p.stockCode(), p.price(), p.changeAmount(), p.changeRate(),
                     direction(p.changeSign()), p.open(), p.high(), p.low(), p.accVolume(),
-                    TimeUtils.toKst(LocalDateTime.now(clock)), false);
+                    TimeUtils.toKst(LocalDateTime.now(clock)), false, priceLimit(p.changeSign()));
         });
     }
 
@@ -258,7 +258,7 @@ public class QuoteService {
     static QuoteResponse fromSnapshot(QuoteSnapshotRow s) {
         return new QuoteResponse(s.stockCode(), s.price(), s.changeAmount(), s.changeRate(),
                 direction(s.changeSign()), s.openPrice(), s.highPrice(), s.lowPrice(), s.accVolume(),
-                TimeUtils.toKst(s.tradedAt()), true);
+                TimeUtils.toKst(s.tradedAt()), true, priceLimit(s.changeSign()));
     }
 
     /** 실시간 수집 상태 */
@@ -269,6 +269,17 @@ public class QuoteService {
                 subscriptions.viewers(),
                 realtime.messages(), buffer.received(), writer.saved(), buffer.dropped(), writer.failed(),
                 buffer.size(), realtime.quarantined(), realtime.reconnects(), mapper.countTicks(LocalDate.now(clock)));
+    }
+
+    /** KIS 전일 대비 부호 → 상한가·하한가 (1 상한 → UPPER, 4 하한 → LOWER, 나머지 null) */
+    static String priceLimit(String kisSign) {
+        if ("1".equals(kisSign)) {
+            return "UPPER";
+        }
+        if ("4".equals(kisSign)) {
+            return "LOWER";
+        }
+        return null;
     }
 
     /** KIS 전일 대비 부호 → 화면용. 1 상한·2 상승 → UP, 4 하한·5 하락 → DOWN, 3 보합 → FLAT */
