@@ -48,7 +48,7 @@ const VARIANTS = [
   { key: 'stock', label: '종목 지도' },
   { key: 'mapcap', label: '뉴스 지도 + 종목' },
 ];
-const VARIANT_KEY = 'snm_home_variant';
+const VARIANT_KEY = 'snm_home_variant2'; // 메인 시안이 바뀌어 예전에 고른 값은 무시 (11/16)
 function useHomeVariant() {
   const [params, setParams] = useSearchParams();
   const [saved, setSaved] = useState(() => {
@@ -59,7 +59,7 @@ function useHomeVariant() {
     }
   });
   const fromUrl = params.get('home');
-  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : VARIANTS.some((x) => x.key === saved) ? saved : 'stock'; // 기본 = 종목 지도 (11/16 사용자: impeccable 적용판을 메인으로)
+  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : VARIANTS.some((x) => x.key === saved) ? saved : 'mapcap'; // 기본 = '뉴스 지도 + 종목' (11/16 저녁 사용자: 이 후보를 메인으로)
   const set = (k) => {
     setSaved(k);
     try {
