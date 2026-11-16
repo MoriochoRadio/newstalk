@@ -6306,3 +6306,27 @@ a { text-underline-offset: 3px; }
 .cap-map .cm-tile .cm-news.cm-n2 { color: var(--buzz); }
 .cap-map .cm-tile .cm-news.cm-n3 { color: var(--buzz); font-weight: 800; background: color-mix(in srgb, var(--buzz-solid) 16%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--buzz-solid) 30%, transparent); }
 .cap-map .cm-tile .cm-news { opacity: 1; padding: 2px 9px; }
+
+/* ===== 시장 지도: 업종 상자 + 머리줄 (11/16 저녁) ===== */
+.cm-sector-box { border-radius: 14px; background: color-mix(in srgb, var(--text-3) 7%, var(--surface)); box-shadow: inset 0 0 0 1px var(--line); }
+.cm-sector-box .cm-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  line-height: 28px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cm-head-name { overflow: hidden; text-overflow: ellipsis; }
+.cm-head-rate { font-size: var(--fs-xs); font-weight: 700; color: var(--text-2); }
+.cm-head-rate.up { color: var(--up); }
+.cm-head-rate.down { color: var(--down); }
+.cm-head-news { margin-left: auto; font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }

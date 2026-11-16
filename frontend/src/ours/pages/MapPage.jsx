@@ -99,7 +99,7 @@ export default function MapPage() {
         {issues.loading && !issues.data && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
         {showCap && (
           <>
-            <CapMap items={capMap.data.items} news={capNews} height={height} />
+            <CapMap items={capMap.data.items} news={capNews} height={height} maxShare={0.14} />
             <CapLegend />
           </>
         )}

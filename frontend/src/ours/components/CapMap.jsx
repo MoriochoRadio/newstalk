@@ -9,7 +9,9 @@ import { Link } from 'react-router-dom';
 import { squarify } from './MarketMap';
 import { fmtRate } from '../lib/format';
 
-const HEAD = 20; // 업종 이름 줄 높이
+const HEAD = 28; // 업종 머리줄 높이 (이름 · 평균 등락 · 기사 수)
+const PAD = 6; // 업종 상자 안 여백
+const SGAP = 10; // 업종 상자 사이
 const GAP = 6; // 칸 사이 여백 (꽉 찬 느낌 줄이기)
 
 function useWidth(ref) {
@@ -87,22 +89,44 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
     }
     const weightOf = (x) => Math.min(raw.get(x.stockCode), capW);
     // 칸마다 오른쪽·아래 여백(GAP)을 빼므로 전체를 GAP 만큼 크게 나눠야 끝이 상자 끝과 맞음
-    const secRects = squarify(sectors.map((s) => s.list.reduce((t, x) => t + weightOf(x), 0)), width + GAP, height + GAP);
+    // 업종으로 나눈 지도면(시장 지도 화면) 업종마다 옅은 상자 + 머리줄(이름·평균 등락·기사 수) — 11/16 사용자: 업종 구분이 더 직관적으로
+    const grouped = sectors.some((x) => x.name);
+    const sg = grouped ? SGAP : GAP;
+    const secRects = squarify(sectors.map((x) => x.list.reduce((t, y) => t + weightOf(y), 0)), width + sg, height + sg);
     return secRects.map((r) => {
-      const s = sectors[r.i];
-      const showHead = Boolean(s.name) && r.h >= HEAD + 30 && r.w >= 60;
-      const top = showHead ? HEAD : 0;
-      const inner = squarify(s.list.map((x) => weightOf(x)), Math.max(0, r.w), Math.max(0, r.h - top));
-      return { ...r, name: s.name, showHead, tiles: inner.map((t) => ({ ...t, it: s.list[t.i] })) };
+      const sct = sectors[r.i];
+      const bw = r.w - (grouped ? SGAP : 0);
+      const bh = r.h - (grouped ? SGAP : 0);
+      const showHead = Boolean(sct.name) && bh >= HEAD + 40 && bw >= 70;
+      const top = showHead ? HEAD : grouped ? PAD : 0;
+      const pad = grouped ? PAD : 0;
+      // 칸이 오른쪽·아래 GAP 을 빼므로 상자 안을 GAP 만큼 넓게 나눔 (상자 없는 홈 지도는 예전 그대로)
+      const inner = squarify(sct.list.map((x) => weightOf(x)), Math.max(0, grouped ? bw - pad * 2 + GAP : bw), Math.max(0, grouped ? bh - top - pad + GAP : bh - top));
+      // 업종 평균 등락(시가총액 가중)·오늘 기사 수
+      const capSum = sct.list.reduce((t, x) => t + (x.marketCap || 0), 0) || 1;
+      const avg = sct.list.reduce((t, x) => t + (x.marketCap || 0) * (Number(x.changeRate) || 0), 0) / capSum;
+      const newsSum = sct.list.reduce((t, x) => t + (news[x.stockCode]?.count || 0), 0);
+      return { ...r, w: bw, h: bh, name: sct.name, grouped, showHead, top, pad, avg, newsSum, tiles: inner.map((t) => ({ ...t, it: sct.list[t.i] })) };
     });
-  }, [items, width, height, limit, maxShare]);
+  }, [items, width, height, limit, maxShare, news]);
 
   return (
     <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)}>
       {layout.map((sec) => (
-        <section key={sec.name} className="cm-sector" style={{ left: sec.x, top: sec.y, width: sec.w, height: sec.h }} aria-label={`${sec.name} 업종`}>
-          {sec.showHead && <h3 className="cm-head">{sec.name}</h3>}
-          <ul style={{ top: sec.showHead ? HEAD : 0 }}>
+        <section
+          key={sec.name}
+          className={`cm-sector ${sec.grouped ? 'cm-sector-box' : ''}`}
+          style={{ left: sec.x, top: sec.y, width: sec.w, height: sec.h }}
+          aria-label={sec.name ? `${sec.name} 업종` : undefined}
+        >
+          {sec.showHead && (
+            <h3 className="cm-head">
+              <span className="cm-head-name">{sec.name}</span>
+              {sec.w >= 150 && <span className={`cm-head-rate num ${sec.avg > 0.05 ? 'up' : sec.avg < -0.05 ? 'down' : ''}`}>{fmtRate(Math.round(sec.avg * 100) / 100)}</span>}
+              {sec.w >= 220 && <span className="cm-head-news num">기사 {sec.newsSum}건</span>}
+            </h3>
+          )}
+          <ul style={{ top: sec.top, left: sec.pad, right: sec.pad, bottom: sec.pad }}>
             {sec.tiles.map((t) => {
               const it = t.it;
               const n = news[it.stockCode]?.count || 0;
@@ -144,8 +168,8 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
                     to={`/stocks/${it.stockCode}`}
                     className={`cm-tile ${capHeat(it.changeRate)} ${roomy ? 'cm-roomy' : ''}`}
                     aria-label={label}
-                    onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + t.x + w / 2, y: sec.y + (sec.showHead ? HEAD : 0) + t.y + h })}
-                    onFocus={() => setTip({ it, sec: sec.name, n, x: sec.x + t.x + w / 2, y: sec.y + (sec.showHead ? HEAD : 0) + t.y + h })}
+                    onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
+                    onFocus={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
                     onBlur={() => setTip(null)}
                   >
                     <span className="cm-main">
