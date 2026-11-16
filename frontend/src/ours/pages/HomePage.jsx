@@ -58,7 +58,7 @@ function useHomeVariant() {
     }
   });
   const fromUrl = params.get('home');
-  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : VARIANTS.some((x) => x.key === saved) ? saved : 'list';
+  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : VARIANTS.some((x) => x.key === saved) ? saved : 'stock'; // 기본 = 종목 지도 (11/16 사용자: impeccable 적용판을 메인으로)
   const set = (k) => {
     setSaved(k);
     try {
