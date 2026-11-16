@@ -737,6 +737,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
             {/* 기간 최고·최저: 축 위 상자로 두면 눈금 숫자를 가려서(11/16 리뷰) 값 줄로 옮김. 차트에는 점선만 */}
             {!isIntraday(unit) && span.length > 1 && (
               <span className="muted">
+                {/* 차트의 점선 두 줄이 이 값이라는 것을 같은 점선 표시로 (11/16 리뷰: 이름 없는 점선) */}
+                <i className="hl-swatch" aria-hidden="true" />
                 <span className="k">기간 최고</span>
                 <b>{fmt(spanHi)}</b>
                 <span className="k" style={{ marginLeft: 8 }}>최저</span>

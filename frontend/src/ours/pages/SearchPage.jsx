@@ -7,6 +7,7 @@ import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
 import { useTitle } from '../lib/hooks';
 import { StoryFeed } from '../components/ArticleRow';
+import { HighlightContext } from '../components/Tone';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { iGa } from '../lib/josa';
 
@@ -121,7 +122,9 @@ export default function SearchPage() {
         {res.error && <ErrorBox error={res.error} onRetry={res.reload} />}
         {res.data && articles.length === 0 && <p className="sub">제목·요약·키워드에 ‘{q}’{iGa(q)} 들어간 글이 없어요.</p>}
         {articles.length > 0 && (
-          <StoryFeed articles={articles} style={{ opacity: res.loading ? 0.5 : 1 }} />
+          <HighlightContext.Provider value={q}>
+            <StoryFeed articles={articles} style={{ opacity: res.loading ? 0.5 : 1 }} />
+          </HighlightContext.Provider>
         )}
         {res.data && <Pager page={page} size={SIZE} total={articleTotal} onChange={(n) => set({ page: n > 1 ? String(n) : '' })} />}
       </section>

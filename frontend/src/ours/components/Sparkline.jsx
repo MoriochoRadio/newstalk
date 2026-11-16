@@ -31,10 +31,18 @@ export default function Sparkline({ code, name, disabled = false }) {
     return () => io.disconnect();
   }, [disabled]);
 
+  // 실패하면 1분 뒤 다시 (화면에 계속 떠 있는 표는 예전엔 다른 화면에 갔다 와야 다시 받았음 — 11/16 코드 리뷰)
+  const [retry, setRetry] = useState(0);
+  const failed = entry?.status === 'failed';
+  useEffect(() => {
+    if (!failed) return undefined;
+    const t = setTimeout(() => setRetry((n) => n + 1), 61_000);
+    return () => clearTimeout(t);
+  }, [failed]);
   useEffect(() => {
     if (!visible || disabled) return undefined;
     return wantSpark(code, (e) => setEntry({ status: e.status, data: e.data }));
-  }, [code, visible, disabled]);
+  }, [code, visible, disabled, retry]);
 
   if (disabled || entry?.status === 'failed') return <span className="spark" aria-hidden="true" ref={boxRef} />;
   // 기다리는 동안은 반짝이는 회색 대신 빈 칸 (11/16 디자이너 리뷰: 표 절반이 반짝여 고장 난 화면처럼 보였음)

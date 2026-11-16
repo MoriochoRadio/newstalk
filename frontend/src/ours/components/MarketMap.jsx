@@ -110,7 +110,7 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
           const h = r.h - GAP;
           const big = w >= 160 && h >= 110;
           const showRate = w >= 64 && h >= 52;
-          const limit = t.rate != null && Math.abs(t.rate) >= 29.5;
+          const limit = t.limit; // 'up'·'down'·null (MapPage 가 limitOf 로 넘김)
           const showName = w >= 44 && h >= 30;
           // 이름이 칸 너비를 넘지 않게 (한글 한 자 ≈ 1em, 좌우 여백 약 20px). 최소 11px
           const nameSize = Math.round(Math.max(11, Math.min(22, Math.sqrt(w * h) / 9, (w - 20) / (Math.max(2, t.name.length) * 0.95))));
@@ -136,7 +136,7 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
                     {/* 종목 목록과 같게 ±30% 근처면 상한가·하한가 (11/16 PM 2차 리뷰: 지도에만 없었음) */}
                     {/* 좁은 칸에선 잘려 '상'만 보였음 → 넓은 칸만, 그때는 기사 수 대신 (11/16 3차 리뷰) */}
                     {limit && w >= 100 ? (
-                      <span className="map-limit">{t.rate > 0 ? ' 상한가' : ' 하한가'}</span>
+                      <span className="map-limit">{limit === 'up' ? ' 상한가' : ' 하한가'}</span>
                     ) : (
                       w >= 120 && <span className="map-count"> 기사 {t.articleCount}</span>
                     )}

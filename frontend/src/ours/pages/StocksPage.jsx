@@ -180,7 +180,7 @@ export default function StocksPage() {
                         {!disabled && (
                           <td className={`r change ${dirClass(q?.changeRate)}`}>
                             {q ? fmtRate(q.changeRate) : ''}
-                            {q && <LimitBadge rate={q.changeRate} />}
+                            {q && <LimitBadge quote={q} />}
                           </td>
                         )}
                       </tr>

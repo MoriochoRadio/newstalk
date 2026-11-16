@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 // 좋은·나쁜 소식 한눈에 (11/12 사용자: "딱 봤을 때 안 좋은 기사네? 좋은 기사네? 를 생각하지 않아도 떠먹여 주듯이")
 // 두 가지를 나눠서 보여 줌 — 근거의 종류가 다르기 때문
 // 1) TitleText: 제목은 그대로 (↑↓ 에 색을 입히던 시도는 값이 떨어진 것처럼 읽혀서 뺌)
@@ -14,8 +15,21 @@ export const TONE_TIP = 'AI가 기사·공시 내용을 읽고 이 회사에 좋
 
 /** 제목 그대로 (11/12 저녁: ↑↓ 숫자에 빨강·파랑을 입혔더니 "주식이 떨어진 것처럼 느껴진다" → 색 없음.
  *  자리만 남겨 둠: 나중에 제목 강조를 다시 시험할 때 이곳만 바꾸면 됨) */
+// 검색 화면에서만 검색어를 <mark> 로 (11/16 디자이너 리뷰: 결과에서 왜 걸렸는지 안 보였음). 다른 화면은 값이 '' 라 그대로
+export const HighlightContext = createContext('');
+
+export function Highlight({ text }) {
+  const q = useContext(HighlightContext).trim();
+  const s = String(text || '');
+  if (!q) return s;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 검색어의 특수 문자는 글자 그대로
+  const parts = s.split(new RegExp(`(${escaped})`, 'gi'));
+  if (parts.length === 1) return s;
+  return parts.map((p, i) => (i % 2 ? <mark key={i}>{p}</mark> : p));
+}
+
 export function TitleText({ text }) {
-  return String(text || '');
+  return <Highlight text={text} />;
 }
 
 /** 제목에 쓰인 방향: 'up' | 'down' | null (둘 다 있거나 없으면 null) */

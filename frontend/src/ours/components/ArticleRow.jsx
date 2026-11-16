@@ -7,7 +7,7 @@ import { ChevronDown, ExternalLink } from 'lucide-react';
 import { groupStories } from '../lib/stories';
 import { relativeTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
-import Tone, { TitleText, toneOf, toneRowClass } from './Tone';
+import Tone, { Highlight, TitleText, toneOf, toneRowClass } from './Tone';
 
 export const SAME_NEWS_TIP = '같은 종목·24시간 안·제목이 비슷한 기사를 같은 소식으로 묶은 수예요. 묶음은 틀릴 수 있어요.';
 const CORRECTION_TIP = '앞서 낸 공시를 고쳐 다시 낸 공시예요.';
@@ -148,7 +148,11 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
           <TitleText text={a.title} />
         </Link>
       )}
-      {summary && !compact && <p className="feed-summary">{summary}</p>}
+      {summary && !compact && (
+        <p className="feed-summary">
+          <Highlight text={summary} />
+        </p>
+      )}
       {/* 종목 칩과 언론·시각을 한 줄로 (11/13: 글마다 세 줄이라 스크롤이 길었음). 좁으면 자연히 두 줄 */}
       <div className="feed-foot">
         {(tags.length > 0 || a.relatedStocks.length > 0) && (

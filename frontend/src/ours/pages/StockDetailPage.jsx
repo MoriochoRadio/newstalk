@@ -80,7 +80,7 @@ function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePa
             </div>
             <div className={`change ${cls}`}>
               {fmtAmount(quote.changeAmount)} ({fmtRate(quote.changeRate)})
-              <LimitBadge rate={quote.changeRate} />
+              <LimitBadge quote={quote} />
             </div>
             <p className="basis num">
               전일 대비 · {paused ? `${shortTime(quote.fetchedAt)} 값에서 멈춤` : `${quote.live ? '실시간' : `${shortTime(quote.fetchedAt)} 기준`} · ${marketState().label}`}
@@ -333,7 +333,9 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
             // 등락률 옆에 '…폭락에 개미들 비명' 같은 시세 기사가 오면 그 기사 때문에 움직인 것처럼 읽힘 (11/16 PM 2차 리뷰)
             // → 시세 기사가 아닌 첫 기사. 그날 기사가 시세 기사뿐이면 제목 대신 건수만
             // 받은 3건이 모두 시세 기사면 첫 기사를 '시세 기사' 꼬리표와 함께 (모호한 안내 문장 대신 — 11/16 4차 리뷰)
-            const nonPrice = m.articles?.find((a) => !isPriceMoveTitle(a.title));
+            // 서버가 priceMoveTitle 을 주면 그대로(그리고 시세 기사를 뒤로 보내 줌), 옛 서버면 같은 낱말 규칙
+            const isPrice = (a) => (a.priceMoveTitle !== undefined ? a.priceMoveTitle : isPriceMoveTitle(a.title));
+            const nonPrice = m.articles?.find((a) => !isPrice(a));
             const top = nonPrice || m.articles?.[0];
             // 오늘 줄은 머리의 실시간 값으로 (서버 일봉은 캐시라 -7.07% vs 머리 -7.44% 처럼 달랐음 — 4차 리뷰)
             const isToday = m.date === todayKst();

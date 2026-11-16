@@ -114,10 +114,19 @@ export function Segmented({ options, value, onChange, label, size }) {
 
 /** 현재가 + 등락률 (상승 빨강·하락 파랑). quote 가 없으면 "–" */
 /** 상한가·하한가 표시 (국내 가격제한폭 ±30%, 반올림 오차를 생각해 ±29.5% 이상). 11/16 MTS PM 리뷰: +29.97% 가 오류처럼 보였음 */
-export function LimitBadge({ rate }) {
+/** 상한가·하한가: 서버가 KIS 판정(priceLimit: UPPER·LOWER·null)을 주면 그대로, 칸이 없는 옛 서버·실시간 체결이면 ±29.5% 어림 */
+export function limitOf(quote) {
+  if (!quote) return null;
+  if (quote.priceLimit !== undefined) return quote.priceLimit === 'UPPER' ? 'up' : quote.priceLimit === 'LOWER' ? 'down' : null;
+  const rate = quote.changeRate;
   if (rate == null || Math.abs(rate) < 29.5) return null;
-  const up = rate > 0;
-  return <span className={`limit-badge ${up ? 'limit-up' : 'limit-down'}`}>{up ? '상한가' : '하한가'}</span>;
+  return rate > 0 ? 'up' : 'down';
+}
+
+export function LimitBadge({ quote }) {
+  const limit = limitOf(quote);
+  if (!limit) return null;
+  return <span className={`limit-badge limit-${limit}`}>{limit === 'up' ? '상한가' : '하한가'}</span>;
 }
 
 export function PriceCell({ quote, stacked = true }) {
@@ -133,7 +142,7 @@ export function PriceCell({ quote, stacked = true }) {
     return (
       <span className="num" style={{ whiteSpace: 'nowrap' }}>
         <b>{fmtPrice(quote.price)}</b> <span className={`change ${cls}`}>{fmtRate(quote.changeRate)}</span>
-        <LimitBadge rate={quote.changeRate} />
+        <LimitBadge quote={quote} />
       </span>
     );
   }
@@ -144,7 +153,7 @@ export function PriceCell({ quote, stacked = true }) {
       </span>
       <span className={`r ${cls}`}>
         {fmtRate(quote.changeRate)}
-        <LimitBadge rate={quote.changeRate} />
+        <LimitBadge quote={quote} />
       </span>
     </span>
   );

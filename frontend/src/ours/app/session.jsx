@@ -110,6 +110,11 @@ export function SessionProvider({ children }) {
   const handleAuthError = useCallback(
     (err, reason) => {
       if (err?.status === 401) {
+        // 다시 로그인한 직후 늦게 돌아온 옛 토큰 요청의 401: 새 토큰은 그대로라(client 가 안 지움) 로그아웃하지 않음 (11/16 2차 코드 리뷰)
+        if (tokenStore.get()) {
+          toast('잠시 뒤 다시 눌러 주세요.');
+          return true;
+        }
         setUser(null);
         const next = { mode: 'login', reason: reason || '로그인이 끝났어요. 다시 로그인해 주세요.' };
         authModalRef.current = next; // 만료 알림(onExpired)이 렌더 전에 보고 겹쳐 띄우지 않게
@@ -118,7 +123,7 @@ export function SessionProvider({ children }) {
       }
       return false;
     },
-    []
+    [toast]
   );
 
   const watchCodes = useMemo(() => new Set(watchlist.items.map((w) => w.stockCode)), [watchlist.items]);

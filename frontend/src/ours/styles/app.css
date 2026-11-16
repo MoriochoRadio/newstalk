@@ -5554,3 +5554,12 @@ html:has(.sec-nav) {
 .stock-head .stock-price { max-width: 100%; min-width: 0; }
 .price-news { max-width: min(520px, 100%); }
 .tag-mini { display: inline-block; margin-right: 6px; padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+
+/* 검색어 강조 (검색 화면만) — 형광펜 대신 글자색이 바뀌지 않는 옅은 배경 */
+mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit; border-radius: 2px; padding: 0 1px; }
+/* 글 화면 PC: 오른쪽 연결 지도가 따라 내려와 아래쪽이 비어 보이지 않게 */
+@media (min-width: 1100px) {
+  .ad-grid > .ad-link { position: sticky; top: 76px; }
+}
+
+.hl-swatch { display: inline-block; width: 14px; margin-right: 4px; vertical-align: middle; border-top: 1px dashed var(--text-3); }

@@ -10,7 +10,7 @@ import { todayLabel } from '../lib/format';
 import { loadTodayFeed, pickWhy } from '../lib/todayFeed';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import Movers from '../components/Movers';
-import { Empty, ErrorBox } from '../components/ui';
+import { Empty, ErrorBox, limitOf } from '../components/ui';
 import { Link } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 
@@ -50,6 +50,7 @@ export default function MapPage() {
     eventCount: it.eventCount,
     disclosureCount: it.disclosureCount,
     rate: quotes[it.stockCode]?.changeRate ?? null,
+    limit: limitOf(quotes[it.stockCode]),
     why: whyOf(it.stockCode),
   }));
 
