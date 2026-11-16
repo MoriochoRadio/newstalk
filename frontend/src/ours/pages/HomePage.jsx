@@ -19,7 +19,7 @@ import { topicMix } from '../components/TopicMix';
 import { groupStories } from '../lib/stories';
 import { rankStories } from '../components/TopStories';
 import { usePerStock } from '../components/HotStocks';
-import { NewsPulse } from '../components/NewsMap';
+import HomeSummary from '../components/HomeSummary';
 import StoryBoard from '../components/StoryBoard';
 import LivePill from '../components/LivePill';
 import { leanOf } from '../components/Tone';
@@ -29,7 +29,7 @@ import { dirClass } from '../lib/format';
 const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
 const TOP_N = 5; // 1~5위 제목 목록 (11/13 피드백: 순위만, 여백 없이)
 const WATCH_N = 8; // 관심 종목 한 줄
-const MAP_STORIES = 6; // 소식 카드 수: 1위 큰 카드 + 5장 = 3줄 (11/16 저녁 지도 → 카드)
+const MAP_STORIES = 8; // 많이 보도된 소식 목록 줄 수 (11/16 저녁 지도 → 큼직한 목록)
 
 /** 화면 낭독기용 한 줄 (눈에는 지도가 말함). 데이터로 만든 문장, LLM 아님. 사실만: 기사 때문이라고 말하지 않음 */
 function headline(newsCount, storyCount, issues, quotes) {
@@ -140,20 +140,18 @@ export default function HomePage() {
         <LivePill className="mobile-pill" />
       </div>
 
+      {/* 1) 한눈에 요약: 숫자·막대로 먼저 (11/16 저녁 사용자: "시각화로 먼저 떠먹여 주고, 그 밑에 자세히") */}
       <section className="card news-hero" aria-labelledby="hero-title">
         <div className="card-head">
           <h2 className="card-title" id="hero-title">
             <Newspaper className="icon" aria-hidden="true" />
-            오늘 많이 보도된 소식
+            오늘 한눈에
           </h2>
-          <Link to="/news?period=today" className="link">
-            소식 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
-          </Link>
         </div>
         {feed.error && !feed.data ? (
           <ErrorBox error={feed.error} onRetry={feed.reload} />
         ) : feed.data && newsArticles.length === 0 ? (
-          // 자정 직후·수집이 멈췄을 때: 빈 지도 대신 (11/16 발표 아침 대비)
+          // 자정 직후·수집이 멈췄을 때 (11/16 발표 아침 대비)
           <Empty
             icon={Newspaper}
             title="아직 오늘 뉴스가 없어요"
@@ -169,19 +167,35 @@ export default function HomePage() {
             }
           />
         ) : feed.loading && !feed.data ? (
-          <div className="hero-grid">
-            <div className="skeleton" style={{ height: 460, borderRadius: 'var(--radius)' }} />
-            <SkeletonRows rows={4} />
-          </div>
+          <div className="skeleton" style={{ height: 150, borderRadius: 'var(--radius)' }} />
         ) : (
-          <div className="hero-grid">
-            <StoryBoard stories={mapStories} />
-            <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
-          </div>
+          <HomeSummary
+            articles={newsArticles}
+            storyCount={storyCount}
+            disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length}
+            topics={topics}
+            issues={issueItems}
+          />
         )}
       </section>
 
       {hasWatch && <WatchStrip quotes={quotes} />}
+
+      {/* 2) 자세히: 많이 보도된 소식을 큼직한 목록으로 (지도·카드판 대신 — 긴 제목이 다 읽히게) */}
+      {!(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
+        <section className="card" aria-labelledby="rank-title">
+          <div className="card-head">
+            <h2 className="card-title" id="rank-title">
+              오늘 많이 보도된 소식
+            </h2>
+            <Link to="/news?period=today" className="link">
+              소식 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
+            </Link>
+          </div>
+          {feed.loading && !feed.data ? <SkeletonRows rows={5} /> : <StoryBoard stories={mapStories} />}
+        </section>
+      )}
+
 
       <nav className="home-links" aria-label="더 보기">
         <Link to="/map" className="home-link">
