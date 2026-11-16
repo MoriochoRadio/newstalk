@@ -913,9 +913,20 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
               <span className="badge badge-outline num">
                 {unit === 'day' ? `${dayRangeLabel(prev?.t, bar.t)} 기사 ${barNews.count}건` : `이 봉 기사 ${barNews.count}건`}
               </span>
-              {/* 이 종목이 중심인 기사를 먼저 ('함께 언급' 기사가 대표로 나왔음 — 4차 리뷰) */}
+              {/* 대표 제목: 이 종목이 주인공인 기사 중 같은 소식(여러 언론이 다룬 수)이 가장 많은 것, 시세 기사·공시는 뒤로
+                  (4차 리뷰: '함께 언급' 기사가 대표 / 11/16 밤 액터: 삼성전자 -5.34% 날 대표가 '파트장 은탑훈장' — 가장 최근 기사였음) */}
               {(() => {
-                const pick = barNews.items.find((x) => x.relatedStocks?.some((s) => s.code === stockCode && s.role === 'MAIN')) || barNews.items[0];
+                const mainOf = (x) => x.relatedStocks?.find((s) => s.code === stockCode && s.role === 'MAIN');
+                const score = (x) => {
+                  const m = mainOf(x);
+                  if (!m) return -1;
+                  return (x.priceMoveTitle || x.isDisclosure ? 0 : 1000) + (m.sameNewsCount || 1);
+                };
+                // 크게 움직인 날이면 '크게 움직인 날' 카드와 같은 기사 (같은 날 두 칸 제목이 달랐음)
+                const move = unit === 'day' && typeof bar.t === 'string' ? (moves || []).find((m) => m.date === bar.t) : null;
+                const moveTop = move?.articles?.find((a) => !a.priceMoveTitle) || null;
+                if (moveTop) return <Link to={`/news/${moveTop.articleId}`}>{moveTop.title}</Link>;
+                const pick = [...barNews.items].sort((a, b) => score(b) - score(a))[0] || barNews.items[0];
                 return pick ? <Link to={`/news/${pick.id}`}>{pick.title}</Link> : null;
               })()}
             </>

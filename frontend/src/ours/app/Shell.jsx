@@ -1,6 +1,6 @@
 // 앱 틀: 데스크톱은 왼쪽 메뉴 + 위 검색줄, 휴대폰(768 이하)은 위 작은 줄 + 아래 탭 4개
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
@@ -223,8 +223,55 @@ export default function Shell() {
   // 새 화면은 맨 위부터 (뒤로 가기는 브라우저가 기억한 위치)
   // + 초점을 본문으로 (11/13 키보드 점검: 기사를 열면 초점이 문서 처음으로 돌아가 Tab 을 10번 넘게 다시 눌러야 본문). 첫 화면은 그대로
   const firstRoute = useRef(true);
+  // 뒤로 가기 위치 (11/16 밤 액터: 목록을 1000px 내려 기사를 열고 돌아오면 188px).
+  // 목록은 돌아온 뒤 다시 받아서 처음엔 짧음 → 브라우저가 위치를 못 맞춤. 화면마다(location.key) 위치를 적어 두고,
+  // 뒤로 가기면 목록이 그만큼 길어질 때까지(최대 3초) 기다렸다가 맞춤
+  const scrollPos = useRef(new Map());
+  const keyRef = useRef(location.key);
   useEffect(() => {
-    if (navType !== 'POP') window.scrollTo(0, 0);
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+    // 타이머로 (requestAnimationFrame 은 가려진 창에서 멈춰 위치가 안 적혔음)
+    let timer = 0;
+    const onScroll = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => scrollPos.current.set(keyRef.current, window.scrollY), 60);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(timer);
+    };
+  }, []);
+  // 화면이 바뀌면 그리기 전에 '지금 화면' 표시부터 바꿈: 새 화면이 짧아 브라우저가 스크롤을 줄일 때 그 값이 이전 화면 위치를 덮어썼음
+  useLayoutEffect(() => {
+    keyRef.current = location.key;
+  }, [location.key]);
+  useEffect(() => {
+    if (navType !== 'POP') return undefined;
+    const target = scrollPos.current.get(location.key) || 0;
+    if (!target) return undefined;
+    let timer = 0;
+    const until = performance.now() + 3000;
+    // 3초 동안 목록 길이가 바뀔 때마다 다시 맞춤 (돌아오면 목록을 다시 받으며 잠깐 뼈대로 짧아져 맞춘 위치가 0으로 밀렸음)
+    const tryRestore = () => {
+      const room = document.documentElement.scrollHeight - window.innerHeight;
+      const want = Math.min(target, Math.max(0, room));
+      if (Math.abs(window.scrollY - want) > 2) window.scrollTo({ top: want, left: 0, behavior: 'instant' });
+      if (performance.now() < until) timer = setTimeout(tryRestore, 50);
+    };
+    timer = setTimeout(tryRestore, 0);
+    // 사용자가 직접 스크롤·키보드를 쓰면 그만
+    const stop = () => clearTimeout(timer);
+    const opts = { once: true, passive: true };
+    ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((ev) => window.addEventListener(ev, stop, opts));
+    return () => {
+      clearTimeout(timer);
+      ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((ev) => window.removeEventListener(ev, stop));
+    };
+  }, [location.key, navType]);
+  useEffect(() => {
+    // behavior 'instant': html 에 scroll-behavior: smooth 가 있어 미끄러지는 동안 새 화면 내용이 바뀌면 중간(188·598px)에서 멈췄음 (11/16 밤)
+    if (navType !== 'POP') window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     setMobileSearch(false);
     if (firstRoute.current) {
       firstRoute.current = false;

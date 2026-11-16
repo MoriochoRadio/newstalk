@@ -140,7 +140,7 @@ function WatchStrip({ quotes }) {
                   {!pos && !neg && <span aria-hidden="true">&nbsp;</span>}
                 </span>
                 <span className="ws-price num">
-                  {q && q.price != null ? <span>{fmtPrice(q.price)}</span> : <span className="muted">–</span>}
+                  {q && q.price != null ? <span>{fmtPrice(q.price)}원</span> : <span className="muted">–</span>}
                   {q && q.changeRate != null && <b className={dirClass(q.changeRate)}>{fmtRate(q.changeRate)}</b>}
                 </span>
               </Link>

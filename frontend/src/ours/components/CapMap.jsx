@@ -174,7 +174,8 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               const heat = capHeatStyle(it.changeRate);
               const limit = it.priceLimit === 'UPPER' ? ' 상한가' : it.priceLimit === 'LOWER' ? ' 하한가' : '';
               const rateText = it.changeRate == null || Number.isNaN(Number(it.changeRate)) ? '등락 정보 없음' : fmtRate(it.changeRate);
-              const label = [it.stockName, it.sectorName || sec.name, sizeKind === 'cap' ? `시가총액 ${capText(it.marketCap)}` : null, `${rateText}${limit}`, `오늘 기사 ${n}건`]
+              // 업종은 읽지 않음: 지도는 거래소 업종(전기·전자), 종목 화면은 표준산업분류(통신 및 방송 장비 제조업)라 서로 달라 보였음 (11/16 밤 액터)
+              const label = [it.stockName, sec.name || null, sizeKind === 'cap' ? `시가총액 ${capText(it.marketCap)}` : null, `${rateText}${limit}`, `오늘 기사 ${n}건`]
                 .filter(Boolean)
                 .join(', ');
               return (
@@ -229,7 +230,7 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
           style={{ left: Math.max(0, Math.min(Math.max(8, tip.x - 140), width - 288)), ...(tip.y + 120 > height ? { bottom: height - tip.top + 6 } : { top: tip.y + 6 }) }}
           role="presentation"
         >
-          <b>{tip.it.stockName}</b> <span className="muted">{tip.it.sectorName || tip.sec}</span>
+          <b>{tip.it.stockName}</b>
           <div className="num">
             {sizeKind === 'cap' ? `시가총액 ${capText(tip.it.marketCap)} · ` : ''}<span className={tip.it.changeRate > 0 ? 'up' : tip.it.changeRate < 0 ? 'down' : ''}>{fmtRate(tip.it.changeRate)}</span>
           </div>

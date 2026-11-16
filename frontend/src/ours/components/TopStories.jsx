@@ -123,10 +123,12 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                 {/* 지도 칸의 '기사 n건'(그 종목 오늘 기사 전부)과 구분 (11/16 밤 PM) */}
                 <span>같은 소식 {st.size || 1}건</span>
                 {/* 14px 링(글자 없음)이 로딩 표시처럼 보였음 → 메타 줄 끝에 짧은 글자 (11/16 디자이너 2차 리뷰) */}
-                {(c.pos > 0 || c.neg > 0) && (
+                {c.pos > 0 || c.neg > 0 ? (
                   <span className={`st-tone ${c.pos && c.neg ? 'mixed' : c.pos ? 'good' : 'bad'}`}>
                     {c.pos && c.neg ? '좋은·나쁜 함께' : c.pos ? '좋은 소식' : '나쁜 소식'}
                   </span>
+                ) : (
+                  <span className="st-tone st-tone-none">판단 없음</span>
                 )}
               </span>
             </span>

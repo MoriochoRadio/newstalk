@@ -19,8 +19,9 @@ const TABS = [
   { key: 'news', label: '뉴스' },
   { key: 'disclosure', label: '공시' },
 ];
+// 기본 = 오늘 (11/16 밤 디자이너: '전체 기간·최신순'이면 첫 화면이 상장폐지·거래정지 공시). 검색어가 있으면 기본 = 전체 기간
 const PERIODS = [
-  { key: '', label: '전체 기간' },
+  { key: 'all', label: '전체 기간' },
   { key: 'today', label: '오늘' },
   { key: '7d', label: '7일' },
   { key: '30d', label: '30일' },
@@ -107,7 +108,10 @@ export default function NewsPage() {
   const [params, setParams] = useSearchParams();
   const tab = TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'all';
   const q = params.get('q') || '';
-  const period = PERIODS.some((p) => p.key === params.get('period')) ? params.get('period') : '';
+  const periodParam = params.get('period');
+  const periodKey = PERIODS.some((p) => p.key === periodParam) ? periodParam : q ? 'all' : 'today';
+  const period = periodKey === 'all' ? '' : periodKey; // API 로 보내는 값 ('' = 전체)
+  const defaultPeriod = q ? 'all' : 'today';
   const sort = params.get('sort') === 'relevance' && tab !== 'disclosure' ? 'relevance' : 'latest'; // 공시 탭은 늘 최신순
   const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
   const [draft, setDraft] = useState(q);
@@ -187,7 +191,7 @@ export default function NewsPage() {
           </form>
         </div>
         <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-          <Segmented label="기간" size="sm" options={PERIODS} value={period} onChange={(k) => update({ period: k })} />
+          <Segmented label="기간" size="sm" options={PERIODS} value={periodKey} onChange={(k) => update({ period: k === defaultPeriod ? '' : k })} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {isAll && all.data && (
               <span className="result-count num" aria-live="polite">

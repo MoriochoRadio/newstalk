@@ -226,7 +226,18 @@ function SentimentCard({ summary }) {
       </div>
       {summary.loading && !s && <div className="skeleton" style={{ height: 114, borderRadius: 'var(--radius-sm)' }} />}
       {s && count === 0 && <p className="sub">오늘 좋은·나쁜 소식을 판단한 기사가 아직 없어요.</p>}
-      {s && count > 0 && (
+      {/* 기사 1~2건으로 '좋은 소식 100% · 좋은 소식이 더 많아요'가 나왔음 (11/16 밤 액터: SK스퀘어 -10.5% 날) → 3건 미만은 건수만 */}
+      {s && count > 0 && count < 3 && (
+        <p className="ratio-legend ratio-few num">
+          {(ratio.positiveCount ?? 0) > 0 && <span className="tb-pos">좋은 소식 {ratio.positiveCount}건</span>}
+          {(ratio.neutralCount ?? 0) > 0 && <span>판단 없음 {ratio.neutralCount}건</span>}
+          {(ratio.negativeCount ?? 0) > 0 && <span className="tb-neg">나쁜 소식 {ratio.negativeCount}건</span>}
+          <span className="muted">
+            AI가 읽은 오늘 {basis === 'event' ? '소식이' : '기사가'} {count}건뿐이라 비율은 보여 주지 않아요
+          </span>
+        </p>
+      )}
+      {s && count >= 3 && (
         <>
           {/* 시그니처 링(다른 화면과 같은 표시) + 비율 막대(정확한 비율은 막대가 더 잘 읽힘 — dataviz) */}
           <div className="ratio-ring-line">
@@ -443,8 +454,8 @@ function QuickSwitch({ code }) {
  * 종목 화면이 길어서(차트 → 요약 → 기사 10건 → 토론) 토론까지 한참 내려가야 했음. 탭으로 화면을 나누지 않고
  * 한 화면에 두되, 위에 붙는 바로 가기 줄로 이동 — 스크롤로 훑는 사람과 바로 가고 싶은 사람 둘 다 */
 const SECTIONS = [
-  { id: 'sec-chart', label: '차트' },
   { id: 'sec-summary', label: 'AI 요약' },
+  { id: 'sec-chart', label: '차트' },
   { id: 'big-moves', label: '움직인 날' }, // 11/16 F-17 카드 연결
   { id: 'related-news', label: '뉴스·공시' },
   { id: 'sec-mention', label: '언급량' },
@@ -561,7 +572,8 @@ function StockDetail({ code }) {
       />
       <SectionNav hide={moves.error?.code === 'QUOTE_DISABLED' ? 'big-moves' : null} />
       {/* 휴대폰에서는 순서를 바꿈 (11/13 사용자 눈으로 써 보기: "왜 떨어졌지?"의 답인 AI 요약이 화면 하나를 다 차지하는
-          차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사. 넓은 화면은 그대로 (CSS .stock-flow) */}
+          차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사.
+          넓은 화면도 11/16 밤부터 [AI 요약 | 좋은/나쁜 소식] → 차트 → [움직인 날 | 언급량] → 기사 (디자이너: AI 요약이 y≈1128) — CSS .stock-flow */}
       <div className="stock-flow">
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
