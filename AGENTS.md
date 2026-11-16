@@ -10,20 +10,20 @@ AI 에이전트는 작업 전에 이 문서를 읽어 주세요.
 ## 1. 프로젝트
 
 - 한경닷컴 IT교육센터 금융 팀프로젝트 (4명, 1차 마무리 목표 2026-11-20)
-- 주제: 뉴스·공시를 종목과 연결하고, 주가 거래 변동 시점과 매칭해 LLM으로 요약하는 웹 서비스
-- 데이터: 한국투자증권(KIS) Open API 시세, 뉴스·공시
+- 주제: 뉴스·공시가 어떤 종목에, 왜 영향을 주는지 AI(LLM)로 연결·요약해 보여 주는 웹 서비스
+- 데이터: 언론사 RSS 뉴스, DART 전자공시, 한국거래소(KIND) 종목 목록. 한국투자증권(KIS) 실시간 시세는 확장 기능
 - 핵심 기능을 먼저 완성하고, 확장 기능은 팀이 정한 뒤에 붙입니다.
 
 ## 2. 레포 구조
 
 | 폴더 | 내용 | 기술 |
 |---|---|---|
-| `backend/` | Spring Boot 서버 (시세 수집, 거래 변동 감지, 시간 윈도 매칭, 회원·관심종목, 화면용 API·SSE) | Java 21, Spring Boot 4.1, Gradle, MyBatis, MariaDB 11.8 |
+| `backend/` | Spring Boot 서버 (종목 사전, 화면용 API, 회원·관심 종목·토론 게시판, 확장: KIS 시세 조회·웹소켓·SSE) | Java 21, Spring Boot 4.1, Gradle, MyBatis, MariaDB 11.8 |
 | `ai/` | 뉴스·공시 수집, 기사-종목 연결, LLM 요약 | Python, FastAPI, LangChain |
-| `frontend/` | 사용자 대시보드 | React, Chart.js |
+| `frontend/` | 사용자 대시보드 | React |
 | `docs/` | 팀 공용 문서 (API 명세, DB 스키마, 결정 기록) | Markdown |
 
-- backend 기본 패키지: `com.hkteam2.stocknews` (하위 `common`, `stock`, `match`, `news`, `user`)
+- backend 기본 패키지: `com.hkteam2.stocknews` (하위 `common`, `stock`, `article`, `search`, `status`, `user`, `watchlist`, `board`, `quote`)
 - 백엔드 2명은 패키지 단위로 담당을 나눕니다.
 
 ## 3. 꼭 지킬 것
