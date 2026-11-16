@@ -258,6 +258,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | 🔓 | GET (SSE) | `/api/quotes/{stockCode}/replay?date=2026-11-03&from=09:00&speed=10` | **다시 보기**. 이벤트 `start` → `replay`(체결마다) → `end`. 배속 1·5·10·30·60 |
 | 🔓 | GET | `/api/quotes/check?date=` | 수집 점검: 종목별 저장 체결량 ÷ 실제 거래량(누적 거래량 차이) = `coverageRate`, 지연 ms |
 | 🔓 | GET | `/api/quotes/{stockCode}/big-moves?period=1y&threshold=5` | **과거 급등·급락 이력 (F-17)**. 하루 등락률이 ±`threshold`% 이상인 날(최신부터) + 그날 이 종목에 연결된 글. `period` `3m`·`6m`·`1y`(기본), `threshold` 3~30(기본 5) |
+| 🔓 | GET | `/api/quotes/market-map` | **종목 지도(시가총액 지도)**. 코스피·코스닥 시가총액 상위 각 30개(우선주 제외): `stockCode`, `stockName`, `market`, `sector`(거래소 업종, 못 받으면 "기타"), `marketCap`(억 원), `price`, `changeRate`, `priceLimit`. 순위 60초 캐시, 업종은 종목마다 하루 캐시 |
 
 현재가 한 건:
 

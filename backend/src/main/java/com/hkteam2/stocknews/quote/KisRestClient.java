@@ -40,6 +40,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class KisRestClient {
 
     private static final String BASE_PATH = "/uapi/domestic-stock/v1/quotations";
+    private static final String RANKING_PATH = "/uapi/domestic-stock/v1/ranking";
     private static final String RATE_LIMIT = "EGW00201";
     private static final int MAX_ATTEMPTS = 3;
     /** 연결 실패는 1번만 다시 (일시 끊김 대비). 응답이 느린 경우는 다시 안 함 → get() 설명 */
@@ -65,7 +66,18 @@ public class KisRestClient {
     record PriceOutput(@JsonProperty("stck_prpr") String price, @JsonProperty("prdy_vrss") String changeAmount,
                        @JsonProperty("prdy_vrss_sign") String changeSign, @JsonProperty("prdy_ctrt") String changeRate,
                        @JsonProperty("acml_vol") String accVolume, @JsonProperty("stck_oprc") String open,
-                       @JsonProperty("stck_hgpr") String high, @JsonProperty("stck_lwpr") String low) {
+                       @JsonProperty("stck_hgpr") String high, @JsonProperty("stck_lwpr") String low,
+                       @JsonProperty("hts_avls") String marketCap, @JsonProperty("bstp_kor_isnm") String sector) {
+    }
+
+    record CapRankResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
+                           @JsonProperty("msg1") String msg1, @JsonProperty("output") List<CapRankRow> rows) {
+    }
+
+    /** 시가총액 상위 한 줄 (2026-11-16 실제 응답으로 칸 확인: 코스피·코스닥 각 30개) */
+    record CapRankRow(@JsonProperty("mksc_shrn_iscd") String code, @JsonProperty("hts_kor_isnm") String name,
+                      @JsonProperty("stck_prpr") String price, @JsonProperty("prdy_vrss_sign") String changeSign,
+                      @JsonProperty("prdy_ctrt") String changeRate, @JsonProperty("stck_avls") String marketCap) {
     }
 
     record MinuteResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
@@ -112,7 +124,28 @@ public class KisRestClient {
         check(res == null ? null : res.rtCd(), res == null ? null : res.msgCd(), res == null ? null : res.msg1());
         PriceOutput o = res.output();
         return new KisPrice(stockCode, toLong(o.price()), toLong(o.changeAmount()), o.changeSign(),
-                toDecimal(o.changeRate()), toLong(o.accVolume()), toLong(o.open()), toLong(o.high()), toLong(o.low()));
+                toDecimal(o.changeRate()), toLong(o.accVolume()), toLong(o.open()), toLong(o.high()), toLong(o.low()),
+                toLong(o.marketCap()), o.sector() == null ? null : o.sector().strip());
+    }
+
+    /**
+     * 시가총액 상위 (국내주식 시가총액 상위 FHPST01740000). market: 0001 코스피 / 1001 코스닥. 한 번에 30개
+     * 시장 지도(종목 지도) 재료 — 2026-11-16 실제 응답으로 확인
+     */
+    public List<CapRankRow> rankMarketCap(String market) {
+        Map<String, String> params = new java.util.LinkedHashMap<>();
+        params.put("fid_cond_mrkt_div_code", "J");
+        params.put("fid_cond_scr_div_code", "20174");
+        params.put("fid_div_cls_code", "0");
+        params.put("fid_input_iscd", market);
+        params.put("fid_trgt_cls_code", "0");
+        params.put("fid_trgt_exls_cls_code", "0");
+        params.put("fid_input_price_1", "");
+        params.put("fid_input_price_2", "");
+        params.put("fid_vol_cnt", "");
+        CapRankResponse res = getRanking("/market-cap", "FHPST01740000", params, CapRankResponse.class);
+        check(res == null ? null : res.rtCd(), res == null ? null : res.msgCd(), res == null ? null : res.msg1());
+        return res.rows() == null ? List.of() : res.rows();
     }
 
     /**
@@ -188,8 +221,17 @@ public class KisRestClient {
      * - 응답이 느림(연결은 됐는데 읽기 시간 초과): 다시 안 함. 모든 호출이 한 줄로 서므로 느린 KIS를 또 기다리면
      *   뒤에 선 다른 종목 요청까지 밀림 (전에는 최악 약 32초 → 지금 약 16초 이하)
      */
+    /** 순위 API (/uapi/domestic-stock/v1/ranking/...) — 경로만 다르고 줄 서기·다시 시도는 get 과 같음 */
+    private <T> T getRanking(String path, String trId, Map<String, String> params, Class<T> type) {
+        return send(props.baseUrl() + RANKING_PATH + path, trId, params, type);
+    }
+
     private <T> T get(String path, String trId, Map<String, String> params, Class<T> type) {
-        UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(props.baseUrl() + BASE_PATH + path);
+        return send(props.baseUrl() + BASE_PATH + path, trId, params, type);
+    }
+
+    private <T> T send(String url, String trId, Map<String, String> params, Class<T> type) {
+        UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(url);
         params.forEach(uri::queryParam);
         int networkRetries = 0;
         for (int attempt = 1; ; attempt++) {

@@ -117,6 +117,12 @@ public class QuoteController {
         return service().status();
     }
 
+    @Operation(summary = "종목 지도(시가총액 지도)", description = "코스피·코스닥 시가총액 상위 각 30개(우선주 제외)와 업종·등락률. 순위 60초 캐시, 업종 하루 캐시. marketCap 은 억 원")
+    @GetMapping("/market-map")
+    public MarketMapResponse getMarketMap() {
+        return service().marketMap();
+    }
+
     @Operation(summary = "현재가 한 종목", description = "실시간으로 받는 종목이면 live=true(DB 현재가), 아니면 KIS 조회 5초 캐시. direction UP/DOWN/FLAT, 하락이면 changeAmount·changeRate 음수")
     @GetMapping("/{stockCode}")
     public QuoteResponse getQuote(@PathVariable String stockCode) {

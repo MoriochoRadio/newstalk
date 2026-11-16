@@ -39,6 +39,8 @@ import com.hkteam2.stocknews.common.TimeUtils;
 public class QuoteService {
 
     static final Duration PRICE_TTL = Duration.ofSeconds(5);
+    static final Duration MARKET_MAP_TTL = Duration.ofSeconds(60);   // 시가총액 순위 (코스피·코스닥 2번)
+    static final Duration SECTOR_TTL = Duration.ofHours(24);         // 업종은 거의 안 바뀜 → 종목당 하루 1번
     static final Duration MINUTE_TTL = Duration.ofSeconds(60);
     static final Duration DAY_TTL = Duration.ofMinutes(10);
     static final Duration TICK_TTL = Duration.ofSeconds(5);
@@ -102,6 +104,59 @@ public class QuoteService {
                     direction(p.changeSign()), p.open(), p.high(), p.low(), p.accVolume(),
                     TimeUtils.toKst(LocalDateTime.now(clock)), false, priceLimit(p.changeSign()));
         });
+    }
+
+    /**
+     * 종목 지도 재료: 코스피·코스닥 시가총액 상위 각 30개 (우선주는 보통주와 겹쳐 뺌) + 업종
+     * 순위는 60초 캐시(KIS 2번), 업종은 종목마다 하루 캐시(현재가 API 의 업종 칸). 업종을 못 받으면 "기타"
+     */
+    public MarketMapResponse marketMap() {
+        return cache.get("market-map", MARKET_MAP_TTL, () -> {
+            List<MarketMapResponse.Item> items = new ArrayList<>();
+            for (String[] m : new String[][] {{"0001", "KOSPI"}, {"1001", "KOSDAQ"}}) {
+                for (KisRestClient.CapRankRow r : kis.rankMarketCap(m[0])) {
+                    if (r.code() == null || isPreferred(r.code(), r.name())) {
+                        continue;
+                    }
+                    items.add(new MarketMapResponse.Item(r.code(), r.name() == null ? r.code() : r.name().strip(), m[1],
+                            sectorOf(r.code()), parseLong(r.marketCap()), parseLong(r.price()),
+                            parseDecimal(r.changeRate()), priceLimit(r.changeSign())));
+                }
+            }
+            return new MarketMapResponse(items, TimeUtils.toKst(LocalDateTime.now(clock)));
+        });
+    }
+
+    private String sectorOf(String code) {
+        try {
+            return cache.get("sector:" + code, SECTOR_TTL, () -> {
+                String s = kis.inquirePrice(code).sector();
+                return s == null || s.isBlank() ? "기타" : s;
+            });
+        } catch (RuntimeException e) {
+            return "기타";   // 업종 하나 못 받았다고 지도 전체를 실패시키지 않음
+        }
+    }
+
+    /** 우선주: 종목코드 끝자리가 0이 아니거나 이름이 '우'·'우B' 등으로 끝남 (삼성전자우 005935) */
+    static boolean isPreferred(String code, String name) {
+        return !code.endsWith("0") || (name != null && name.strip().matches(".*우[A-C]?(\\(전환\\))?$"));
+    }
+
+    private static long parseLong(String s) {
+        try {
+            return s == null || s.isBlank() ? 0 : Long.parseLong(s.strip());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private static java.math.BigDecimal parseDecimal(String s) {
+        try {
+            return s == null || s.isBlank() ? java.math.BigDecimal.ZERO : new java.math.BigDecimal(s.strip());
+        } catch (NumberFormatException e) {
+            return java.math.BigDecimal.ZERO;
+        }
     }
 
     /** 오늘 날짜 (한국 시간). 분봉 날짜를 고를 때 기준 */
