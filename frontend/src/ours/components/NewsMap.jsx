@@ -28,7 +28,7 @@ const TONE_WORD = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·
 
 /** 칸에 넣을 한두 낱말 (11/13 피드백: 칸마다 기사 제목 전체라 글이 많아 한눈에 안 들어옴)
  *  AI 가 뽑은 핵심 키워드 첫 번째 → 없으면 소식 종류(실적·수주·계약…) → 없으면 비움. 제목 전체는 마우스를 올리면 */
-function storyWord(st) {
+export function storyWord(st) {
   const all = [st.lead, ...(st.others || [])];
   const k = all.find((a) => a.keywords?.length)?.keywords[0];
   if (k) return k;

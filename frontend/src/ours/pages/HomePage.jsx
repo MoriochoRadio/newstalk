@@ -17,9 +17,10 @@ import { fmtPrice, fmtRate, todayLabel } from '../lib/format';
 import { loadTodayFeed } from '../lib/todayFeed';
 import { topicMix } from '../components/TopicMix';
 import { groupStories } from '../lib/stories';
-import TopStories, { rankStories } from '../components/TopStories';
+import { rankStories } from '../components/TopStories';
 import { usePerStock } from '../components/HotStocks';
-import { NewsMap, NewsPulse } from '../components/NewsMap';
+import { NewsPulse } from '../components/NewsMap';
+import StoryBoard from '../components/StoryBoard';
 import LivePill from '../components/LivePill';
 import { leanOf } from '../components/Tone';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
@@ -28,7 +29,7 @@ import { dirClass } from '../lib/format';
 const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
 const TOP_N = 5; // 1~5위 제목 목록 (11/13 피드백: 순위만, 여백 없이)
 const WATCH_N = 8; // 관심 종목 한 줄
-const MAP_STORIES = 12; // 뉴스 지도 칸 수 (18칸은 제목이 다 잘림)
+const MAP_STORIES = 6; // 소식 카드 수: 1위 큰 카드 + 5장 = 3줄 (11/16 저녁 지도 → 카드)
 
 /** 화면 낭독기용 한 줄 (눈에는 지도가 말함). 데이터로 만든 문장, LLM 아님. 사실만: 기사 때문이라고 말하지 않음 */
 function headline(newsCount, storyCount, issues, quotes) {
@@ -145,14 +146,10 @@ export default function HomePage() {
             <Newspaper className="icon" aria-hidden="true" />
             오늘 많이 보도된 소식
           </h2>
-          <span className="nm-legend" aria-hidden="true">
-            <span><i className="nm-pos" />좋은 소식</span>
-            <span><i className="nm-neg" />나쁜 소식</span>
-            <span><i className="nm-none" />판단 없음</span>
-          </span>
+          <Link to="/news?period=today" className="link">
+            소식 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
+          </Link>
         </div>
-        {/* 시장 지도(종목 순위)와 1등이 다른 이유를 화면에서 바로 (11/16 사용자·PM 리뷰: 휴대폰에선 설명이 숨겨져 있었음) */}
-        <p className="nm-explain">같은 내용을 쓴 기사가 많은 소식부터 크게 보여요 · 종목 순위가 아니에요 (종목 순위는 시장 지도)</p>
         {feed.error && !feed.data ? (
           <ErrorBox error={feed.error} onRetry={feed.reload} />
         ) : feed.data && newsArticles.length === 0 ? (
@@ -173,40 +170,18 @@ export default function HomePage() {
           />
         ) : feed.loading && !feed.data ? (
           <div className="hero-grid">
-            <div className="skeleton" style={{ height: 380, borderRadius: 'var(--radius)' }} />
+            <div className="skeleton" style={{ height: 460, borderRadius: 'var(--radius)' }} />
             <SkeletonRows rows={4} />
           </div>
         ) : (
           <div className="hero-grid">
-            <NewsMap stories={mapStories} />
+            <StoryBoard stories={mapStories} />
             <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
           </div>
         )}
       </section>
 
       {hasWatch && <WatchStrip quotes={quotes} />}
-
-      {feed.loading && !feed.data ? (
-        <div className="front-page front-dash">
-          <div className="story-card story-big">
-            <SkeletonRows rows={3} />
-          </div>
-          <div className="front-side">
-            <SkeletonRows rows={5} compact />
-          </div>
-        </div>
-      ) : (
-        <TopStories
-          stories={topStories}
-          quotes={quotes}
-          list
-          moreLink={
-            <Link to="/news?period=today" className="link">
-              소식 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
-            </Link>
-          }
-        />
-      )}
 
       <nav className="home-links" aria-label="더 보기">
         <Link to="/map" className="home-link">

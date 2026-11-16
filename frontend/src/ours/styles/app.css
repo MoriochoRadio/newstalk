@@ -5669,3 +5669,91 @@ mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit;
 @media (min-width: 1100px) {
   .ad-grid > .ad-link { max-height: calc(100vh - 92px); overflow: auto; }
 }
+
+/* ===== 홈 소식 카드판 (11/16 저녁: 지도 대신) — 바탕은 아주 연하게, 글자는 본문 색 그대로 ===== */
+.story-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.sb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.sb-pos { background: color-mix(in srgb, var(--good) 7%, var(--surface)); border-color: color-mix(in srgb, var(--good) 28%, transparent); }
+.sb-neg { background: color-mix(in srgb, var(--bad) 7%, var(--surface)); border-color: color-mix(in srgb, var(--bad) 28%, transparent); }
+.sb-mixed { background: var(--surface-2); }
+.sb-lead { grid-column: span 2; grid-row: span 2; padding: 20px 22px; gap: 12px; }
+.sb-top { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.sb-rank { font-weight: 800; font-size: var(--fs-md); color: var(--text-3); min-width: 14px; }
+.sb-lead .sb-rank { color: var(--accent-text); font-size: var(--fs-lg); }
+.sb-stock {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text);
+}
+.sb-tone { font-size: var(--fs-xs); font-weight: 700; }
+.sb-tone-pos { color: var(--good); }
+.sb-tone-neg { color: var(--bad); }
+.sb-tone-mixed { color: var(--text-2); }
+.sb-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 1.45;
+  font-weight: 700;
+  color: var(--text);
+  word-break: keep-all;
+}
+.sb-title:hover { color: var(--accent-text); }
+.sb-lead .sb-title { font-size: 24px; line-height: 1.4; -webkit-line-clamp: 3; letter-spacing: -0.01em; }
+.sb-lead .sb-summary { -webkit-line-clamp: 6; }
+.sb-summary {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.sb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+.sb-foot b { color: var(--text); font-size: var(--fs-sm); }
+.sb-bar { display: block; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--text-3) 15%, transparent); overflow: hidden; }
+.sb-bar i { display: block; height: 100%; border-radius: 3px; background: var(--text-3); }
+.sb-pos .sb-bar i { background: var(--good); }
+.sb-neg .sb-bar i { background: var(--bad); }
+@media (max-width: 1100px) {
+  .story-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sb-lead { grid-row: auto; }
+}
+@media (max-width: 640px) {
+  .story-board { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .sb-lead { grid-column: auto; padding: 16px 18px; }
+  .sb-lead .sb-title { font-size: 20px; }
+  .sb-title { font-size: 17px; }
+}
+
+@media (max-width: 640px) {
+  .sb-lead .sb-summary { -webkit-line-clamp: 3; }
+}
