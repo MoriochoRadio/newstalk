@@ -22,7 +22,7 @@ import { usePerStock } from '../components/HotStocks';
 import { NewsMap, NewsPulse } from '../components/NewsMap';
 import LivePill from '../components/LivePill';
 import { ToneRing, leanOf } from '../components/Tone';
-import { SkeletonRows } from '../components/ui';
+import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 import { dirClass } from '../lib/format';
 
 const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
@@ -146,7 +146,25 @@ export default function HomePage() {
             <span className="hide-mobile">칸 크기 = 기사 수</span>
           </span>
         </div>
-        {feed.loading && !feed.data ? (
+        {feed.error && !feed.data ? (
+          <ErrorBox error={feed.error} onRetry={feed.reload} />
+        ) : feed.data && newsArticles.length === 0 ? (
+          // 자정 직후·수집이 멈췄을 때: 빈 지도 대신 (11/16 발표 아침 대비)
+          <Empty
+            icon={Newspaper}
+            title="아직 오늘 뉴스가 없어요"
+            action={
+              <div className="empty-actions">
+                <Link to="/news?period=7d" className="btn btn-primary btn-sm">
+                  최근 7일 소식
+                </Link>
+                <Link to="/map" className="btn btn-secondary btn-sm">
+                  시장 지도
+                </Link>
+              </div>
+            }
+          />
+        ) : feed.loading && !feed.data ? (
           <div className="hero-grid">
             <div className="skeleton" style={{ height: 380, borderRadius: 'var(--radius)' }} />
             <SkeletonRows rows={4} />

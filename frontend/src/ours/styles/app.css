@@ -5192,3 +5192,9 @@ html {
   color: var(--text-3);
 }
 
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
