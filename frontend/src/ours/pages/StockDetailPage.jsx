@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Sparkles, Star } from 'lucide-react';
-import { articleApi, stockApi } from '../../api';
+import { articleApi, quoteApi, stockApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
@@ -257,6 +257,75 @@ function MentionCard({ code }) {
   );
 }
 
+const MOVE_LEVELS = [
+  { key: 5, label: '±5% 이상' },
+  { key: 3, label: '±3% 이상' },
+];
+const MOVES_SHOWN = 5;
+const WEEKDAY = '일월화수목금토';
+
+/** "2026-11-11" → "11월 11일 (화)" (한국 날짜 그대로, 시간대 변환 없음) */
+function dayLabel(date) {
+  const [y, m, d] = String(date).split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${m}월 ${d}일 (${WEEKDAY[dow]})`;
+}
+
+/** 크게 움직인 날 (F-17 과거 급등·급락 이력): 최근 1년 하루 등락률 ±n% 이상인 날 + 그날 이 종목 기사
+ *  11/16: 백엔드에 있던 API 를 화면에 연결. 말은 조심스럽게 — 그날 나온 기사일 뿐 "때문에" 가 아님 */
+function BigMovesCard({ moves, level, onLevel }) {
+  const [open, setOpen] = useState(false);
+  if (moves.error?.code === 'QUOTE_DISABLED') return null; // 시세가 꺼진 서버: 칸을 숨김
+  const items = moves.data?.items || [];
+  // 기본은 기사가 있는 날만 (AI 가 기사를 모으기 전인 10월 말 이전 날은 "기사 없음"만 줄줄이 나와서). 없으면 최근 날부터
+  const withNews = items.filter((m) => m.articleCount > 0);
+  const base = withNews.length ? withNews : items;
+  const shown = open ? items : base.slice(0, MOVES_SHOWN);
+  return (
+    <section className="card" aria-labelledby="moves-title" id="big-moves">
+      <div className="card-head">
+        <h2 className="card-title" id="moves-title">
+          크게 움직인 날
+          {moves.data && <span className="count num">최근 1년 {items.length}번{withNews.length ? ` · 기사 있는 날 ${withNews.length}번` : ''}</span>}
+        </h2>
+        <Segmented label="등락 기준" size="sm" options={MOVE_LEVELS} value={level} onChange={onLevel} />
+      </div>
+      {moves.loading && !moves.data && <SkeletonRows rows={3} compact />}
+      {moves.error && <ErrorBox error={moves.error} onRetry={moves.reload} />}
+      {moves.data && items.length === 0 && <Empty title={`최근 1년 동안 하루 ±${level}% 넘게 움직인 날이 없어요`} />}
+      {shown.length > 0 && (
+        <ul className="moves-list">
+          {shown.map((m) => {
+            const top = m.articles?.[0];
+            return (
+              <li key={m.date} className="move-row">
+                <span className="move-day num">{dayLabel(m.date)}</span>
+                <b className={`move-rate num ${dirClass(m.changeRate)}`}>{fmtRate(m.changeRate)}</b>
+                <span className="move-news">
+                  {top ? (
+                    <Link to={`/news/${top.articleId}`} className="move-title">
+                      {top.title}
+                    </Link>
+                  ) : (
+                    <span className="muted">그날 연결된 기사 없음</span>
+                  )}
+                </span>
+                {m.articleCount > 0 && <span className="move-count num">기사 {m.articleCount}</span>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {items.length > shown.length || open ? (
+        <button type="button" className="story-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          {open ? '접기' : `모든 날 보기 (${items.length}번)`}
+        </button>
+      ) : null}
+      {items.length > 0 && <p className="card-note">그날 이 종목과 연결된 기사예요. 주가가 움직인 이유라는 뜻은 아니에요.</p>}
+    </section>
+  );
+}
+
 function RelatedNews({ code, name }) {
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [code]);
@@ -366,6 +435,8 @@ function StockDetail({ code }) {
   const dayCounts = days.data ? (days.data.items || []).map((p) => ({ date: String(p.time).slice(0, 10), count: p.totalCount })) : null;
   const recentArticles = recent.data ? (recent.data.items || []).map(toUiArticle) : null;
   const { quotes, loading, disabled } = useQuotes([code], { live: true });
+  const [moveLevel, setMoveLevel] = useState(5);
+  const moves = useApi((signal) => quoteApi.bigMoves(code, { period: '1y', threshold: moveLevel }, { signal }), [code, moveLevel]);
   const stock = info.data?.stockCode === code ? info.data : null;
   useTitle(stock?.stockName || code);
 
@@ -398,13 +469,16 @@ function StockDetail({ code }) {
       <div className="stock-flow">
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
-          <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} />
+          <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} />
         </div>
         <div className="grid-2 sf-grid">
           <div className="stack sf-stack">
             <div className="sf-summary">
               <div id="sec-summary" className="sec-anchor" />
               <SummaryCard code={code} summary={summary} />
+            </div>
+            <div className="sf-moves">
+              <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} />
             </div>
             <div className="sf-news">
               <RelatedNews code={code} name={stock?.stockName} />

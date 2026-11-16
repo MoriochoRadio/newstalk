@@ -115,6 +115,9 @@ export const quoteApi = {
    */
   chart: (stockCode, unit = 'day', { date, to } = {}, options) =>
     retryIfBusy(() => apiGet(`/api/quotes/${stockCode}/chart`, { unit, date, to }, options), options?.signal),
+  /** 과거 급등·급락 이력 (F-17): 하루 등락률 ±threshold% 이상인 날(최신부터) + 그날 연결된 글 3개. period 3m·6m·1y */
+  bigMoves: (stockCode, { period = '1y', threshold = 5 } = {}, options) =>
+    retryIfBusy(() => apiGet(`/api/quotes/${stockCode}/big-moves`, { period, threshold }, options), options?.signal),
   /** 실시간 방송(SSE) 주소. 최대 5종목 (docs/api.md 시세). 듣는 쪽은 hooks/useQuoteStream.js */
   streamUrl: (codes) => apiUrl(`/api/quotes/stream?codes=${encodeURIComponent(codes.join(','))}`),
 };

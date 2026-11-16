@@ -9,7 +9,7 @@
 // 데이터는 우리 백엔드 GET /api/quotes/{code}/chart (원래 KIS). TradingView 서버·데이터는 쓰지 않음
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CandlestickSeries, HistogramSeries, LineSeries, createChart } from 'lightweight-charts';
+import { CandlestickSeries, HistogramSeries, LineSeries, createChart, createSeriesMarkers } from 'lightweight-charts';
 import { quoteApi } from '../../api';
 import { errorText } from '../lib/errors';
 import { fmtRate } from '../lib/format';
@@ -240,7 +240,7 @@ function tradingNow(now = new Date()) {
   return day >= 1 && day <= 5 && min >= 9 * 60 && min < 15 * 60 + 30;
 }
 
-export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null }) {
+export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null, moves = null }) {
   const [rangeKey, setRangeKey] = useState('3m');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
   const unit = range.unit;
@@ -341,7 +341,9 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     };
     box.addEventListener('wheel', onWheel, { passive: false });
 
-    chartRef.current = { chart, candles, volume, news, maSeries, colors: c };
+    // 크게 움직인 날 표시(일봉에서만): 오른 날은 봉 아래 ▲, 내린 날은 봉 위 ▼ (11/16 F-17 연결)
+    const moveMarks = createSeriesMarkers(candles, []);
+    chartRef.current = { chart, candles, volume, news, maSeries, moveMarks, colors: c };
 
     // 라이트/다크가 바뀌면(<html data-theme> 또는 운영체제 설정) 차트 색도 따라감
     const recolor = () => {
@@ -538,6 +540,26 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     showRange(ref.chart.timeScale(), rowsRef.current.length, range.bars);
   }, [rangeKey, key, range.bars]);
 
+  // 크게 움직인 날 표시: 받은 봉 안에 있는 날만 (일봉일 때). 다른 단위로 바꾸면 지움
+  const movesKey = `${key}:${rows.length}:${(moves || []).map((m) => `${m.date}${m.direction}`).join(',')}`;
+  useEffect(() => {
+    const ref = chartRef.current;
+    if (!ref?.moveMarks) return;
+    if (unit !== 'day' || !moves?.length) {
+      ref.moveMarks.setMarkers([]);
+      return;
+    }
+    const have = new Set(rowsRef.current.map((r) => r.t));
+    const marks = moves
+      .filter((m) => have.has(m.date))
+      .map((m) => {
+        const up = m.changeRate > 0;
+        return { time: m.date, position: up ? 'belowBar' : 'aboveBar', shape: up ? 'arrowUp' : 'arrowDown', color: up ? ref.colors.up : ref.colors.down, size: 1 };
+      })
+      .sort((a, b) => (a.time < b.time ? -1 : 1));
+    ref.moveMarks.setMarkers(marks);
+  }, [movesKey, unit]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 기사 수 막대: 데이터나 기사 목록이 바뀌면 다시 그림
   const marks = newsByBar(rows, unit, dayCounts, articles);
   const marksKey = `${key}:${rows.length}:${[...marks.entries()].map(([t, m]) => `${t}=${m.count}`).join(',')}`;
@@ -662,6 +684,12 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
               <i className="news-dot" />
               {unit === 'day' ? '기사 수 막대 = 그날 기사 수 (최근 30일)' : '기사 수 막대 = 5분마다 기사 수 (최근 기사 100건)'}
             </span>
+          )}
+          {unit === 'day' && moves?.length > 0 && (
+            <a href="#big-moves" className="move-legend">
+              <span className="up">▲</span>
+              <span className="down">▼</span> 크게 움직인 날
+            </a>
           )}
           {hasMa(unit) && ind.macd && indAt.macd && (
             <span>

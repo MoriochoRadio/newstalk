@@ -5100,3 +5100,78 @@ html {
   margin: 0 0 0 auto;
   white-space: nowrap;
 }
+
+/* 크게 움직인 날 (F-17, 11/16) */
+.moves-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.move-row {
+  display: grid;
+  grid-template-columns: 9.5em 5em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--line);
+}
+.move-row:first-child {
+  border-top: 0;
+}
+.move-day {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.move-rate {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  text-align: right;
+}
+.move-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 600;
+}
+.move-title:hover {
+  color: var(--accent-text);
+}
+.move-count {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .move-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 4px 10px;
+  }
+  .move-news {
+    grid-column: 1 / -1;
+  }
+  .move-count {
+    grid-column: 3;
+    grid-row: 1;
+    text-align: right;
+  }
+  .sf-moves { order: 4; }
+  .sf-news { order: 5; }
+  .sf-mention { order: 6; }
+}
+.move-legend {
+  color: inherit;
+  text-decoration: none;
+}
+.move-legend:hover {
+  text-decoration: underline;
+}
+.move-legend .up {
+  color: var(--up);
+}
+.move-legend .down {
+  color: var(--down);
+  margin-right: 2px;
+}
+
