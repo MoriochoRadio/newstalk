@@ -150,7 +150,6 @@ export default function NewsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">뉴스·공시</h1>
-          <p className="page-sub hide-mobile">AI가 종목과 연결한 기사와 전자공시예요.</p>
         </div>
       </div>
 

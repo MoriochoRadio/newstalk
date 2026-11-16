@@ -13,12 +13,10 @@ function BriefTone({ sentiment: t }) {
   if (!t || !t.articleCount || (!t.positiveCount && !t.negativeCount)) return null;
   const lean = leanOf(t.positiveCount, t.neutralCount || 0, t.negativeCount);
   return (
-    <p className={`brief-tone brief-tone-${lean.kind}`} title={TONE_TIP}>
+    // 숫자 설명("AI가 읽은 기사 2건: 좋은 0 · 나쁜 1 …")은 마우스를 올리면 (11/16 글 줄이기: 링과 한 마디로 충분)
+    <p className={`brief-tone brief-tone-${lean.kind}`} title={`${toneCountText(t.positiveCount, t.neutralCount || 0, t.negativeCount)}. ${TONE_TIP}`}>
       <ToneRing pos={t.positiveCount} neu={t.neutralCount} neg={t.negativeCount} size={22} />
-      <span>
-        <b>{lean.text}</b>
-        <span className="num muted"> {toneCountText(t.positiveCount, t.neutralCount || 0, t.negativeCount)}</span>
-      </span>
+      <b>{lean.text}</b>
     </p>
   );
 }
@@ -51,7 +49,7 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
       {!compact && (
         <div className="brief-spark">
           <Sparkline code={code} name={name} disabled={priceOff} />
-          {!priceOff && <span className="muted">최근 20거래일 종가</span>}
+          {!priceOff && <span className="muted">20일</span>}
         </div>
       )}
 

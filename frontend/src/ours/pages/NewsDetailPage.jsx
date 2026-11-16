@@ -70,16 +70,20 @@ function ToneBand({ article }) {
     <div className={`tone-band tone-band-${kind}`}>
       <ToneRing {...c} size={40} className="tone-band-ring" />
       <div className="tone-band-text">
-        <p className="tone-band-main">
-          {judged.length === 1
-            ? `${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}이에요`
-            : judged.map((s, i) => (
-                <span key={s.code} className={s.sentiment === 'POSITIVE' ? 'tb-pos' : 'tb-neg'}>
-                  {i > 0 && ', '}
-                  {s.name}에 {s.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}
-                </span>
-              ))}
-        </p>
+        {/* 여러 종목이면 좋은·나쁜 소식으로 묶어 한 줄씩 (11/16: "OO에 좋은 소식"이 종목 수만큼 되풀이돼 글이 길었음) */}
+        {judged.length === 1 ? (
+          <p className="tone-band-main">{`${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}이에요`}</p>
+        ) : (
+          ['POSITIVE', 'NEGATIVE']
+            .map((t) => [t, judged.filter((x) => x.sentiment === t)])
+            .filter(([, list]) => list.length)
+            .map(([t, list]) => (
+              <p key={t} className="tone-band-main tone-band-group">
+                <span className={t === 'POSITIVE' ? 'tb-pos' : 'tb-neg'}>{t === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}</span>
+                <span className="tb-names">{list.map((x) => x.name).join(' · ')}</span>
+              </p>
+            ))
+        )}
         {/* 11/13 준호(글 안 읽음): 두 줄 → 한 줄. 뜻(AI 판단 · 주가 예측 아님)은 그대로 */}
         <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용으로 나눈 판단 · 주가 예측 아님</p>
       </div>
@@ -88,7 +92,7 @@ function ToneBand({ article }) {
 }
 
 /** 연결 지도의 종목 카드: 주인공은 크게(이유·근거 다 보임), 함께 언급은 작게, 간접 연결은 점선 + "AI 추정" */
-function LinkCard({ s, quote, priceOff, disclosure = false }) {
+function LinkCard({ s, quote, priceOff, disclosure = false, sameEvidence = false }) {
   const indirect = s.matchType === 'INDIRECT';
   const cls = s.role === 'MAIN' ? 'is-main' : 'is-mentioned';
   return (
@@ -106,17 +110,13 @@ function LinkCard({ s, quote, priceOff, disclosure = false }) {
           </span>
         )}
       </div>
-      {/* v3 문구 (UX 글쓰기 점검 11/12): 카드가 답할 질문은 "왜 연결됐나" → 역할 한 줄 + 형광펜 근거 문장, AI 판단 문장은 작게 */}
-      <p className="lmap-role">
-        {indirect
-          ? '기사에 쓰인 사건이 이 업종에 닿는다고 AI가 추정했어요'
-          : disclosure
-            ? '이 공시를 낸 회사예요'
-            : s.role === 'MAIN'
-              ? '이 기사가 주로 다루는 회사예요'
-              : '기사에 함께 나온 회사예요'}
-      </p>
-      {s.evidence ? (
+      {/* 역할 한 줄은 배지·묶음 이름(주인공/함께 언급)과 같은 말이라 뺌 (11/16 글 줄이기). 간접 연결·공시만 남김 */}
+      {(indirect || disclosure) && (
+        <p className="lmap-role">{indirect ? '기사에 쓰인 사건이 이 업종에 닿는다고 AI가 추정했어요' : '이 공시를 낸 회사예요'}</p>
+      )}
+      {s.evidence && sameEvidence ? (
+        <p className="lmap-same">↑ 같은 근거 문장</p>
+      ) : s.evidence ? (
         <blockquote className="lmap-evidence">
           {s.factTypeLabel && <span className={`badge ${FACT_BADGE[s.factType] || ''}`}>{s.factTypeLabel}</span>}
           <span className="sr-only">근거 원문: </span>
@@ -142,6 +142,14 @@ function LinkCard({ s, quote, priceOff, disclosure = false }) {
 function LinkMap({ a, quotes, priceOff }) {
   const mains = a.relatedStocks.filter((s) => s.role === 'MAIN');
   const others = a.relatedStocks.filter((s) => s.role !== 'MAIN');
+  // 같은 근거 문장이 여러 종목에 붙으면 처음 한 번만 보여 줌 (11/16: 보험 3사 기사에 같은 문장이 세 번)
+  const seen = new Set();
+  const repeated = new Set();
+  [...mains, ...others].forEach((s) => {
+    if (!s.evidence) return;
+    if (seen.has(s.evidence)) repeated.add(s.code);
+    seen.add(s.evidence);
+  });
   return (
     <div className="lmap">
       <div className="lmap-node">
@@ -154,13 +162,13 @@ function LinkMap({ a, quotes, priceOff }) {
       <div className="lmap-branch">
         {mains.length > 0 && <p className="lmap-group">주인공 {mains.length}</p>}
         {mains.map((s) => (
-          <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} disclosure={a.isDisclosure} />
+          <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} disclosure={a.isDisclosure} sameEvidence={repeated.has(s.code)} />
         ))}
         {others.length > 0 && <p className="lmap-group">함께 언급 {others.length}</p>}
         {others.length > 0 && (
           <div className="lmap-grid">
             {others.map((s) => (
-              <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} />
+              <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} sameEvidence={repeated.has(s.code)} />
             ))}
           </div>
         )}

@@ -2237,7 +2237,7 @@ a.feed-title:hover {
   line-height: 1.65;
   color: var(--text);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2; /* 11/16: 세 줄 → 두 줄 (카드 4장이 화면 하나를 다 덮었음) */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -5173,5 +5173,22 @@ html {
 .move-legend .down {
   color: var(--down);
   margin-right: 2px;
+}
+
+/* 글 화면 판단 띠: 좋은·나쁜 소식으로 묶은 줄 (11/16) */
+.tone-band-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.tone-band-group .tb-names {
+  color: var(--text);
+  font-weight: 700;
+}
+.lmap-same {
+  margin: 6px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
 }
 

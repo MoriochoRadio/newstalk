@@ -84,7 +84,6 @@ export default function StocksPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">종목</h1>
-          <p className="page-sub hide-mobile">오늘 뉴스에 많이 나온 종목부터 보여 드려요.</p>
         </div>
       </div>
       <SearchBox
