@@ -56,14 +56,15 @@ export function NewsMap({ stories, height = 380 }) {
           const h = r.h - GAP;
           const main = (a.relatedStocks || []).find((x) => x.role === 'MAIN') || a.relatedStocks?.[0];
           const big = w >= 200 && h >= 130;
-          // 칸: 종목 이름(크게) + 한두 낱말 + 기사 수. 글자 크기는 칸 크기에 맞춤
-          // 이름이 칸 너비를 넘지 않게 (휴대폰 '삼성바이오로…' 잘림): 한글 한 자 ≈ 1em
-          const nameLen = Math.max(2, (main?.name || '').length);
-          const nameSize = Math.round(Math.max(13, Math.min(30, Math.sqrt(w * h) / 8, (w - 28) / (nameLen * 0.95))));
-          // 칸 높이에 들어가는 줄만 (11/16 리뷰: 낮은 칸에서 이름·낱말·기사 수가 겹쳐 잘림). 위아래 여백 20, 낱말 22, 기사 수 26
-          const nameH = nameSize * 1.2;
-          const showCount = w >= 80 && h >= 20 + nameH + 26;
-          const showWord = Boolean(word) && w >= 80 && h >= 20 + nameH + 22 + (showCount ? 26 : 0);
+          // 칸: 소식 제목(크게) + 종목 꼬리표(작게) + 같은 소식 기사 수 (11/16 사용자: 시장 지도처럼 종목 이름이 크게 있어
+          //   '왜 여기선 삼성SDI 가 1등이고 시장 지도에선 삼성전자가 1등이지?' 헷갈림 → 이 지도는 '소식'이 주인공이라는 게 보이게)
+          // 글자 크기는 칸 크기에 맞추고, 칸 높이에 들어가는 줄 수만큼만 제목을 보여 줌 (위아래 여백 20, 꼬리표 26, 기사 수 24)
+          const titleSize = Math.round(Math.max(13, Math.min(big ? 24 : 17, Math.sqrt(w * h) / 10)));
+          const lineH = titleSize * 1.3;
+          const showTag = Boolean(main) && w >= 96 && h >= 20 + 26 + lineH; // 좁은 칸은 꼬리표가 '카…'로 잘려 뺌
+          const showCount = w >= 80 && h >= 20 + (showTag ? 26 : 0) + lineH + 24;
+          const lines = Math.max(1, Math.floor((h - 20 - (showTag ? 26 : 0) - (showCount ? 24 : 0)) / lineH));
+          const showTitle = w >= 56 && h >= 20 + lineH;
           return (
             <li key={a.id} className="nm-cell" style={{ left: r.x, top: r.y, width: w, height: h }}>
               <Link
@@ -72,15 +73,18 @@ export function NewsMap({ stories, height = 380 }) {
                 aria-label={`${main ? `${main.name}: ` : ''}${a.title}. 오늘 기사 ${st.size || 1}건${tone ? `, ${tone.name}에 ${TONE_WORD[tone.kind]}` : ''}`}
                 title={a.title}
               >
-                {main && (
-                  <span className="nm-name" style={{ fontSize: nameSize }}>
-                    {main.name}
+                {showTag && <span className="nm-stock">{main.name}</span>}
+                {showTitle ? (
+                  <span className="nm-headline" style={{ fontSize: titleSize, WebkitLineClamp: lines }}>
+                    {a.title}
                   </span>
+                ) : (
+                  main && <span className="nm-headline" style={{ fontSize: 13, WebkitLineClamp: 1 }}>{main.name}</span>
                 )}
-                {showWord && <span className="nm-word">{word}</span>}
                 {showCount && (
                   <span className="nm-count num">
-                    기사 <b>{st.size || 1}</b>건
+                    {w >= 150 ? '같은 소식 기사 ' : '기사 '}
+                    <b>{st.size || 1}</b>건
                   </span>
                 )}
               </Link>

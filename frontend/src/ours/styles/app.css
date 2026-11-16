@@ -5619,3 +5619,29 @@ mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit;
 .brief-topics .bt-bar { height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; }
 .brief-topics .bt-bar i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
 .brief-topics .bt-n { text-align: right; color: var(--text-2); font-weight: 600; }
+
+/* 홈 소식 지도: 칸의 주인공은 소식(제목), 종목은 작은 꼬리표 — 종목이 주인공인 시장 지도와 한눈에 다르게 (11/16 사용자) */
+.nm-tile .nm-stock {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+.nm-tile.nm-none .nm-stock { background: var(--surface); border: 1px solid var(--line); }
+.nm-tile .nm-headline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+.nm-tile .nm-count { margin-top: auto; font-size: 13px; }
+.nm-tile .nm-count b { font-size: 15px; }
