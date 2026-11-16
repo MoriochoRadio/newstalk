@@ -27,7 +27,7 @@ export default function LivePill({ className = '' }) {
       <i aria-hidden="true" />
       {/* 11/13 사용자 눈으로: '실시간 매칭'은 우리 내부 말이라 일반 사용자는 뜻을 모름 → '새 소식 확인 시각' */}
       {/* 시세 시각으로 읽히지 않게 '새 소식' (11/16 MTS PM 리뷰) */}
-      {live ? `새 소식 ${shortTime(at)}` : at ? `새 소식 ${relativeTime(at)}` : '수집 기록 없음'}
+      {live ? `새 기사 확인 ${shortTime(at)}` : at ? `새 기사 확인 ${relativeTime(at)}` : '수집 기록 없음'}
     </span>
   );
 }

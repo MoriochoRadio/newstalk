@@ -98,10 +98,10 @@ export function NewsPulse({ articles, storyCount, topics = [], disclosureCount =
       .filter((a) => !a.titleOnly && !a.disclosurePending)
       .map((a) => (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment)
   );
-  // 세 수의 합 = 위 '오늘 뉴스 n건' (11/16 리뷰: 132건인데 링은 29+11+51=91 이라 숫자가 안 맞았음)
-  // 제목만 받은 기사·요약 전 기사도 '판단 없음'에 넣음 (지도 범례의 '판단 없음'과 같은 말)
-  const total = (articles || []).length;
-  const tone = { pos: judged.pos, neg: judged.neg, neu: Math.max(0, total - judged.pos - judged.neg) };
+  // '판단 없음' = AI가 읽고 좋다·나쁘다 하지 않은 기사 (종목 화면과 같은 뜻). AI가 읽지 않은 기사(제목만·요약 전 공시)는 세지 않고
+  // 'AI가 읽은 n건'을 밝혀 세 수의 합과 맞춤 (11/16 PM 2차 리뷰: 홈은 안 읽은 기사까지 '판단 없음'에 넣어 같은 말이 다른 뜻이었음)
+  const tone = judged;
+  const read = judged.pos + judged.neu + judged.neg;
   return (
     <div className="news-pulse">
       <div className="np-total">
@@ -121,24 +121,26 @@ export function NewsPulse({ articles, storyCount, topics = [], disclosureCount =
             좋은 소식 <b>{tone.pos}</b>
           </li>
           <li>
-            <i className="np-dot neg" />
-            나쁜 소식 <b>{tone.neg}</b>
-          </li>
-          <li>
             <i className="np-dot neu" />
             판단 없음 <b>{tone.neu}</b>
           </li>
+          <li>
+            <i className="np-dot neg" />
+            나쁜 소식 <b>{tone.neg}</b>
+          </li>
+          <li className="np-read">AI가 읽은 {read}건</li>
         </ul>
       </div>
       {/* 시간대별 보도량은 뺌 (11/13 피드백: 투자자는 몇 시에 기사가 많았는지 궁금하지 않음) → 오늘 무슨 일이 많았나 */}
       {topics.length > 0 && (
         <div className="np-topics">
-          <span className="np-k">오늘 많이 나온 소식</span>
+          {/* '소식' = 같은 기사를 묶은 것으로만 씀 → 여기는 주제, 숫자는 소식 개수 (11/16 PM 2차 리뷰: '실적 32'가 기사 32건으로 읽힘) */}
+          <span className="np-k">오늘 많이 나온 주제</span>
           <ul>
             {topics.slice(0, 3).map((t) => (
               <li key={t.label}>
                 <span>{t.label}</span>
-                <b className="num">{t.count}</b>
+                <b className="num">소식 {t.count}개</b>
               </li>
             ))}
           </ul>

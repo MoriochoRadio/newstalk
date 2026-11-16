@@ -35,7 +35,7 @@ export default function TopicMix({ rows, storyCount }) {
     <section className="card topic-mix" aria-labelledby="topic-title">
       <div className="card-head">
         <h2 className="card-title" id="topic-title">
-          오늘 많이 나온 소식
+          오늘 많이 나온 주제
         </h2>
         <span className="muted num" style={{ fontSize: 'var(--fs-sm)' }}>
           소식 {storyCount}개 기준
@@ -49,7 +49,7 @@ export default function TopicMix({ rows, storyCount }) {
               <span className="topic-bar" aria-hidden="true">
                 <i style={{ width: `${Math.max(6, (r.count / max) * 100)}%` }} />
               </span>
-              <span className="topic-count num">{r.count}</span>
+              <span className="topic-count num">{r.count}개</span>
             </div>
             {r.top && (
               <Link to={`/news/${r.top.lead.id}`} className="topic-example">

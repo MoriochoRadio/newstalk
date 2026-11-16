@@ -27,12 +27,19 @@ export function SessionProvider({ children }) {
   // 토큰이 만료돼 client 가 지우면 여기서도 로그아웃 상태로 (한 번만 알림)
   const userRef = useRef(user);
   userRef.current = user;
+  const authModalRef = useRef(authModal);
+  authModalRef.current = authModal;
   useEffect(() => {
     const onExpired = () => {
       if (!userRef.current) return;
+      userRef.current = null; // 동시에 여러 요청이 401 이어도 알림은 한 번 (다음 렌더 전에 막음)
       setUser(null);
       setWatchlist({ items: [], loaded: false, error: null });
-      toast('로그인 시간이 지났어요. 다시 로그인해 주세요.', 'info', { label: '로그인', run: () => setAuthModal({ mode: 'login' }) });
+      // 로그인이 필요한 동작(별 담기 등)이면 handleAuthError 가 곧 로그인 창을 엶 → 그때는 알림을 겹쳐 띄우지 않음
+      setTimeout(() => {
+        if (authModalRef.current) return;
+        toast('로그인 시간이 지났어요. 다시 로그인해 주세요.', 'info', { label: '로그인', run: () => setAuthModal({ mode: 'login' }) });
+      }, 0);
     };
     window.addEventListener('snm:auth-expired', onExpired);
     return () => window.removeEventListener('snm:auth-expired', onExpired);
@@ -104,7 +111,9 @@ export function SessionProvider({ children }) {
     (err, reason) => {
       if (err?.status === 401) {
         setUser(null);
-        setAuthModal({ mode: 'login', reason: reason || '로그인이 끝났어요. 다시 로그인해 주세요.' });
+        const next = { mode: 'login', reason: reason || '로그인이 끝났어요. 다시 로그인해 주세요.' };
+        authModalRef.current = next; // 만료 알림(onExpired)이 렌더 전에 보고 겹쳐 띄우지 않게
+        setAuthModal(next);
         return true;
       }
       return false;

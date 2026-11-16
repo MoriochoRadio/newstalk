@@ -32,11 +32,13 @@ export function titleDir(title) {
  * mixed: 제목의 방향(↑↓)과 AI 판단이 반대일 때 (11/12 발견: "영업이익 20.9%↓" 제목에 AI 는 "좋은 소식" — AI 팩토리 계약 때문.
  *   둘 다 기사에 있는 내용이라 한쪽만 보여 주면 틀려 보임 → "좋은·나쁜 내용 함께")
  */
-export function toneOf(article, focusCode) {
+export function toneOf(article, focusCode, onlyCodes) {
   // 시세 기사는 판단을 안 붙임: '주가가 내렸다' 기사를 '나쁜 소식'이라 하면 순환 논리 (11/16 MTS PM 리뷰)
   if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS' || article.priceMoveTitle) return null;
   const stocks = article.relatedStocks || [];
-  const s = (focusCode && stocks.find((x) => x.code === focusCode)) || stocks.find((x) => x.role === 'MAIN') || stocks[0];
+  // onlyCodes(관심 종목 화면): 그 종목들 판단만. 관심 없는 종목의 '좋은 소식' 배지가 맨 위에 뜨던 것 (11/16 디자이너 2차 리뷰)
+  const pool = onlyCodes ? stocks.filter((x) => onlyCodes.has(x.code)) : stocks;
+  const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
   // '함께 언급'만 된 종목에는 목록에서 좋은·나쁜 표시를 안 붙임 (11/16 리뷰: 은행원 수기 글이 SK하이닉스에 '나쁜 소식'으로 보임). 글 화면 카드에는 그대로
   if (s && s.role !== 'MAIN') return null;
   const v = s?.sentiment || null;

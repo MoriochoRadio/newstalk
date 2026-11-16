@@ -15,7 +15,7 @@ function emit() {
 /** fetch 자체가 실패한 오류인가 (서버 꺼짐·인터넷 끊김). 서버가 답한 오류(4xx·5xx)는 아님 */
 // fetch 자체 실패만: 코드 실수로 난 TypeError(undefined 읽기 등)까지 '연결 끊김'으로 보이던 것 (11/16 코드 리뷰)
 // 브라우저별 문구: Chrome 'Failed to fetch', Firefox 'NetworkError when attempting…', Safari 'Load failed'
-export const isNetworkError = (err) => err instanceof TypeError && /fetch|network|load failed/i.test(err.message || '');
+export const isNetworkError = (err) => err instanceof TypeError && /^(Failed to fetch|NetworkError|Load failed)/i.test(err.message || '');
 
 export function markOffline() {
   if (offline) return;

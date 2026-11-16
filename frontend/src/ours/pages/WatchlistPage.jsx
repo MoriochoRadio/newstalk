@@ -17,6 +17,7 @@ import { ToneRing, leanOf } from '../components/Tone';
 const NEWS_SIZE = 10;
 
 function WatchNews({ count }) {
+  const { watchCodes } = useSession();
   const [page, setPage] = useState(1);
   const list = useApi((signal) => watchlistApi.articles({ page, size: NEWS_SIZE }, { signal }), [page, count]);
   const items = (list.data?.items || []).map(toUiArticle);
@@ -31,7 +32,7 @@ function WatchNews({ count }) {
       {list.error && <ErrorBox error={list.error} onRetry={list.reload} />}
       {list.data && items.length === 0 && <Empty title="관심 종목과 연결된 글이 아직 없어요" />}
       {items.length > 0 && (
-        <StoryFeed articles={items} style={{ opacity: list.loading ? 0.5 : 1 }} />
+        <StoryFeed articles={items} toneCodes={watchCodes} style={{ opacity: list.loading ? 0.5 : 1 }} />
       )}
       {list.data && (
         <Pager

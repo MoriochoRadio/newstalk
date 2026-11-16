@@ -5526,3 +5526,19 @@ html:has(.sec-nav) {
   gap: 12px;
 }
 
+
+/* 11/16 PM 2차 리뷰: 오늘 주가를 다룬 기사 한 줄 (가격 바로 아래, 원인 판단이 아니라 보도된 기사로) */
+.price-news { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; font-size: var(--fs-sm); max-width: 520px; min-width: 0; }
+.price-news .k { color: var(--text-3); white-space: nowrap; flex: none; }
+.price-news a { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.price-news a:hover { color: var(--text); text-decoration: underline; }
+
+/* 11/16 디자이너 2차 리뷰: 글자 없는 링 → 짧은 글자 (관심 종목 카드·순위 목록) */
+.ws-tone { display: flex; gap: 6px; font-size: var(--fs-xs, 12px); line-height: 1.4; min-height: 1.4em; }
+.ws-tone .good, .st-tone.good { color: var(--good); font-weight: 600; }
+.ws-tone .bad, .st-tone.bad { color: var(--bad); font-weight: 600; }
+.st-tone.mixed { color: var(--text-2); font-weight: 600; }
+
+.np-tone-list .np-read { color: var(--text-3); font-size: var(--fs-xs); }
+
+.map-limit { font-weight: 700; font-size: 0.85em; }

@@ -133,6 +133,8 @@ export default function SearchBox({
       e.preventDefault();
       submit();
     } else if (e.key === 'Escape') {
+      // 추천 목록이 열려 있으면 Esc 는 목록만 닫음: 휴대폰 검색 창 전체가 닫히며 입력이 사라졌음 (11/16 2차 코드 리뷰)
+      if (open) e.stopPropagation();
       setOpen(false);
       setActive(-1);
     }

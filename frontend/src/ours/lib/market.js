@@ -8,6 +8,6 @@ export function marketState(now = new Date()) {
   const min = k.getUTCHours() * 60 + k.getUTCMinutes();
   if (day === 0 || day === 6) return { key: 'closed', label: '휴장' };
   if (min < 9 * 60) return { key: 'pre', label: '장 시작 전' };
-  if (min <= 15 * 60 + 30) return { key: 'open', label: '장중' };
+  if (min < 15 * 60 + 30) return { key: 'open', label: '장중' }; // 차트 tradingNow 와 같게 15:30 부터 마감
   return { key: 'after', label: '장 마감' };
 }

@@ -116,14 +116,14 @@ export function StockChips({ stocks, focusCode, max = 3 }) {
 /**
  * 글 한 줄. others 가 있으면(같은 소식 묶음) "같은 소식 다른 기사 n건" 을 눌러 펼침 — 목록은 소식 단위로 짧게
  */
-export default function ArticleRow({ article: a, others = [], focusCode, compact = false, showSummary = true }) {
+export default function ArticleRow({ article: a, others = [], focusCode, toneCodes, compact = false, showSummary = true }) {
   const [open, setOpen] = useState(false);
   const sns = a.sourceType === 'SNS';
   // 공시도 원문을 AI 가 요약함 (11/13 지난 공시까지 채움). 요약 전 공시는 어댑터가 hasSummary=false 로 줌 → 요약 줄 생략
   const summary = showSummary && a.hasSummary ? a.summary.join(' ') : '';
   // 펼침 단추('같은 소식 다른 기사 n건')가 있으면 '같은 소식 n건' 칩은 뺌 — 2건·1건이 다른 숫자처럼 보였음 (11/16 리뷰 9번)
   const tags = ArticleTags({ article: a }).filter((t) => !(others.length > 0 && t.key === 's'));
-  const tone = toneOf(a, focusCode);
+  const tone = toneOf(a, focusCode, toneCodes);
   return (
     <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>
       {(a.isDisclosure || tone) && (
@@ -188,12 +188,12 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
 }
 
 /** 글 목록을 소식 단위로 (같은 소식은 첫 보도 한 줄 + 펼치기) */
-export function StoryFeed({ articles, focusCode, compact = false, className = 'feed', style }) {
+export function StoryFeed({ articles, focusCode, toneCodes, compact = false, className = 'feed', style }) {
   const stories = groupStories(articles);
   return (
     <div className={className} style={style}>
       {stories.map((st) => (
-        <ArticleRow key={st.lead.id} article={st.lead} others={st.others} focusCode={focusCode} compact={compact} />
+        <ArticleRow key={st.lead.id} article={st.lead} others={st.others} focusCode={focusCode} toneCodes={toneCodes} compact={compact} />
       ))}
     </div>
   );

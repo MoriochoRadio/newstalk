@@ -1,6 +1,7 @@
 // API 실패를 화면 문장으로. 서버가 준 message(사용자에게 보여 줘도 되는 한국어 문장, docs/api.md 1절)를 먼저 씀
 import { ApiError } from '../../api';
 import { hasFinal } from './josa';
+import { isNetworkError } from './netStatus';
 
 // 서버 문장은 '~습니다'(합니다체)라 화면의 해요체와 섞였음 → 자주 보이는 오류는 해요체로, '무슨 일 + 할 일' 순서로 (11/16 UX 라이팅 점검:
 // NN/g 오류 메시지 지침·토스 UX 라이팅 — 해요체 통일, 사용자 탓으로 들리지 않게)
@@ -50,7 +51,7 @@ export function errorText(err, fallback = '요청을 처리하지 못했어요. 
     return err.message ? haeyo(err.message) : fallback;
   }
   // fetch 자체가 실패 (서버가 꺼져 있거나 네트워크 끊김)
-  if (err instanceof TypeError) return '서버에 연결하지 못했어요. 인터넷 연결이나 서버 상태를 확인해 주세요.';
+  if (isNetworkError(err)) return '서버에 연결하지 못했어요. 인터넷 연결이나 서버 상태를 확인해 주세요.';
   return fallback;
 }
 

@@ -7,7 +7,12 @@ export function buzzOf(mentions) {
   const items = mentions?.items || [];
   if (items.length < 2) return null;
   const today = items[items.length - 1].totalCount;
-  const past = items.slice(0, -1);
+  // 평일은 평일끼리: 기사가 적은 주말이 평균에 섞이면 월요일 배수가 부풀려짐 (11/16 PM 2차 리뷰: 삼성SDI '평소의 5.3배')
+  const dow = (it) => new Date(`${String(it.time).slice(0, 10)}T12:00:00Z`).getUTCDay();
+  const weekday = (it) => dow(it) >= 1 && dow(it) <= 5;
+  const before = items.slice(0, -1);
+  const sameKind = before.filter((it) => weekday(it) === weekday(items[items.length - 1]));
+  const past = sameKind.length >= 2 ? sameKind : before;
   const avg = past.reduce((s, p) => s + p.totalCount, 0) / past.length;
   if (today <= 0) return { today, avg, ratio: null, level: 0, text: '오늘 기사 없음' };
   if (avg < 1) {
@@ -21,4 +26,4 @@ export function buzzOf(mentions) {
   return { today, avg, ratio, level, text: `평소의 ${ratio.toFixed(1)}배` };
 }
 
-export const BUZZ_TIP = '오늘 이 종목 기사 수를 최근 6일(오늘 제외) 하루 평균과 비교했어요. 오늘은 지금까지 나온 기사 기준이에요.';
+export const BUZZ_TIP = '오늘 이 종목 기사 수를 최근 일주일 하루 평균(평일은 평일끼리, 오늘 제외)과 비교했어요. 오늘은 지금까지 나온 기사 기준이에요.';

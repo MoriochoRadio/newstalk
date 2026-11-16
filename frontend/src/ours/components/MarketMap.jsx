@@ -132,6 +132,8 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
                 {showRate && (
                   <span className="map-rate num" style={{ fontSize: Math.max(12, nameSize - 4) }}>
                     {t.rate != null ? fmtRate(t.rate) : ''}
+                    {/* 종목 목록과 같게 ±30% 근처면 상한가·하한가 (11/16 PM 2차 리뷰: 지도에만 없었음) */}
+                    {t.rate != null && Math.abs(t.rate) >= 29.5 && <span className="map-limit">{t.rate > 0 ? ' 상한가' : ' 하한가'}</span>}
                     {w >= 120 && <span className="map-count"> 기사 {t.articleCount}</span>}
                   </span>
                 )}

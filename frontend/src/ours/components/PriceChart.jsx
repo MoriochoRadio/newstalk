@@ -7,7 +7,7 @@
 //   - 봉 단위 버튼 8개(1분~년) 대신 투자자에게 익숙한 기간 버튼 (오늘·1개월·3개월·6개월·1년·5년), 기본 3개월
 //   - 기사 점(마커) 대신 차트 맨 아래 칸에 "그날 기사 수" 막대 → 거래량처럼 읽히는 '뉴스 거래량'. 십자선을 올리면 그날 대표 기사 제목
 // 데이터는 우리 백엔드 GET /api/quotes/{code}/chart (원래 KIS). TradingView 서버·데이터는 쓰지 않음
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CandlestickSeries, HistogramSeries, LineSeries, createChart, createSeriesMarkers } from 'lightweight-charts';
 import { quoteApi } from '../../api';
@@ -480,7 +480,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   };
 
   // 받은 데이터를 차트에 그림 (+ 이동평균)
-  const rows = data.key === key ? data.items.map((it) => ({ ...it, t: toChartTime(it.time, unit) })) : [];
+  // 십자선이 움직일 때마다(setHover) 다시 그려지므로 무거운 계산은 데이터가 바뀔 때만 (11/16 2차 코드 리뷰)
+  const rows = useMemo(() => (data.key === key ? data.items.map((it) => ({ ...it, t: toChartTime(it.time, unit) })) : []), [data, key, unit]);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   useEffect(() => {
@@ -607,8 +608,10 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   }, [movesKey, unit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 기사 수 막대: 데이터나 기사 목록이 바뀌면 다시 그림
-  const marks = newsByBar(rows, unit, dayCounts, articles);
-  const marksKey = `${key}:${rows.length}:${[...marks.entries()].map(([t, m]) => `${t}=${m.count}`).join(',')}`;
+  const marks = useMemo(() => newsByBar(rows, unit, dayCounts, articles), [rows, unit, dayCounts, articles]);
+  const marksKey = useMemo(() => `${key}:${rows.length}:${[...marks.entries()].map(([t, m]) => `${t}=${m.count}`).join(',')}`, [key, rows, marks]);
+  const macdAll = useMemo(() => (ind.macd && hasMa(unit) ? macd(rows) : null), [ind.macd, unit, rows]);
+  const rsiAll = useMemo(() => (ind.rsi && hasMa(unit) ? rsi(rows) : null), [ind.rsi, unit, rows]);
   const marksRef = useRef(marks);
   marksRef.current = marks;
   useEffect(() => {
@@ -635,19 +638,21 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   const prev = idx > 0 ? rows[idx - 1] : null;
   // 보조지표 값 줄 (십자선이 가리키는 봉)
   const indAt = {
-    macd: ind.macd && hasMa(unit) && bar ? macd(rows)[idx] : null,
-    rsi: ind.rsi && hasMa(unit) && bar ? rsi(rows)[idx]?.value ?? null : null,
+    macd: macdAll && bar ? macdAll[idx] : null,
+    rsi: rsiAll && bar ? rsiAll[idx]?.value ?? null : null,
   };
   // 장중의 오늘 일봉은 아직 종가가 아님 → "종" 대신 "현재" (11/13: 장중에 '종 27,650'이 위 현재가와 달라 헷갈림)
   const live = bar && idx === rows.length - 1 && unit === 'day' && bar.t === kstDate(new Date().toISOString()) && tradingNow();
   const diffRate = bar && prev && prev.close ? ((bar.close - prev.close) / prev.close) * 100 : null;
   // 화면 낭독용 한 줄 (11/12 접근성 점검: 차트 값이 마우스·터치로만 보였음) — 고른 기간의 첫 봉과 마지막 봉 종가
-  const span = range.bars ? rows.slice(-range.bars) : rows;
+  const span = useMemo(() => (range.bars ? rows.slice(-range.bars) : rows), [range.bars, rows]);
+  const spanHi = useMemo(() => (span.length ? Math.max(...span.map((r) => r.high)) : null), [span]);
+  const spanLo = useMemo(() => (span.length ? Math.min(...span.map((r) => r.low)) : null), [span]);
   const first = span[0];
   const last = span[span.length - 1];
   const chartLabel =
     first && last && first.close
-      ? `${stockName} 주가 차트, ${range.label}. ${unit === 'day' && last.t === kstDate(new Date().toISOString()) && tradingNow() ? '현재' : '마지막 종가'} ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(Math.max(...span.map((r) => r.high)))}원, 최저 ${fmt(Math.min(...span.map((r) => r.low)))}원`
+      ? `${stockName} 주가 차트, ${range.label}. ${unit === 'day' && last.t === kstDate(new Date().toISOString()) && tradingNow() ? '현재' : '마지막 종가'} ${fmt(last.close)}원, 기간 등락 ${fmtRate(((last.close - first.close) / first.close) * 100)}, 최고 ${fmt(spanHi)}원, 최저 ${fmt(spanLo)}원`
       : `${stockName} 주가 차트`;
   const maAt = (n) => {
     if (!hasMa(unit) || idx < n - 1) return null;
@@ -721,9 +726,9 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
             {!isIntraday(unit) && span.length > 1 && (
               <span className="muted">
                 <span className="k">기간 최고</span>
-                <b>{fmt(Math.max(...span.map((r) => r.high)))}</b>
+                <b>{fmt(spanHi)}</b>
                 <span className="k" style={{ marginLeft: 8 }}>최저</span>
-                <b>{fmt(Math.min(...span.map((r) => r.low)))}</b>
+                <b>{fmt(spanLo)}</b>
               </span>
             )}
           </>
@@ -792,6 +797,12 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
                 onClick={() => {
                   setData(EMPTY);
                   setReloadN((n) => n + 1);
+                  // 단추가 사라지며 초점이 맨 앞으로 튀지 않게 차트 제목으로 (11/16 2차 코드 리뷰)
+                  const h = document.getElementById('chart-title');
+                  if (h) {
+                    h.setAttribute('tabindex', '-1');
+                    h.focus({ preventScroll: true });
+                  }
                 }}
               >
                 다시 시도

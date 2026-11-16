@@ -101,7 +101,7 @@ export default function StocksPage() {
         <section className="card sl-rank" aria-labelledby="rank-title">
           <div className="card-head">
             <h2 className="card-title" id="rank-title">
-              오늘의 이슈 순위
+              오늘 화제 종목 순위
             </h2>
             <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>
               오늘 0시부터 뉴스 기사 수
@@ -199,7 +199,7 @@ export default function StocksPage() {
         {/* 휴대폰에선 등락을 순위표(30줄) 위로 (11/13 사용자 눈으로: '오늘 많이 내린 종목'을 찾다가 표 밑에 있어 못 찾음) */}
         <div className="stack sl-side">
           <div className="sl-movers">
-            {items.length > 0 && <Movers issues={items} quotes={quotes} disabled={disabled} loading={quoteLoading} top={5} title={`이슈 종목 ${items.length}개 중 등락`} />}
+            {items.length > 0 && <Movers issues={items} quotes={quotes} disabled={disabled} loading={quoteLoading} top={5} title={`화제 종목 ${items.length}개 중 등락`} />}
           </div>
           <div className="sl-watch">
             <WatchMini />

@@ -21,7 +21,7 @@ import TopStories, { rankStories } from '../components/TopStories';
 import { usePerStock } from '../components/HotStocks';
 import { NewsMap, NewsPulse } from '../components/NewsMap';
 import LivePill from '../components/LivePill';
-import { ToneRing, leanOf } from '../components/Tone';
+import { leanOf } from '../components/Tone';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 import { dirClass } from '../lib/format';
 
@@ -84,8 +84,14 @@ function WatchStrip({ quotes }) {
             <li key={w.stockCode}>
               <Link to={`/stocks/${w.stockCode}`} className="ws-card" title={pos || neg ? leanOf(pos, neu, neg).text : '오늘 판단한 기사가 아직 없어요'}>
                 <span className="ws-top">
-                  {pos || neg ? <ToneRing pos={pos} neu={neu} neg={neg} size={22} /> : <span className="wr-dot" />}
                   <span className="ws-name">{w.stockName}</span>
+                </span>
+                {/* 글자 없는 22px 링은 '불러오는 중' 표시처럼 보였음 → 짧은 글자로 (11/16 디자이너 2차 리뷰, WCAG 1.4.1).
+                    줄은 늘 두어 판단이 늦게 와도 카드 높이가 그대로 */}
+                <span className="ws-tone num">
+                  {pos > 0 && <b className="good">좋은 {pos}</b>}
+                  {neg > 0 && <b className="bad">나쁜 {neg}</b>}
+                  {!pos && !neg && <span aria-hidden="true">&nbsp;</span>}
                 </span>
                 <span className="ws-price num">
                   {q && q.price != null ? <span>{fmtPrice(q.price)}</span> : <span className="muted">–</span>}
@@ -206,7 +212,7 @@ export default function HomePage() {
           <LayoutGrid className="icon" aria-hidden="true" />
           <span>
             <b>시장 지도</b>
-            <small>오늘 기사가 많은 30종목의 등락</small>
+            <small>화제 종목 30개의 등락</small>
           </span>
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>
@@ -214,7 +220,7 @@ export default function HomePage() {
           <TrendingUp className="icon" aria-hidden="true" />
           <span>
             <b>종목</b>
-            <small>오늘 화제 종목·이슈 순위</small>
+            <small>오늘 화제 종목 순위</small>
           </span>
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>

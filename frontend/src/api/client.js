@@ -70,9 +70,12 @@ async function request(method, path, { params, body, signal } = {}, retried = fa
 
   // 만료·위조 토큰이면 로그인이 필요 없는 API도 401 → 토큰을 지우고 알림 (docs/api.md 2절)
   if (res.status === 401) {
-    tokenStore.clear();
-    // 화면(로그인 상태)에도 알림: 토큰만 지우고 머리에는 계속 '로그인됨'으로 남던 것 (11/16 코드 리뷰)
-    if (token && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('snm:auth-expired'));
+    // 보낸 토큰이 아직 저장된 그 토큰일 때만 지움: 늦게 돌아온 옛 요청이 방금 다시 로그인한 새 토큰을 지우지 않게 (11/16 2차 코드 리뷰)
+    if (token && tokenStore.get() === token) {
+      tokenStore.clear();
+      // 화면(로그인 상태)에도 알림: 토큰만 지우고 머리에는 계속 '로그인됨'으로 남던 것 (11/16 코드 리뷰)
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('snm:auth-expired'));
+    }
     // 읽기(GET)는 토큰 없이 한 번 더: 어제 로그인한 사람이 다시 오면 공개 화면(종목 정보 등)까지 '로그인이 필요해요'로 막혔음 (11/16 점검)
     // 로그인이 꼭 필요한 API 는 다시 401 이 나서 그대로 로그인 안내로 감
     if (token && method === 'GET' && !retried) return request(method, path, { params, body, signal }, true);

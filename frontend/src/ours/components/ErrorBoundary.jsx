@@ -2,6 +2,7 @@
 // 화면 단위(Shell 의 Outlet)와 차트 단위(종목 화면)에 씀. 화면 파일을 못 받은 경우(배포 뒤 옛 파일·순간 끊김)는 새로 고침을 권함
 import { Component } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { hasFinal } from '../lib/josa';
 
 const isChunkError = (err) => /Loading chunk|dynamically imported module|Importing a module script failed/i.test(String(err?.message || err));
 
@@ -28,7 +29,7 @@ export default class ErrorBoundary extends Component {
     return (
       <div className={compact ? 'error-box' : 'card error-screen'} role="alert">
         <p style={{ margin: 0 }}>
-          {chunk ? '새 버전이 올라와 화면 파일을 다시 받아야 해요.' : `${label}을 그리지 못했어요.`} 다시 시도해 주세요.
+          {chunk ? '새 버전이 올라와 화면 파일을 다시 받아야 해요.' : `${label}${hasFinal(label) ? '을' : '를'} 그리지 못했어요.`} 다시 시도해 주세요.
         </p>
         <button
           type="button"

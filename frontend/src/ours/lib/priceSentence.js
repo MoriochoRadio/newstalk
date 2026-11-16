@@ -4,6 +4,11 @@
 const PRICE_WORD = /(주가|장\s?초반|장중|시간외|종가|거래됐|거래되|상한가|하한가|급등|급락)/;
 const NUMBER = /\d[\d,.]*\s*(%|원)/;
 
+// 제목이 주가 움직임 기사인가: 백엔드 ArticleLabels.PRICE_MOVE 와 같은 낱말 (목록 API 는 priceMoveTitle 을 주지만
+// 크게 움직인 날 API 는 제목만 줘서 화면에서 같은 규칙으로 가림)
+const PRICE_MOVE = /특징주|급등|급락|상한가|하한가|강세|약세|상승|하락|뛰|올랐|내렸|떨어|치솟|곤두박질|반등|폭락|폭등|신고가|52주/;
+export const isPriceMoveTitle = (title) => PRICE_MOVE.test(String(title || ''));
+
 export function isPriceSentence(s) {
   return PRICE_WORD.test(s) && NUMBER.test(s);
 }
