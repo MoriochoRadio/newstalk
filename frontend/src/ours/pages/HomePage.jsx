@@ -353,7 +353,7 @@ export default function HomePage() {
           <LayoutGrid className="icon" aria-hidden="true" />
           <span>
             <b>시장 지도</b>
-            <small>화제 종목 30개의 등락</small>
+            <small>시가총액 상위 종목과 오늘 기사 수</small>
           </span>
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>
