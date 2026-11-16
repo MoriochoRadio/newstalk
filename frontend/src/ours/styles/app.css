@@ -6080,3 +6080,86 @@ a.hs-bl:hover { color: var(--accent-text); }
 @media (prefers-reduced-motion: reduce) {
   .tb-bubble { animation: none; opacity: 1; }
 }
+
+/* ===== 4차 (11/16 저녁): 플립 시계 숫자 · 지도 칸 배치 · 주제 설명 ===== */
+.pulse-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+.pl-num { gap: 10px; margin-top: 4px; }
+.pl-num small { align-self: flex-end; margin-bottom: 6px; }
+.pl-sub b { color: var(--text); font-weight: 700; }
+.pl-live { margin-top: 2px; }
+.flip-number { display: inline-flex; gap: 5px; }
+.flip-digit {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 64px;
+  font-size: 48px;
+  line-height: 64px;
+  font-weight: 800;
+  text-align: center;
+  border-radius: 8px;
+  color: #f5f6f8;
+  background: #262a32;
+  perspective: 300px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+.flip-blank { background: transparent; box-shadow: none; width: 0; margin-right: -5px; }
+.flip-digit::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0, 0, 0, 0.45); z-index: 3; }
+.fd-top, .fd-bottom, .fd-flap-top, .fd-flap-bottom { position: absolute; inset: 0; border-radius: inherit; background: inherit; backface-visibility: hidden; }
+.fd-top, .fd-flap-top { clip-path: inset(0 0 50% 0); background: #2b3038; }
+.fd-bottom, .fd-flap-bottom { clip-path: inset(50% 0 0 0); }
+.fd-flap-top { z-index: 2; transform-origin: 50% 50%; animation: fd-top 0.32s ease-in forwards; }
+.fd-flap-bottom { z-index: 2; transform-origin: 50% 50%; transform: rotateX(90deg); animation: fd-bottom 0.32s ease-out 0.32s forwards; }
+@keyframes fd-top { to { transform: rotateX(-90deg); } }
+@keyframes fd-bottom { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .fd-flap-top, .fd-flap-bottom { display: none; }
+}
+@media (max-width: 760px) {
+  .flip-digit { width: 36px; height: 52px; font-size: 38px; line-height: 52px; }
+}
+
+/* 지도 칸: 큰 칸은 왼쪽 위 이름·등락 + 왼쪽 아래 기사 수 (증권 앱 지도처럼 정돈), 작은 칸은 가운데 */
+.cm-main { display: flex; flex-direction: column; align-items: inherit; gap: 2px; min-width: 0; max-width: 100%; }
+.cm-tile.cm-roomy { align-items: flex-start; justify-content: space-between; text-align: left; padding: 12px 14px; }
+.cm-tile.cm-roomy .cm-main { align-items: flex-start; }
+.cm-tile.cm-roomy .cm-news { background: transparent; padding: 0; color: var(--text-2); font-weight: 700; }
+.cm-name { font-weight: 800; }
+.cm-tile { border-radius: 12px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 5%, transparent); }
+.cm-head { letter-spacing: 0.02em; }
+
+/* 주제: 거품(왼쪽) + 고른 주제 설명·대표 기사(오른쪽) */
+.topic-wrap { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+.tb-bubble button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--buzz-solid) var(--tb-level), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--buzz-solid) 22%, transparent);
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.tb-bubble button:hover, .tb-bubble button:focus-visible { transform: scale(1.05); box-shadow: 0 8px 24px color-mix(in srgb, var(--buzz-solid) 22%, transparent); }
+.tb-bubble.on button { border: 2px solid var(--buzz-solid); box-shadow: 0 0 0 4px color-mix(in srgb, var(--buzz-solid) 15%, transparent); }
+.topic-detail { padding: 16px 18px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); min-width: 0; }
+.td-head { margin: 0; font-size: var(--fs-md); }
+.td-head b { font-weight: 800; }
+.td-how { margin: 4px 0 10px; font-size: var(--fs-xs); color: var(--text-3); }
+.td-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.td-list li { display: flex; flex-direction: column; gap: 2px; }
+.td-list a { font-weight: 700; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.td-list a:hover { color: var(--accent-text); }
+.td-list .muted { font-size: var(--fs-xs); }
+.td-more { display: inline-block; margin-top: 12px; font-size: var(--fs-sm); }
+@media (max-width: 900px) {
+  .topic-wrap { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .pulse-line { grid-template-columns: minmax(0, 1fr); gap: 16px; } /* 위 4차 규칙이 휴대폰 한 줄 배치를 덮어써서 다시 */
+}

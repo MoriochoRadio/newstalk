@@ -2,35 +2,9 @@
 // - 칸 없이 한 줄: 왼쪽 큰 숫자(오늘 들어온 기사·공시) + 오른쪽 분위기 막대
 // - 새 기사가 들어오면 숫자가 굴러 올라가고 '+n' 이 잠깐 떠오름 (움직임 줄이기면 바로 바뀜)
 import { useEffect, useRef, useState } from 'react';
+import FlipNumber from './FlipNumber';
 import { countsOf } from './Tone';
 import { shortTime } from '../lib/format';
-
-/** 숫자가 이전 값에서 새 값까지 0.9초 동안 굴러감 */
-function useCountUp(value) {
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
-  useEffect(() => {
-    const start = from.current;
-    from.current = value;
-    if (start === value) return undefined;
-    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduce || start == null) {
-      setShown(value);
-      return undefined;
-    }
-    let raf;
-    const t0 = performance.now();
-    const step = (t) => {
-      const k = Math.min(1, (t - t0) / 900);
-      const e = 1 - (1 - k) ** 3;
-      setShown(Math.round(start + (value - start) * e));
-      if (k < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [value]);
-  return shown;
-}
 
 export default function HomeKpi({ articles, disclosureCount = 0, updatedAt }) {
   const news = articles || [];
@@ -42,7 +16,6 @@ export default function HomeKpi({ articles, disclosureCount = 0, updatedAt }) {
   );
   const read = t.pos + t.neu + t.neg;
   const pct = (n) => (read ? Math.round((n / read) * 100) : 0);
-  const shown = useCountUp(total);
   // 처음 그린 뒤 늘어난 만큼 '+n' (3초 뒤 사라짐)
   const first = useRef(total);
   const [plus, setPlus] = useState(0);
@@ -59,17 +32,14 @@ export default function HomeKpi({ articles, disclosureCount = 0, updatedAt }) {
   return (
     <div className="pulse-line">
       <div className="pl-count">
-        <span className="pl-live">
-          <i aria-hidden="true" />
-          {updatedAt ? `${shortTime(updatedAt)} 기준 · 새 기사가 오면 바로 늘어요` : '새 기사가 오면 바로 늘어요'}
-        </span>
-        <p className="pl-num num" aria-live="polite">
-          {shown.toLocaleString('ko-KR')}
+        <span className="pl-k">오늘 들어온 기사·공시</span>
+        <p className="pl-num" aria-live="polite">
+          <FlipNumber value={total} />
           <small>건</small>
-          {plus > 0 && <em className="pl-plus">+{plus}</em>}
+          {plus > 0 && <em className="pl-plus num">+{plus}</em>}
         </p>
         <span className="pl-sub num">
-          오늘 들어온 기사·공시 · 뉴스 {news.length.toLocaleString('ko-KR')} · 공시 {disclosureCount.toLocaleString('ko-KR')}
+          뉴스 <b>{news.length.toLocaleString('ko-KR')}</b> · 공시 <b>{disclosureCount.toLocaleString('ko-KR')}</b>
         </span>
       </div>
       <div className="pl-tone">
@@ -89,6 +59,10 @@ export default function HomeKpi({ articles, disclosureCount = 0, updatedAt }) {
           </span>
         </div>
         <span className="pl-note">AI가 읽은 뉴스 {read.toLocaleString('ko-KR')}건 기준 · 주가 예측 아님</span>
+        <span className="pl-live">
+          <i aria-hidden="true" />
+          {updatedAt ? `${shortTime(updatedAt)} 기준 · 새 기사가 오면 숫자가 넘어가요` : '새 기사가 오면 숫자가 넘어가요'}
+        </span>
       </div>
     </div>
   );

@@ -95,7 +95,8 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
               const h = t.h - GAP;
               // 글자 폭(em): 한글 0.95, 영문·숫자 0.62 ('LG에너지솔루션'을 한글 8자로 쳐서 칸에 안 들어간다고 숨겼음)
               const len = Math.max(2, [...it.stockName].reduce((t, ch) => t + (/[가-힣]/.test(ch) ? 0.95 : 0.62), 0));
-              const nameSize = Math.round(Math.max(10, Math.min(28, (w - 8) / len, h / 2.6)));
+              const roomy = w >= 130 && h >= 96; // 큰 칸: 증권 앱 지도처럼 왼쪽 위에 이름·등락, 왼쪽 아래 기사 수
+              const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8)));
               // 이름이 칸 너비에 다 들어갈 때만 (잘린 이름 '삼성엔지니…' 대신 빈 칸 + 마우스를 올리면 정보)
               const showName = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
               const rateSize = Math.max(10, Math.round(nameSize * 0.72));
@@ -110,23 +111,25 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
                 <li key={it.stockCode} style={{ left: t.x, top: t.y, width: w, height: h }}>
                   <Link
                     to={`/stocks/${it.stockCode}`}
-                    className={`cm-tile ${capHeat(it.changeRate)}`}
+                    className={`cm-tile ${capHeat(it.changeRate)} ${roomy ? 'cm-roomy' : ''}`}
                     aria-label={label}
                     onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + t.x + w / 2, y: sec.y + (sec.showHead ? HEAD : 0) + t.y + h })}
                     onFocus={() => setTip({ it, sec: sec.name, n, x: sec.x + t.x + w / 2, y: sec.y + (sec.showHead ? HEAD : 0) + t.y + h })}
                     onBlur={() => setTip(null)}
                   >
-                    {showName && (
-                      <span className="cm-name" style={{ fontSize: nameSize }}>
-                        {it.stockName}
-                      </span>
-                    )}
-                    {showRate && (
-                      <span className="cm-rate num" style={{ fontSize: rateSize }}>
-                        {fmtRate(it.changeRate)}
-                        {limit}
-                      </span>
-                    )}
+                    <span className="cm-main">
+                      {showName && (
+                        <span className="cm-name" style={{ fontSize: nameSize }}>
+                          {it.stockName}
+                        </span>
+                      )}
+                      {showRate && (
+                        <span className="cm-rate num" style={{ fontSize: rateSize }}>
+                          {fmtRate(it.changeRate)}
+                          {limit}
+                        </span>
+                      )}
+                    </span>
                     {showNews && (
                       <span className="cm-news num" style={{ fontSize: newsSize }}>
                         기사 {n}건

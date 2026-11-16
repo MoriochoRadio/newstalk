@@ -17,6 +17,9 @@ export function topicMix(stories, n = 6) {
       rows[i].stories.push(st);
     });
   }
+  rows.forEach((r) => {
+    r.articles = r.stories.reduce((t, st) => t + (st.size || 1), 0); // 그 주제를 다룬 기사 수 (같은 내용 묶음의 기사까지)
+  });
   const shown = rows.filter((r) => r.count > 0).sort((x, y) => y.count - x.count).slice(0, n);
   // 줄마다 대표 소식: 많이 다룬 순으로, 위 줄에서 이미 쓴 소식은 건너뜀 (같은 제목이 여러 줄에 반복되지 않게)
   const used = new Set();
