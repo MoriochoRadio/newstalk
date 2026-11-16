@@ -5850,3 +5850,29 @@ a.hs-bl:hover { color: var(--accent-text); }
   .sr-summary { font-size: 15px; }
   .sr-bar { width: 72px; }
 }
+
+/* ===== 홈 시안 비교 스위치 (임시) ===== */
+.home-variant { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: var(--fs-xs); }
+@media (max-width: 640px) { .home-variant { width: 100%; margin-top: 8px; } }
+
+/* ===== 단어 구름 (11/16 저녁) ===== */
+.word-cloud { position: relative; margin-bottom: 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.word-cloud ul { list-style: none; margin: 0; padding: 0; }
+.wc-word {
+  position: absolute;
+  line-height: 1.15;
+  white-space: nowrap;
+  opacity: 0;
+  animation: wc-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--wc-delay) forwards, wc-float var(--wc-float) ease-in-out calc(var(--wc-delay) + 0.6s + var(--wc-float-delay)) infinite;
+}
+.wc-word a { color: var(--text-2); letter-spacing: -0.02em; transition: color 0.15s ease; }
+.wc-word a:hover, .wc-word a:focus-visible { color: var(--accent-text); text-decoration: underline; }
+.wc-pos a { color: var(--good); }
+.wc-neg a { color: var(--bad); }
+.wc-none a { color: var(--text); }
+.wc-word:nth-child(n + 9) a { opacity: 0.85; }
+@keyframes wc-in { from { opacity: 0; transform: translateY(8px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes wc-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .wc-word { animation: none; opacity: 1; }
+}

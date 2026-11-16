@@ -36,7 +36,7 @@ export function storyWord(st) {
   return TOPICS.find((t) => t.words.some((w) => text.includes(w)))?.label || '';
 }
 
-export function NewsMap({ stories, height = 380 }) {
+export function NewsMap({ stories, height = 380, variant = 'headline' }) {
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
   // 기사 수 차이를 크게 (** 1.7): 소식마다 2~4건으로 비슷해 칸이 다 같아 보였음
@@ -65,6 +65,31 @@ export function NewsMap({ stories, height = 380 }) {
           const showCount = w >= 80 && h >= 20 + (showTag ? 26 : 0) + lineH + 24;
           const lines = Math.max(1, Math.floor((h - 20 - (showTag ? 26 : 0) - (showCount ? 24 : 0)) / lineH));
           const showTitle = w >= 56 && h >= 20 + lineH;
+          if (variant === 'stock') {
+            // 예전 칸(11/16 낮까지): 종목 이름 크게 + 소식 종류 낱말 + 기사 수
+            const nameLen = Math.max(2, (main?.name || '').length);
+            const nameSize = Math.round(Math.max(13, Math.min(30, Math.sqrt(w * h) / 8, (w - 28) / (nameLen * 0.95))));
+            const nameH = nameSize * 1.2;
+            const cnt = w >= 80 && h >= 20 + nameH + 26;
+            const showWord = Boolean(word) && w >= 80 && h >= 20 + nameH + 22 + (cnt ? 26 : 0);
+            return (
+              <li key={a.id} className="nm-cell" style={{ left: r.x, top: r.y, width: w, height: h }}>
+                <Link to={`/news/${a.id}`} className={`nm-tile nm-${tone?.kind || 'none'} ${big ? 'big' : ''}`} title={a.title}>
+                  {main && (
+                    <span className="nm-name" style={{ fontSize: nameSize }}>
+                      {main.name}
+                    </span>
+                  )}
+                  {showWord && <span className="nm-word">{word}</span>}
+                  {cnt && (
+                    <span className="nm-count num">
+                      기사 <b>{st.size || 1}</b>건
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          }
           return (
             <li key={a.id} className="nm-cell" style={{ left: r.x, top: r.y, width: w, height: h }}>
               <Link

@@ -5,8 +5,8 @@
 // 4) 바로 가기: 시장 지도(/map)·종목·소식 전체
 // 이전 홈(세 칸 띠·화제 종목 카드·그 밖의 소식·소식 종류·보도량·이슈 순위)은 브랜치 test/fe-ours-1113-before-dashboard
 // 말은 조심스럽게: 호재·악재·예측·"때문에" 금지. 등락률은 어제 종가 대비 값
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, LayoutGrid, Newspaper, Star, TrendingUp } from 'lucide-react';
 import { stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
@@ -17,19 +17,55 @@ import { fmtPrice, fmtRate, todayLabel } from '../lib/format';
 import { loadTodayFeed } from '../lib/todayFeed';
 import { topicMix } from '../components/TopicMix';
 import { groupStories } from '../lib/stories';
-import { rankStories } from '../components/TopStories';
+import TopStories, { rankStories } from '../components/TopStories';
 import { usePerStock } from '../components/HotStocks';
 import HomeSummary from '../components/HomeSummary';
+import { NewsMap, NewsPulse } from '../components/NewsMap';
+import WordCloud from '../components/WordCloud';
+import { marketTerms } from '../lib/marketTerms';
 import StoryBoard from '../components/StoryBoard';
 import LivePill from '../components/LivePill';
 import { leanOf } from '../components/Tone';
-import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
+import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
 import { dirClass } from '../lib/format';
 
 const MAP_LIMIT = 12; // 낭독기 문장용 이슈 종목 수
 const TOP_N = 5; // 1~5위 제목 목록 (11/13 피드백: 순위만, 여백 없이)
 const WATCH_N = 8; // 관심 종목 한 줄
 const MAP_STORIES = 8; // 많이 보도된 소식 목록 줄 수 (11/16 저녁 지도 → 큼직한 목록)
+const MAP_TILES = 12; // 시안 '뉴스 지도'의 칸 수
+
+// 홈 시안 비교 (11/16 저녁 사용자: 뉴스 지도 / 요약+목록 / 단어 구름을 비교) — 주소 ?home=map|list|cloud, 고른 것은 기억
+const VARIANTS = [
+  { key: 'map', label: '뉴스 지도' },
+  { key: 'list', label: '요약 + 목록' },
+  { key: 'cloud', label: '단어 구름' },
+];
+const VARIANT_KEY = 'snm_home_variant';
+function useHomeVariant() {
+  const [params, setParams] = useSearchParams();
+  const [saved, setSaved] = useState(() => {
+    try {
+      return localStorage.getItem(VARIANT_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const fromUrl = params.get('home');
+  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : VARIANTS.some((x) => x.key === saved) ? saved : 'list';
+  const set = (k) => {
+    setSaved(k);
+    try {
+      localStorage.setItem(VARIANT_KEY, k);
+    } catch {
+      // 기억 못 해도 이번 화면은 바뀜
+    }
+    const p = new URLSearchParams(params);
+    p.set('home', k);
+    setParams(p, { replace: true });
+  };
+  return [v, set];
+}
 
 /** 화면 낭독기용 한 줄 (눈에는 지도가 말함). 데이터로 만든 문장, LLM 아님. 사실만: 기사 때문이라고 말하지 않음 */
 function headline(newsCount, storyCount, issues, quotes) {
@@ -126,7 +162,10 @@ export default function HomePage() {
   const { quotes } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
   const newsArticles = feed.data ? feed.data.items.filter((a) => !a.isDisclosure) : [];
   const newsCount = newsArticles.length;
-  const mapStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_STORIES) : []), [feed.data]);
+  const [variant, setVariant] = useHomeVariant();
+  const tileStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_TILES) : []), [feed.data]);
+  const mapStories = tileStories.slice(0, MAP_STORIES);
+  const terms = useMemo(() => (feed.data && variant === 'cloud' ? marketTerms(groupStories(feed.data.items.filter((a) => !a.isDisclosure))) : []), [feed.data, variant]);
   const topics = useMemo(() => (feed.data ? topicMix(groupStories(newsArticles)) : []), [feed.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -138,6 +177,11 @@ export default function HomePage() {
           {topStories.length > 0 && <p className="sr-only">{headline(newsCount, storyCount, issueItems, quotes)}</p>}
         </div>
         <LivePill className="mobile-pill" />
+        {/* 시안 비교 (임시): 팀 회의에서 고른 뒤 뺌 */}
+        <div className="home-variant">
+          <span className="muted">홈 시안</span>
+          <Segmented label="홈 시안 고르기" size="sm" options={VARIANTS} value={variant} onChange={setVariant} />
+        </div>
       </div>
 
       {/* 1) 한눈에 요약: 숫자·막대로 먼저 (11/16 저녁 사용자: "시각화로 먼저 떠먹여 주고, 그 밑에 자세히") */}
@@ -145,8 +189,23 @@ export default function HomePage() {
         <div className="card-head">
           <h2 className="card-title" id="hero-title">
             <Newspaper className="icon" aria-hidden="true" />
-            오늘 한눈에
+            {variant === 'map' ? '오늘 뉴스 한눈에' : variant === 'cloud' ? '오늘 시장, 단어로 한눈에' : '오늘 한눈에'}
           </h2>
+          {variant === 'map' && (
+            <span className="nm-legend" aria-hidden="true">
+              <span><i className="nm-pos" />좋은 소식</span>
+              <span><i className="nm-neg" />나쁜 소식</span>
+              <span><i className="nm-none" />판단 없음</span>
+              <span className="hide-mobile">칸 하나 = 소식 하나 · 크기 = 그 소식 기사 수</span>
+            </span>
+          )}
+          {variant === 'cloud' && (
+            <span className="nm-legend" aria-hidden="true">
+              <span><i className="nm-pos" />주로 좋은 소식</span>
+              <span><i className="nm-neg" />주로 나쁜 소식</span>
+              <span className="hide-mobile">글자 크기 = 그 말이 나온 소식 수</span>
+            </span>
+          )}
         </div>
         {feed.error && !feed.data ? (
           <ErrorBox error={feed.error} onRetry={feed.reload} />
@@ -169,20 +228,44 @@ export default function HomePage() {
         ) : feed.loading && !feed.data ? (
           <div className="skeleton" style={{ height: 150, borderRadius: 'var(--radius)' }} />
         ) : (
-          <HomeSummary
-            articles={newsArticles}
-            storyCount={storyCount}
-            disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length}
-            topics={topics}
-            issues={issueItems}
-          />
+          <>
+            {variant === 'map' ? (
+              <div className="hero-grid">
+                <NewsMap stories={tileStories} variant="stock" />
+                <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
+              </div>
+            ) : (
+              <>
+                {variant === 'cloud' && <WordCloud terms={terms} />}
+                <HomeSummary
+                  articles={newsArticles}
+                  storyCount={storyCount}
+                  disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length}
+                  topics={topics}
+                  issues={issueItems}
+                />
+              </>
+            )}
+          </>
         )}
       </section>
 
       {hasWatch && <WatchStrip quotes={quotes} />}
 
       {/* 2) 자세히: 많이 보도된 소식을 큼직한 목록으로 (지도·카드판 대신 — 긴 제목이 다 읽히게) */}
-      {!(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
+      {variant === 'map' && feed.data && (
+        <TopStories
+          stories={topStories}
+          quotes={quotes}
+          list
+          moreLink={
+            <Link to="/news?period=today" className="link">
+              소식 전체 <ChevronRight className="icon-sm" aria-hidden="true" />
+            </Link>
+          }
+        />
+      )}
+      {variant !== 'map' && !(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
         <section className="card" aria-labelledby="rank-title">
           <div className="card-head">
             <h2 className="card-title" id="rank-title">
