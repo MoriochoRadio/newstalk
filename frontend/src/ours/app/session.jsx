@@ -19,10 +19,24 @@ export function SessionProvider({ children }) {
   const toast = useCallback((message, tone = 'info', action = null) => {
     toastId.current += 1;
     const id = toastId.current;
-    setToasts((list) => [...list.slice(-2), { id, message, tone, action }]);
-    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), action ? 7000 : tone === 'error' ? 5000 : 3000);
+    // 사라지는 시간은 알림 칸(Shell 의 Toast)이 셈: 마우스를 올리거나 초점이 있으면 멈춤 (WCAG 2.2.1, 11/16 코드 리뷰 — '되돌리기'를 누르려다 사라짐)
+    setToasts((list) => [...list.slice(-2), { id, message, tone, action, ms: action ? 7000 : tone === 'error' ? 5000 : 3000 }]);
   }, []);
   const dismissToast = useCallback((id) => setToasts((list) => list.filter((t) => t.id !== id)), []);
+
+  // 토큰이 만료돼 client 가 지우면 여기서도 로그아웃 상태로 (한 번만 알림)
+  const userRef = useRef(user);
+  userRef.current = user;
+  useEffect(() => {
+    const onExpired = () => {
+      if (!userRef.current) return;
+      setUser(null);
+      setWatchlist({ items: [], loaded: false, error: null });
+      toast('로그인 시간이 지났어요. 다시 로그인해 주세요.', 'info', { label: '로그인', run: () => setAuthModal({ mode: 'login' }) });
+    };
+    window.addEventListener('snm:auth-expired', onExpired);
+    return () => window.removeEventListener('snm:auth-expired', onExpired);
+  }, [toast]);
 
   const loadWatchlist = useCallback(async () => {
     try {
@@ -100,6 +114,7 @@ export function SessionProvider({ children }) {
 
   const watchCodes = useMemo(() => new Set(watchlist.items.map((w) => w.stockCode)), [watchlist.items]);
 
+  const busyCodes = useRef(new Set());
   const toggleWatch = useCallback(
     async (stockCode, stockName) => {
       if (!user) {
@@ -116,6 +131,9 @@ export function SessionProvider({ children }) {
         });
         return;
       }
+      // 같은 종목을 빠르게 두 번 누르면 담기·빼기 요청이 겹쳐 409·상태 엇갈림 → 처리 중이면 무시 (11/16 코드 리뷰)
+      if (busyCodes.current.has(stockCode)) return;
+      busyCodes.current.add(stockCode);
       const has = watchCodes.has(stockCode);
       try {
         if (has) await watchlistApi.remove(stockCode);
@@ -141,11 +159,21 @@ export function SessionProvider({ children }) {
         }
       } catch (err) {
         if (!handleAuthError(err)) toast(errorText(err), 'error');
+      } finally {
+        busyCodes.current.delete(stockCode);
       }
     },
     [user, watchCodes, loadWatchlist, toast, requireLogin, handleAuthError]
   );
 
+  // 열고 닫는 함수는 한 번만 만듦: 값 묶음(value)이 알림·관심 종목이 바뀔 때마다 새로 만들어지면서 closeAuth 도 바뀌어,
+  // 로그인 창의 effect 가 다시 돌아 입력한 비밀번호가 지워지고 초점이 튀었음 (11/16 코드 리뷰)
+  const openAuth = useCallback((mode = 'login', reason) => setAuthModal({ mode, reason }), []);
+  const closeAuth = useCallback(() => {
+    // 로그인하지 않고 닫을 때만 맡긴 일을 버림. 로그인하면 바로 저장되는 토큰으로 판단
+    if (!tokenStore.get()) pendingRef.current = null;
+    setAuthModal(null);
+  }, []);
   const value = useMemo(
     () => ({
       user,
@@ -154,13 +182,8 @@ export function SessionProvider({ children }) {
       signup,
       logout,
       authModal,
-      openAuth: (mode = 'login', reason) => setAuthModal({ mode, reason }),
-      closeAuth: () => {
-        // 로그인하지 않고 닫을 때만 맡긴 일을 버림. user 값은 이 함수가 만들어진 때의 옛 값일 수 있어(로그인 직후 닫힘)
-        // 로그인하면 바로 저장되는 토큰으로 판단
-        if (!tokenStore.get()) pendingRef.current = null;
-        setAuthModal(null);
-      },
+      openAuth,
+      closeAuth,
       requireLogin,
       handleAuthError,
       watchlist,

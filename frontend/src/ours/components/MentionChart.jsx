@@ -9,7 +9,7 @@ const PAD = { l: 28, r: 8, t: 10, b: 22 };
 const labelOf = (time, unit) =>
   unit === 'HOUR' ? `${String(time).slice(11, 13)}시` : `${Number(String(time).slice(5, 7))}/${Number(String(time).slice(8, 10))}`;
 
-export default function MentionChart({ data }) {
+export default function MentionChart({ data, periodLabel = '' }) {
   const [hover, setHover] = useState(null);
   const [W, setW] = useState(600);
   const boxRef = useRef(null);
@@ -38,7 +38,7 @@ export default function MentionChart({ data }) {
       <p className="mention-tip" aria-live="polite">
         {shown
           ? `${labelOf(shown.time, data.unit)} · 기사 ${shown.newsCount}건${shown.snsCount ? ` · SNS ${shown.snsCount}건` : ''}`
-          : `합계 ${total.toLocaleString('ko-KR')}건`}
+          : `${periodLabel ? `${periodLabel} ` : '합계 '}${total.toLocaleString('ko-KR')}건`}
       </p>
       <svg className="mention-chart" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`언급량 추이, 합계 ${total}건, 가장 많은 칸 ${max}건`}>
         {[0, 0.5, 1].map((f) => (

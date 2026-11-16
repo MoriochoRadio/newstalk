@@ -10,11 +10,10 @@ import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
-import SearchBox from '../components/SearchBox';
 import Movers from '../components/Movers';
 import HotStocks from '../components/HotStocks';
 import Sparkline from '../components/Sparkline';
-import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
+import { Empty, ErrorBox, LimitBadge, SkeletonRows } from '../components/ui';
 
 const LIMIT = 30;
 
@@ -90,12 +89,7 @@ export default function StocksPage() {
           <h1 className="page-title">종목</h1>
         </div>
       </div>
-      <SearchBox
-        mode="stock"
-        label="종목 찾기"
-        placeholder="종목 이름·코드·별칭 (예: 삼전, 005930)…"
-        onPick={(s) => navigate(`/stocks/${s.stockCode}`)}
-      />
+      {/* 화면 안 종목 검색창은 뺌: 바로 위 머리줄 검색과 같은 일이라 어느 쪽에 써야 할지 망설이게 함 (11/16 디자이너 리뷰) */}
       {/* 홈에서 옮겨 온 화제 종목 카드 (11/13 피드백: 홈은 한 화면 대시보드, 자세한 건 눌러서 다른 화면) */}
       <section className="hot-section" aria-labelledby="hot-title">
         <h2 className="section-title" id="hot-title">
@@ -183,7 +177,12 @@ export default function StocksPage() {
                         </td>
                         <td className="r hide-mobile">{it.eventCount ?? '–'}</td>
                         {!disabled && <td className="r hide-mobile">{q ? fmtPrice(q.price) : quoteLoading ? '' : '–'}</td>}
-                        {!disabled && <td className={`r change ${dirClass(q?.changeRate)}`}>{q ? fmtRate(q.changeRate) : ''}</td>}
+                        {!disabled && (
+                          <td className={`r change ${dirClass(q?.changeRate)}`}>
+                            {q ? fmtRate(q.changeRate) : ''}
+                            {q && <LimitBadge rate={q.changeRate} />}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

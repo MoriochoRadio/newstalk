@@ -113,6 +113,13 @@ export function Segmented({ options, value, onChange, label, size }) {
 }
 
 /** 현재가 + 등락률 (상승 빨강·하락 파랑). quote 가 없으면 "–" */
+/** 상한가·하한가 표시 (국내 가격제한폭 ±30%, 반올림 오차를 생각해 ±29.5% 이상). 11/16 MTS PM 리뷰: +29.97% 가 오류처럼 보였음 */
+export function LimitBadge({ rate }) {
+  if (rate == null || Math.abs(rate) < 29.5) return null;
+  const up = rate > 0;
+  return <span className={`limit-badge ${up ? 'limit-up' : 'limit-down'}`}>{up ? '상한가' : '하한가'}</span>;
+}
+
 export function PriceCell({ quote, stacked = true }) {
   if (!quote) {
     return (
@@ -126,6 +133,7 @@ export function PriceCell({ quote, stacked = true }) {
     return (
       <span className="num" style={{ whiteSpace: 'nowrap' }}>
         <b>{fmtPrice(quote.price)}</b> <span className={`change ${cls}`}>{fmtRate(quote.changeRate)}</span>
+        <LimitBadge rate={quote.changeRate} />
       </span>
     );
   }
@@ -134,7 +142,10 @@ export function PriceCell({ quote, stacked = true }) {
       <span className="p" style={{ display: 'block' }}>
         {fmtPrice(quote.price)}원
       </span>
-      <span className={`r ${cls}`}>{fmtRate(quote.changeRate)}</span>
+      <span className={`r ${cls}`}>
+        {fmtRate(quote.changeRate)}
+        <LimitBadge rate={quote.changeRate} />
+      </span>
     </span>
   );
 }

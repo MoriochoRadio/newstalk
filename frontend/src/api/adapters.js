@@ -12,8 +12,8 @@ const EMPTY_RATIO = Object.freeze({ positive: 0, neutral: 0, negative: 0 });
  */
 export const SENTIMENT_LABEL = Object.freeze({ POSITIVE: '긍정', NEGATIVE: '부정', NEUTRAL: '중립' });
 export const SENTIMENT_NONE_LABEL = '판단 보류';
-export const ROLE_LABEL = Object.freeze({ MAIN: '주인공', MENTIONED: '함께 언급' });
-export const FACT_TYPE_LABEL = Object.freeze({ FACT: '일어난 일', PLAN: '회사 계획', FORECAST: '전망', RUMOR: '소문' });
+export const ROLE_LABEL = Object.freeze({ MAIN: '중심 종목', MENTIONED: '함께 언급' }); // 11/16 MTS PM 리뷰: '주인공'은 증권 앱 말투와 거리
+export const FACT_TYPE_LABEL = Object.freeze({ FACT: '보도된 사실', PLAN: '회사 계획', FORECAST: '전망', RUMOR: '확인 안 된 이야기' }); // 11/16: '일어난 일'은 단정처럼 읽힘
 // 공시의 의무/자율 (보고서 이름의 "(자율공시)"·"(공정공시)" 표시로 나눔. 그 밖은 주요사항보고서·수시공시 = 의무)
 export const DISCLOSURE_KIND_LABEL = Object.freeze({ MANDATORY: '의무', VOLUNTARY: '자율', FAIR: '공정공시' });
 

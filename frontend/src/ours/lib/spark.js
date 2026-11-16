@@ -30,6 +30,7 @@ function pump() {
       })
       .catch(() => {
         entry.status = 'failed';
+        entry.failedAt = Date.now(); // 연결 실패만 1분 뒤 다시 (데이터가 모자란 종목은 다시 물어도 같음)
       })
       .finally(() => {
         active -= 1;
@@ -42,6 +43,11 @@ function pump() {
 /** code 의 종가 목록을 원함. onChange(entry) 로 알려 줌. 돌려준 함수를 부르면 "이제 안 봄" */
 export function wantSpark(code, onChange) {
   let entry = cache.get(code);
+  // 잠깐 끊겼다 돌아오면 흐름선이 화면을 새로 고칠 때까지 계속 비어 있었음 → 1분 지난 실패는 다시 줄 세움 (11/16 코드 리뷰)
+  if (entry?.failedAt && Date.now() - entry.failedAt > 60_000 && entry.wanted === 0) {
+    cache.delete(code);
+    entry = null;
+  }
   if (!entry) {
     entry = { status: 'queued', data: null, wanted: 0, listeners: new Set() };
     cache.set(code, entry);

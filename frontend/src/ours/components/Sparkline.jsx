@@ -37,7 +37,8 @@ export default function Sparkline({ code, name, disabled = false }) {
   }, [code, visible, disabled]);
 
   if (disabled || entry?.status === 'failed') return <span className="spark" aria-hidden="true" ref={boxRef} />;
-  if (!entry?.data) return <span className="spark skeleton" ref={boxRef} aria-hidden="true" />;
+  // 기다리는 동안은 반짝이는 회색 대신 빈 칸 (11/16 디자이너 리뷰: 표 절반이 반짝여 고장 난 화면처럼 보였음)
+  if (!entry?.data) return <span className="spark spark-wait" ref={boxRef} aria-hidden="true" />;
 
   const vals = entry.data;
   const min = Math.min(...vals);

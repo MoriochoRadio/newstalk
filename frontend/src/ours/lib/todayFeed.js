@@ -28,7 +28,8 @@ export async function loadTodayFeed(signal) {
  * items 는 최신순이라 처음 찾은 것이 가장 최근
  */
 export function pickWhy(items, code) {
-  const mine = items.filter((a) => a.relatedStocks.some((s) => s.code === code));
+  // 시세 기사('하이닉스 2%대 하락' 같은 주가 움직임 기사)는 뺌: 등락 칸 안에 두면 원인처럼 읽히고 숫자도 지금과 다름 (11/16 MTS PM 리뷰)
+  const mine = items.filter((a) => !a.priceMoveTitle && a.relatedStocks.some((s) => s.code === code));
   const pick =
     mine.find((a) => !a.isDisclosure && a.relatedStocks.some((s) => s.code === code && s.role === 'MAIN')) ||
     mine.find((a) => !a.isDisclosure) ||

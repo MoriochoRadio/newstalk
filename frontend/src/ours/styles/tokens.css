@@ -65,7 +65,7 @@
   --danger: #c4222f;
   --danger-soft: #fdecee;
   --danger-solid: #c4222f;
-  --star: #d97706;
+  --star: #e3a008; /* 노랑: 나쁜 소식 주황(#a3480a)과 같은 계열로 보이지 않게 (11/16 디자이너 리뷰) */
 
   /* 차트 이동평균 선 */
   --ma5: #e8a317;
@@ -149,7 +149,7 @@
     --danger: #ff7b85;
     --danger-soft: rgba(255, 123, 133, 0.14);
     --danger-solid: #c9303c;
-    --star: #f5b547;
+    --star: #facc15;
     --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.35);
     --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
     --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
@@ -207,7 +207,7 @@
   --danger: #ff7b85;
   --danger-soft: rgba(255, 123, 133, 0.14);
   --danger-solid: #c9303c;
-  --star: #f5b547;
+  --star: #facc15;
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.35);
   --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
   --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
@@ -342,6 +342,10 @@
   --good-soft: #e7f6ee;
   --bad: #a3480a;
   --bad-soft: #fdf1e3;
+  /* 칸 채움(뉴스 지도): 밝은 화면은 같은 진한 색 + 흰 글자 */
+  --good-fill: #047857;
+  --bad-fill: #a3480a;
+  --on-tone-fill: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -349,6 +353,10 @@
     --good-soft: rgba(52, 211, 153, 0.13);
     --bad: #f5a524;
     --bad-soft: rgba(245, 165, 36, 0.13);
+    /* 어두운 화면: 링·점과 같은 밝은 색으로 채우고 글자는 검정 (11/16 디자이너 리뷰: 칸은 진한 초록, 링은 민트라 같은 뜻이 두 색) */
+    --good-fill: #34d399;
+    --bad-fill: #f5a524;
+    --on-tone-fill: #111111;
   }
 }
 :root[data-theme='dark'] {
@@ -356,6 +364,9 @@
   --good-soft: rgba(52, 211, 153, 0.13);
   --bad: #f5a524;
   --bad-soft: rgba(245, 165, 36, 0.13);
+  --good-fill: #34d399;
+  --bad-fill: #f5a524;
+  --on-tone-fill: #111111;
 }
 
 /* 이동평균선 색 (11/12, dataviz 스킬 validate_palette.js 로 검사)

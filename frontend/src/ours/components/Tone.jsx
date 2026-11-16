@@ -33,7 +33,8 @@ export function titleDir(title) {
  *   둘 다 기사에 있는 내용이라 한쪽만 보여 주면 틀려 보임 → "좋은·나쁜 내용 함께")
  */
 export function toneOf(article, focusCode) {
-  if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS') return null;
+  // 시세 기사는 판단을 안 붙임: '주가가 내렸다' 기사를 '나쁜 소식'이라 하면 순환 논리 (11/16 MTS PM 리뷰)
+  if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS' || article.priceMoveTitle) return null;
   const stocks = article.relatedStocks || [];
   const s = (focusCode && stocks.find((x) => x.code === focusCode)) || stocks.find((x) => x.role === 'MAIN') || stocks[0];
   // '함께 언급'만 된 종목에는 목록에서 좋은·나쁜 표시를 안 붙임 (11/16 리뷰: 은행원 수기 글이 SK하이닉스에 '나쁜 소식'으로 보임). 글 화면 카드에는 그대로

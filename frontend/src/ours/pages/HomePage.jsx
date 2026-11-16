@@ -143,7 +143,7 @@ export default function HomePage() {
             <span><i className="nm-pos" />좋은 소식</span>
             <span><i className="nm-neg" />나쁜 소식</span>
             <span><i className="nm-none" />판단 없음</span>
-            <span className="hide-mobile">칸 크기 = 기사 수</span>
+            <span className="hide-mobile">칸 하나 = 소식 하나 · 크기 = 그 소식 기사 수</span>
           </span>
         </div>
         {feed.error && !feed.data ? (
@@ -172,7 +172,7 @@ export default function HomePage() {
         ) : (
           <div className="hero-grid">
             <NewsMap stories={mapStories} />
-            <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} />
+            <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
           </div>
         )}
       </section>

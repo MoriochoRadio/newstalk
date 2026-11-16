@@ -26,6 +26,8 @@ export default function AuthModal() {
   const [serverError, setServerError] = useState('');
   const [busy, setBusy] = useState(false);
   const firstRef = useRef(null);
+  const closeRef = useRef(closeAuth);
+  closeRef.current = closeAuth;
   const dialogRef = useRef(null);
   const mode = authModal?.mode || 'login';
 
@@ -38,7 +40,7 @@ export default function AuthModal() {
     const prev = document.activeElement;
     firstRef.current?.focus();
     const onKey = (e) => {
-      if (e.key === 'Escape') closeAuth();
+      if (e.key === 'Escape') closeRef.current();
       // 창 안에서만 Tab 이 돌게
       if (e.key === 'Tab' && dialogRef.current) {
         const items = dialogRef.current.querySelectorAll('button, input, a[href]');
@@ -58,7 +60,8 @@ export default function AuthModal() {
       document.removeEventListener('keydown', onKey);
       prev?.focus?.();
     };
-  }, [authModal, closeAuth]);
+    // 열릴 때(authModal 이 바뀔 때)만: closeAuth 가 바뀌어도 다시 돌지 않게 (입력값·초점 유지)
+  }, [authModal]);
 
   if (!authModal) return null;
   const isSignup = mode === 'signup';

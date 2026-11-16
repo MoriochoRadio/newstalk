@@ -249,6 +249,10 @@ export default function Board({ stockCode, stockName }) {
   const [writing, setWriting] = useState(false);
   const posts = useApi((signal) => boardApi.posts(stockCode, { page, size: PAGE_SIZE }, { signal }), [stockCode, page]);
   const items = posts.data?.items || [];
+  // 2쪽 이후의 마지막 글을 지우면 빈 쪽이 남음 → 앞쪽으로 (11/16 코드 리뷰)
+  useEffect(() => {
+    if (posts.data && items.length === 0 && page > 1) setPage((p) => Math.max(1, p - 1));
+  }, [posts.data, items.length, page]);
   // 글을 올리면 폼이 사라져 포커스가 화면 맨 앞으로 튐 → 새 목록의 첫 글(방금 쓴 글) 제목으로 (11/13 사용자 눈으로)
   const listRef = useRef(null);
   const focusNew = useRef(false);

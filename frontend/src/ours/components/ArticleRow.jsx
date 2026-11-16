@@ -55,7 +55,7 @@ export function ArticleTags({ article: a, detail = false }) {
   if (a.priceMoveTitle) {
     tags.push(
       <span key="p" className="badge badge-outline" title={PRICE_MOVE_TIP}>
-        주가 움직임 뒤 기사
+        시세 기사
       </span>
     );
   }

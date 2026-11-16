@@ -120,6 +120,8 @@ export default function SearchBox({
   };
 
   const onKey = (e) => {
+    // 한글 조합 중 Enter·화살표는 IME 몫: 안 막으면 '삼성' 입력 끝 Enter 가 조합 전 글자로 검색되거나 두 번 눌림 (11/16 코드 리뷰)
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);

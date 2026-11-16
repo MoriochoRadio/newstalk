@@ -24,7 +24,7 @@ function WatchNews({ count }) {
     <section className="card" aria-labelledby="wn-title" id="watch-news">
       <div className="card-head">
         <h2 className="card-title" id="wn-title">
-          관심 종목 소식 {list.data && <span className="count num">{list.data.totalCount.toLocaleString('ko-KR')}건</span>}
+          관심 종목 소식 {list.data && <span className="count num">전체 기간 {list.data.totalCount.toLocaleString('ko-KR')}건</span>}
         </h2>
       </div>
       {list.loading && !list.data && <SkeletonRows rows={4} />}

@@ -16,9 +16,11 @@ const PriceChart = lazy(() => import('../components/PriceChart'));
 import MentionChart from '../components/MentionChart';
 import Board from '../components/Board';
 import { ToneRing, leanOf } from '../components/Tone';
-import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
+import { Empty, ErrorBox, LimitBadge, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { useBack } from './NewsDetailPage';
 import { dropPriceSentences } from '../lib/priceSentence';
+import { marketState } from '../lib/market';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const NEWS_SIZE = 10;
 const MENTION_PERIODS = [
@@ -78,13 +80,14 @@ function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePa
             </div>
             <div className={`change ${cls}`}>
               {fmtAmount(quote.changeAmount)} ({fmtRate(quote.changeRate)})
+              <LimitBadge rate={quote.changeRate} />
             </div>
             <p className="basis num">
-              어제 종가 대비 · {paused ? `${shortTime(quote.fetchedAt)} 값에서 멈춤` : quote.live ? '실시간' : `${shortTime(quote.fetchedAt)} 기준`}
+              전일 대비 · {paused ? `${shortTime(quote.fetchedAt)} 값에서 멈춤` : `${quote.live ? '실시간' : `${shortTime(quote.fetchedAt)} 기준`} · ${marketState().label}`}
               {/* WCAG 2.2.2 저절로 바뀌는 정보는 멈출 수 있어야 함 (이해 문서가 실시간 주가를 예로 듦, 11/16 전문가 기준 점검) */}
               {onTogglePause && (
                 <button type="button" className="link-btn pause-btn" aria-pressed={paused} onClick={onTogglePause}>
-                  {paused ? '다시 켜기' : '멈추기'}
+                  {paused ? '실시간 켜기' : '실시간 끄기'}
                 </button>
               )}
             </p>
@@ -204,8 +207,8 @@ function SentimentCard({ summary }) {
             label="세는 방법"
             size="sm"
             options={[
-              { key: 'article', label: '기사 기준' },
-              { key: 'event', label: '소식 기준' },
+              { key: 'article', label: '기사마다' },
+              { key: 'event', label: '같은 소식은 한 번' },
             ]}
             value={basis}
             onChange={setBasis}
@@ -243,7 +246,7 @@ function SentimentCard({ summary }) {
               나쁜 소식 {ratio.negative}%
             </span>
             <span className="muted">
-              {basis === 'event' ? '소식' : '기사'} {count}건
+              오늘 {basis === 'event' ? '소식' : '기사'} {count}건
             </span>
           </p>
         </>
@@ -272,7 +275,7 @@ function MentionCard({ code }) {
       </div>
       {m.loading && !m.data && <div className="skeleton" style={{ height: 170 }} />}
       {m.error && <ErrorBox error={m.error} onRetry={m.reload} />}
-      {m.data && <MentionChart data={m.data} />}
+      {m.data && <MentionChart data={m.data} periodLabel={MENTION_PERIODS.find((x) => x.key === period)?.label} />}
     </section>
   );
 }
@@ -355,7 +358,7 @@ function RelatedNews({ code, name }) {
       <div className="card-head">
         <h2 className="card-title" id="rel-title">
           {name ? `${name} 관련 뉴스·공시` : '관련 뉴스·공시'}
-          {list.data && <span className="count num">{list.data.totalCount.toLocaleString('ko-KR')}건</span>}
+          {list.data && <span className="count num">전체 기간 {list.data.totalCount.toLocaleString('ko-KR')}건</span>}
         </h2>
       </div>
       {list.loading && !list.data && <SkeletonRows rows={4} />}
@@ -425,7 +428,25 @@ const SECTIONS = [
 ];
 // 이동 + 주소 # 바꾸기 + 키보드 포커스도 그 칸으로 (11/12 점검: 예전엔 포커스가 바로 가기 줄에 남음.
 // 보통 앵커에 맡겨 보니 이 앱 안에서는 주소만 바뀌고 스크롤이 안 됨 → 직접 처리)
-function SectionNav() {
+function SectionNav({ hide }) {
+  const sections = SECTIONS.filter((s) => s.id !== hide); // 시세가 꺼진 서버면 '움직인 날' 칸이 없으므로 링크도 뺌
+  // 지금 보이는 구역을 표시 (11/16 디자이너 리뷰: 붙어서 따라오는데 어디인지 안 보여 그냥 글자 줄 같았음)
+  const [current, setCurrent] = useState(null);
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const els = SECTIONS.map((x) => document.getElementById(x.id)).filter(Boolean);
+    const seen = new Map();
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => seen.set(e.target.id, e.isIntersecting ? e.boundingClientRect.top : null));
+        const visible = SECTIONS.map((x) => [x.id, seen.get(x.id)]).filter(([, top]) => top != null);
+        if (visible.length) setCurrent(visible[0][0]);
+      },
+      { rootMargin: '-130px 0px -55% 0px' }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
   const go = (e, id) => {
     e.preventDefault();
     const el = document.getElementById(id);
@@ -438,8 +459,8 @@ function SectionNav() {
   };
   return (
     <nav className="sec-nav" aria-label="이 종목 화면 바로 가기">
-      {SECTIONS.map((s) => (
-        <a key={s.id} className={`sn-${s.id}`} href={`#${s.id}`} onClick={(e) => go(e, s.id)}>
+      {sections.map((s) => (
+        <a key={s.id} className={`sn-${s.id}`} href={`#${s.id}`} aria-current={current === s.id ? 'true' : undefined} onClick={(e) => go(e, s.id)}>
           {s.label}
         </a>
       ))}
@@ -493,15 +514,17 @@ function StockDetail({ code }) {
       <QuickSwitch code={code} />
       {info.error && <ErrorBox error={info.error} onRetry={info.reload} />}
       <StockHeader code={code} info={stock} quote={shownQuote} quoteState={{ loading, disabled }} paused={paused} onTogglePause={() => setPaused((v) => !v)} />
-      <SectionNav />
+      <SectionNav hide={moves.error?.code === 'QUOTE_DISABLED' ? 'big-moves' : null} />
       {/* 휴대폰에서는 순서를 바꿈 (11/13 사용자 눈으로 써 보기: "왜 떨어졌지?"의 답인 AI 요약이 화면 하나를 다 차지하는
           차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사. 넓은 화면은 그대로 (CSS .stock-flow) */}
       <div className="stock-flow">
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
-          <Suspense fallback={<section className="card" aria-busy="true"><div className="skeleton" style={{ height: 556, borderRadius: 'var(--radius-sm)' }} /></section>}>
+          <ErrorBoundary compact label="차트" key={code}>
+          <Suspense fallback={<section className="card" aria-busy="true"><div className="skeleton" style={{ height: 616, borderRadius: 'var(--radius-sm)' }} /></section>}>
             <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} liveQuote={shownQuote || null} />
           </Suspense>
+          </ErrorBoundary>
         </div>
         <div className="grid-2 sf-grid">
           <div className="stack sf-stack">
@@ -511,9 +534,6 @@ function StockDetail({ code }) {
             </div>
             <div className="sf-moves">
               <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} />
-            </div>
-            <div className="sf-news">
-              <RelatedNews code={code} name={stock?.stockName} />
             </div>
           </div>
           <div className="stack sf-stack">
@@ -525,6 +545,10 @@ function StockDetail({ code }) {
               <MentionCard code={code} />
             </div>
           </div>
+        </div>
+        {/* 관련 뉴스는 두 칸 아래 전체 너비로 (11/16 디자이너 리뷰: 왼쪽 칸만 길어 오른쪽이 900px 비었음) */}
+        <div className="sf-news">
+          <RelatedNews code={code} name={stock?.stockName} />
         </div>
       </div>
       <div style={{ marginTop: 16 }} id="sec-board" className="sec-anchor-box">

@@ -86,7 +86,7 @@ function ToneBand({ article }) {
             ))
         )}
         {/* 11/13 준호(글 안 읽음): 두 줄 → 한 줄. 뜻(AI 판단 · 주가 예측 아님)은 그대로 */}
-        <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용으로 나눈 판단 · 주가 예측 아님</p>
+        <p className="tone-band-sub">AI가 {article.isDisclosure ? '공시' : '기사'} 내용만 보고 판단했어요 · 주가 예측이 아니에요</p>
       </div>
     </div>
   );
@@ -161,7 +161,7 @@ function LinkMap({ a, quotes, priceOff }) {
         </p>
       </div>
       <div className="lmap-branch">
-        {mains.length > 0 && <p className="lmap-group">주인공 {mains.length}</p>}
+        {mains.length > 0 && <p className="lmap-group">중심 종목 {mains.length}</p>}
         {mains.map((s) => (
           <LinkCard key={s.code} s={s} quote={quotes[s.code]} priceOff={priceOff} disclosure={a.isDisclosure} sameEvidence={repeated.has(s.code)} />
         ))}

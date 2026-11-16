@@ -92,7 +92,7 @@ export function NewsMap({ stories, height = 380 }) {
 }
 
 /** 옆 칸: 오늘 뉴스 상태 숫자 */
-export function NewsPulse({ articles, storyCount, topics = [] }) {
+export function NewsPulse({ articles, storyCount, topics = [], disclosureCount = 0 }) {
   const judged = countsOf(
     (articles || [])
       .filter((a) => !a.titleOnly && !a.disclosurePending)
@@ -110,7 +110,8 @@ export function NewsPulse({ articles, storyCount, topics = [] }) {
           {(articles || []).length.toLocaleString('ko-KR')}
           <small>건</small>
         </span>
-        <span className="np-sub num">같은 소식끼리 묶으면 {storyCount}개</span>
+        {/* 아래 '뉴스·공시 n건'과 맞춰 보이게 공시 수도 (11/16 리뷰: 173건 vs 182건) */}
+        <span className="np-sub num">같은 소식끼리 묶으면 {storyCount}개{disclosureCount ? ` · 공시 ${disclosureCount}건 따로` : ''}</span>
       </div>
       <div className="np-tone">
         <ToneRing pos={tone.pos} neu={tone.neu} neg={tone.neg} size={84} />

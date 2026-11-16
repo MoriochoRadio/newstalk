@@ -107,6 +107,25 @@ const formatTime = (t) => {
   return String(t);
 };
 
+// 값 줄의 날짜는 한국어로: '2026-11-16' → '11월 16일 (월)', 올해가 아니면 연도도 (11/16 MTS PM 리뷰: 기계 표기 그대로였음)
+// formatTime 은 봉 찾기 비교에도 쓰여 모양을 못 바꿈 → 보여 주기만 따로
+const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+const readoutTime = (t) => {
+  let y, m, d, hm = '';
+  if (typeof t === 'number') {
+    const x = new Date(t * 1000);
+    [y, m, d] = [x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate()];
+    hm = ` ${pad(x.getUTCHours())}:${pad(x.getUTCMinutes())}`;
+  } else if (typeof t === 'object' && t) [y, m, d] = [t.year, t.month, t.day];
+  else if (typeof t === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t)) [y, m, d] = t.split('-').map(Number);
+  else return String(t);
+  const w = WEEK[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const thisYear = new Date().getFullYear();
+  return `${y !== thisYear ? `${y}년 ` : ''}${m}월 ${d}일 (${w})${hm}`;
+};
+// 거래량: '9,684,123' → '968만 주' (값 줄은 정확히 읽을 일이 적고 크기만 보면 됨. 1만 주 아래는 그대로)
+const volText = (v) => (v == null ? '–' : v >= 1e8 ? `${(v / 1e8).toFixed(2)}억 주` : v >= 1e4 ? `${Math.round(v / 1e4).toLocaleString('ko-KR')}만 주` : `${Math.round(v).toLocaleString('ko-KR')}주`);
+
 /** 종가 단순 이동평균. 앞쪽 n-1 개는 값 없음 */
 function movingAverage(rows, n) {
   const out = [];
@@ -248,6 +267,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
   const unit = range.unit;
   const [data, setData] = useState(EMPTY);
+  const [reloadN, setReloadN] = useState(0); // 차트를 못 받았을 때 '다시 시도' (11/16 코드 리뷰: 기간을 바꿔도 같은 일봉이라 다시 안 받았음)
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(null);
   const [hover, setHover] = useState(null); // 십자선이 가리키는 봉의 시각
@@ -278,7 +298,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const c = readColors();
     const chart = createChart(boxRef.current, {
       autoSize: true,
-      layout: { textColor: c.text, background: { color: 'transparent' }, attributionLogo: true, fontFamily: 'Pretendard Variable, Pretendard, system-ui, sans-serif', panes: { separatorColor: c.grid, separatorHoverColor: c.grid } }, // 칸 나눔 선: 어두운 화면에서 흰 선이 튀어서 격자 색으로 (11/16)
+      layout: { textColor: c.text, background: { color: 'transparent' }, attributionLogo: false, fontFamily: 'Pretendard Variable, Pretendard, system-ui, sans-serif', panes: { separatorColor: c.grid, separatorHoverColor: c.grid } }, // 칸 나눔 선: 어두운 화면에서 흰 선이 튀어서 격자 색으로 (11/16)
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
       // entireTextOnly: 칸 끝에서 반쯤 잘리는 눈금 글자는 안 그림 (11/13 QA: 맨 위 '325,000' 이 반만 보였음)
       rightPriceScale: { borderVisible: false, entireTextOnly: true },
@@ -327,7 +347,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       2
     );
     news.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0 } });
-    chart.panes()[0].setStretchFactor(4);
+    chart.panes()[0].setStretchFactor(5); // 가격 칸을 더 크게 (11/16 디자이너 리뷰: 캔들이 납작함)
     chart.panes()[1].setStretchFactor(1);
     chart.panes()[2].setStretchFactor(1);
 
@@ -377,6 +397,12 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
       chart.remove();
       chartRef.current = null;
+      // 지운 차트의 보조지표·가격선을 붙잡고 있으면 새 차트에 칸이 안 생기고, 끌 때 지운 시리즈를 만져 앱 전체가 멈춤
+      // (11/16 코드 리뷰: 개발 모드 StrictMode 에서 MACD 를 켜 둔 채 열면 재현)
+      indRef.current = { macd: null, rsi: null };
+      hiLoRef.current = [];
+      placedKeyRef.current = null;
+      shownCountRef.current = 0;
     };
   }, []);
 
@@ -413,7 +439,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
         if (err.name !== 'AbortError') setData({ ...EMPTY, key, error: err });
       });
     return () => controller.abort();
-  }, [stockCode, unit, key]);
+  }, [stockCode, unit, key, reloadN]);
 
   loadOlderRef.current = () => {
     const d = dataRef.current;
@@ -539,8 +565,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const hi = Math.max(...span.map((r) => r.high));
     const lo = Math.min(...span.map((r) => r.low));
     hiLoRef.current = [
-      ref.candles.createPriceLine({ price: hi, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, axisLabelColor: ref.colors.labelBg, axisLabelTextColor: ref.colors.ink, title: '기간 최고' }),
-      ref.candles.createPriceLine({ price: lo, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, axisLabelColor: ref.colors.labelBg, axisLabelTextColor: ref.colors.ink, title: '기간 최저' }),
+      ref.candles.createPriceLine({ price: hi, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' }),
+      ref.candles.createPriceLine({ price: lo, color: ref.colors.text, lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' }),
     ];
   }, [data, key, unit, rangeKey, range.bars]);
 
@@ -574,7 +600,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       .filter((m) => have.has(m.date))
       .map((m) => {
         const up = m.changeRate > 0;
-        return { time: m.date, position: up ? 'belowBar' : 'aboveBar', shape: up ? 'arrowUp' : 'arrowDown', color: up ? ref.colors.up : ref.colors.down, size: 1 };
+        return { time: m.date, position: up ? 'belowBar' : 'aboveBar', shape: up ? 'arrowUp' : 'arrowDown', color: up ? ref.colors.up : ref.colors.down, size: 0.5 }; // 작게 (리뷰: 화살표가 캔들을 가림)
       })
       .sort((a, b) => (a.time < b.time ? -1 : 1));
     ref.moveMarks.setMarkers(marks);
@@ -664,7 +690,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       <div className="chart-readout" aria-live="off">
         {bar && !message ? (
           <>
-            <span className="muted">{formatTime(bar.t)}</span>
+            <span className="muted">{readoutTime(bar.t)}</span>
             <span>
               <span className="k">시가</span>
               <b>{fmt(bar.open)}</b>
@@ -689,8 +715,17 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
             </span>
             <span>
               <span className="k">거래량</span>
-              <b>{fmt(bar.volume)}</b>
+              <b>{volText(bar.volume)}</b>
             </span>
+            {/* 기간 최고·최저: 축 위 상자로 두면 눈금 숫자를 가려서(11/16 리뷰) 값 줄로 옮김. 차트에는 점선만 */}
+            {!isIntraday(unit) && span.length > 1 && (
+              <span className="muted">
+                <span className="k">기간 최고</span>
+                <b>{fmt(Math.max(...span.map((r) => r.high)))}</b>
+                <span className="k" style={{ marginLeft: 8 }}>최저</span>
+                <b>{fmt(Math.min(...span.map((r) => r.low)))}</b>
+              </span>
+            )}
           </>
         ) : (
           <span>&nbsp;</span>
@@ -731,7 +766,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           <button type="button" className="ind-btn" aria-pressed={ind.macd} onClick={() => toggleInd('macd')} title="MACD: 짧은 평균과 긴 평균의 차이로 흐름이 바뀌는지 보는 지표 (12·26·9)">
             MACD
           </button>
-          <button type="button" className="ind-btn" aria-pressed={ind.rsi} onClick={() => toggleInd('rsi')} title="RSI: 최근 14봉의 오른 폭과 내린 폭 비율. 70 위는 많이 오른 편, 30 아래는 많이 내린 편">
+          <button type="button" className="ind-btn" aria-pressed={ind.rsi} onClick={() => toggleInd('rsi')} title="RSI: 최근 14봉의 오른 폭과 내린 폭 비율. 70 이상이면 많이 오른 편, 30 이하면 많이 내린 편">
             RSI
           </button>
         </div>
@@ -747,7 +782,23 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
             ))}
           </div>
         )}
-        {message && <div className="chart-overlay">{message}</div>}
+        {message && (
+          <div className="chart-overlay">
+            <span>{message}</span>
+            {data.error && data.key === key && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setData(EMPTY);
+                  setReloadN((n) => n + 1);
+                }}
+              >
+                다시 시도
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {showMarks && bar && !message && (
         <div className="chart-news" aria-live="off">
