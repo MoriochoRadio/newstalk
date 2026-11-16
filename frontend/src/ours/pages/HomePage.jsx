@@ -265,7 +265,7 @@ export default function HomePage() {
                 {/* ② 종목 지도: 시가총액 지도. 서버가 아직 모르면(백엔드 브랜치 합치기 전) 같은 모양으로 '오늘 기사 많은 종목'(크기 = 기사 수) */}
                 {capMap.data?.items?.length ? (
                   <>
-                    <CapMap items={capMap.data.items} news={capNews} height={400} />
+                    <CapMap items={capMap.data.items} news={capNews} height={540} />
                     <CapLegend />
                   </>
                 ) : capMap.error || issueItems.length ? (
@@ -280,7 +280,7 @@ export default function HomePage() {
                         priceLimit: { up: 'UPPER', down: 'LOWER' }[limitOf(quotes[it.stockCode])] ?? null,
                       }))}
                       news={Object.fromEntries(issueItems.map((it) => [it.stockCode, { count: it.articleCount, top: feed.data ? pickWhy(newsArticles, it.stockCode) : null }]))}
-                      height={380}
+                      height={520}
                       limit={15}
                     />
                     <CapLegend size="오늘 기사 수 (시가총액 지도는 새 서버를 켜면 보여요)" grouped={false} />
@@ -292,7 +292,7 @@ export default function HomePage() {
                 {topicRows.length > 0 && (
                   <div className="home-words">
                     <h3 className="hs-k">오늘 기사가 많이 다룬 주제</h3>
-                    <TopicBubbles rows={topicRows} height={280} />
+                    <TopicBubbles rows={topicRows} height={360} />
                   </div>
                 )}
               </>

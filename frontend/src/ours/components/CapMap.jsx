@@ -101,7 +101,7 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
               const showName = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
               const rateSize = Math.max(10, Math.round(nameSize * 0.72));
               const showRate = showName && h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44;
-              const newsSize = Math.max(12, Math.min(16, Math.round(nameSize * 0.6)));
+              const newsSize = roomy ? Math.max(14, Math.min(18, Math.round(nameSize * 0.66))) : Math.max(12, Math.min(16, Math.round(nameSize * 0.6)));
               const showNews = n > 0 && showRate && h >= nameSize * 1.2 + rateSize * 1.25 + newsSize * 1.6 + 10 && w >= 64;
               // 숫자 동그라미는 이름과 안 겹칠 때만 (이름이 가운데라 양옆에 24px 씩 남아야) — 휴대폰에서 이름을 가렸음
               const showBadge = n > 0 && !showNews && w >= 22 && h >= 18 && (!showName || w - len * nameSize >= 48);
