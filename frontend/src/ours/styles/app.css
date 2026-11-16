@@ -6330,3 +6330,23 @@ a { text-underline-offset: 3px; }
 .cm-head-rate.up { color: var(--up); }
 .cm-head-rate.down { color: var(--down); }
 .cm-head-news { margin-left: auto; font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }
+
+/* ===== 지도 색: 등락 폭에 따라 이어지는 진하기 (11/16 저녁) ===== */
+.cm-tile.cm-up { background: color-mix(in srgb, var(--up) var(--heat), var(--surface)); }
+.cm-tile.cm-down { background: color-mix(in srgb, var(--down) var(--heat), var(--surface)); }
+.cm-tile.cm-up .cm-rate { color: var(--up); }
+.cm-tile.cm-down .cm-rate { color: var(--down); }
+.cm-tile.cm-strong .cm-rate { color: var(--text); } /* 진한 바탕에서는 빨강·파랑 글자 대비가 모자라 본문색 (+/− 부호가 방향) */
+.cm-scale2 { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-3); }
+.cm-scale2 i {
+  display: inline-block;
+  width: 160px;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--down) 52%, var(--surface)),
+    color-mix(in srgb, var(--down) 8%, var(--surface)) 48%,
+    color-mix(in srgb, var(--text-3) 14%, var(--surface)) 50%,
+    color-mix(in srgb, var(--up) 8%, var(--surface)) 52%,
+    color-mix(in srgb, var(--up) 52%, var(--surface)));
+}

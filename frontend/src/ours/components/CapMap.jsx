@@ -28,16 +28,19 @@ function useWidth(ref) {
   return w;
 }
 
-/** 등락률 → 색 단계 (FINVIZ 처럼 7단계, 국내 관례 색) */
+/** 등락률 → 색. 등락 폭에 비례해 진하기가 이어짐: 0% 회색 · 1% 옅게 … 5% 이상 가장 진하게 (바탕에 섞는 비율 8~52%)
+ *  11/16 사용자: '많이 떨어지면 더 진하게, 적게 떨어지면 연하게' — 예전 7단계는 1%와 2.9%가 같은 색이었음 */
+export function capHeatStyle(rate) {
+  if (rate == null || Number.isNaN(Number(rate))) return { cls: 'cm-na', style: undefined, strong: false };
+  const r = Number(rate);
+  if (Math.abs(r) < 0.05) return { cls: 'cm-0', style: undefined, strong: false };
+  const heat = Math.round(8 + Math.min(1, Math.abs(r) / 5) * 44);
+  return { cls: r > 0 ? 'cm-up' : 'cm-down', style: { '--heat': `${heat}%` }, strong: heat > 26 };
+}
+
+/** (예전 단계 이름 — 다른 곳에서 쓰면 그대로) */
 export function capHeat(rate) {
-  if (rate == null) return 'cm-na';
-  if (rate >= 3) return 'cm-u3';
-  if (rate >= 1) return 'cm-u2';
-  if (rate > 0.2) return 'cm-u1';
-  if (rate > -0.2) return 'cm-0';
-  if (rate > -1) return 'cm-d1';
-  if (rate > -3) return 'cm-d2';
-  return 'cm-d3';
+  return capHeatStyle(rate).cls;
 }
 
 /** 억 원 → '1,152조' / '9,531억' */
@@ -160,13 +163,15 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
               const cornerNews = !newsText && n > 0 && w >= shortW + 8 && h >= 22 && (!showName || w - len * nameSize >= shortW * 2 + 8);
               // 기사가 많을수록 진하게: 없음 회색 · 1~2건 보통 · 3~5건 보라 · 6건 이상 진한 보라
               const newsLevel = n === 0 ? 0 : n >= 6 ? 3 : n >= 3 ? 2 : 1;
+              const heat = capHeatStyle(it.changeRate);
               const limit = it.priceLimit === 'UPPER' ? ' 상한가' : it.priceLimit === 'LOWER' ? ' 하한가' : '';
               const label = `${it.stockName}, ${sec.name}, 시가총액 ${capText(it.marketCap)}, ${fmtRate(it.changeRate)}${limit}, 오늘 기사 ${n}건`;
               return (
                 <li key={it.stockCode} style={{ left: t.x, top: t.y, width: w, height: h }}>
                   <Link
                     to={`/stocks/${it.stockCode}`}
-                    className={`cm-tile ${capHeat(it.changeRate)} ${roomy ? 'cm-roomy' : ''}`}
+                    className={`cm-tile ${heat.cls} ${heat.strong ? 'cm-strong' : ''} ${roomy ? 'cm-roomy' : ''}`}
+                    style={heat.style}
                     aria-label={label}
                     onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
                     onFocus={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
@@ -209,7 +214,7 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
       ))}
       {tip && (
         <div className="cm-tip" style={{ left: Math.min(Math.max(8, tip.x - 140), width - 288), top: Math.min(tip.y + 6, height - 8) }} role="presentation">
-          <b>{tip.it.stockName}</b> <span className="muted">{tip.sec}</span>
+          <b>{tip.it.stockName}</b> <span className="muted">{tip.it.sectorName || tip.sec}</span>
           <div className="num">
             시가총액 {capText(tip.it.marketCap)} · <span className={tip.it.changeRate > 0 ? 'up' : tip.it.changeRate < 0 ? 'down' : ''}>{fmtRate(tip.it.changeRate)}</span>
           </div>
@@ -225,14 +230,10 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
 export function CapLegend({ size = '시가총액', grouped = true }) {
   return (
     <div className="cm-legend" aria-hidden="true">
-      <span className="cm-scale">
-        <i className="cm-d3">-3%</i>
-        <i className="cm-d2">-1%</i>
-        <i className="cm-d1" />
-        <i className="cm-0">0</i>
-        <i className="cm-u1" />
-        <i className="cm-u2">+1%</i>
-        <i className="cm-u3">+3%</i>
+      <span className="cm-scale2">
+        <span className="num">-5%</span>
+        <i />
+        <span className="num">+5%</span>
       </span>
       <span>
         크기 = {size}

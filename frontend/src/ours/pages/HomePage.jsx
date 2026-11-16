@@ -300,7 +300,7 @@ export default function HomePage() {
               </>
             ) : variant === 'mapcap' ? (
               // 뉴스 지도 시안 구성(왼쪽 지도 + 오른쪽 숫자 칸) 그대로, 지도만 시가총액 주요 종목(업종 묶음 없이 한 덩어리).
-              // 업종별 자세한 지도는 시장 지도 화면. 서버가 시총 지도를 모르면 오늘 기사 많은 종목으로 대신
+              // 더 많은 종목은 시장 지도 화면. 서버가 시총 지도를 모르면 오늘 기사 많은 종목으로 대신
               <div className="hero-grid">
                 <div style={{ minWidth: 0 }}>
                   <CapMap
@@ -325,7 +325,7 @@ export default function HomePage() {
                     limit={16}
                     maxShare={0.16}
                   />
-                  <CapLegend size={capMap.data?.items?.length ? '시가총액 (업종별 지도는 시장 지도)' : '오늘 기사 수'} grouped={false} />
+                  <CapLegend size={capMap.data?.items?.length ? '시가총액 (더 많은 종목은 시장 지도)' : '오늘 기사 수'} grouped={false} />
                 </div>
                 <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
               </div>

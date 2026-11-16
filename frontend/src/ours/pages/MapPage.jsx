@@ -99,8 +99,9 @@ export default function MapPage() {
         {issues.loading && !issues.data && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
         {showCap && (
           <>
-            <CapMap items={capMap.data.items} news={capNews} height={height} maxShare={0.14} />
-            <CapLegend />
+            {/* 업종 상자로 나누면 칸이 잘게 깨져 글자가 안 들어감 (11/16 사용자) → 한 덩어리, 업종은 마우스를 올린 설명에 */}
+            <CapMap items={capMap.data.items.map((it) => ({ ...it, sector: '', sectorName: it.sector }))} news={capNews} height={height} maxShare={0.12} limit={24} />
+            <CapLegend grouped={false} />
           </>
         )}
         {!showCap && items.length > 0 && <MarketMap tiles={tiles} priceReady={!disabled && !loading} height={height} />}
