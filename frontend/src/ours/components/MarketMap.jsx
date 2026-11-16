@@ -138,7 +138,7 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
                     {limit && w >= 100 ? (
                       <span className="map-limit">{limit === 'up' ? ' 상한가' : ' 하한가'}</span>
                     ) : (
-                      w >= 120 && <span className="map-count"> 기사 {t.articleCount}</span>
+                      w >= 120 && <span className="map-count"> 기사 {t.articleCount}건{t.eventCount && t.eventCount !== t.articleCount && w >= 170 ? ` · 소식 ${t.eventCount}개` : ''}</span>
                     )}
                   </span>
                 )}

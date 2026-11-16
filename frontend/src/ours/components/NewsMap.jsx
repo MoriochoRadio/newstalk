@@ -70,7 +70,7 @@ export function NewsMap({ stories, height = 380 }) {
               <Link
                 to={`/news/${a.id}`}
                 className={`nm-tile nm-${tone?.kind || 'none'} ${big ? 'big' : ''}`}
-                aria-label={`${main ? `${main.name}: ` : ''}${a.title}. 오늘 기사 ${st.size || 1}건${tone ? `, ${tone.name}에 ${TONE_WORD[tone.kind]}` : ''}`}
+                aria-label={`${main ? `${main.name}: ` : ''}${a.title}. 같은 소식 기사 ${st.size || 1}건${tone ? `, ${tone.name}에 ${TONE_WORD[tone.kind]}` : ''}`}
                 title={a.title}
               >
                 {showTag && <span className="nm-stock">{main.name}</span>}
@@ -123,17 +123,17 @@ export function NewsPulse({ articles, storyCount, topics = [], disclosureCount =
         <ul className="np-tone-list num">
           <li>
             <i className="np-dot pos" />
-            좋은 소식 <b>{tone.pos}</b>
+            좋은 소식 <b>{tone.pos}</b>건
           </li>
           <li>
             <i className="np-dot neu" />
-            판단 없음 <b>{tone.neu}</b>
+            판단 없음 <b>{tone.neu}</b>건
           </li>
           <li>
             <i className="np-dot neg" />
-            나쁜 소식 <b>{tone.neg}</b>
+            나쁜 소식 <b>{tone.neg}</b>건
           </li>
-          <li className="np-read">AI가 읽은 {read}건</li>
+          <li className="np-read">AI가 읽은 기사 {read}건 기준</li>
         </ul>
       </div>
       {/* 시간대별 보도량은 뺌 (11/13 피드백: 투자자는 몇 시에 기사가 많았는지 궁금하지 않음) → 오늘 무슨 일이 많았나 */}

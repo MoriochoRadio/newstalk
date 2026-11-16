@@ -61,7 +61,7 @@ export default function MapPage() {
           <p className="eyebrow num">{todayLabel()}</p>
           <h1 className="page-title">시장 지도</h1>
           {/* 홈 '오늘 많이 보도된 소식'은 소식 하나가 칸 하나, 여기는 종목 하나가 칸 하나 (그 종목 오늘 기사를 모두 더함) — 11/16 사용자 질문 */}
-          <p className="page-sub">종목마다 칸 하나 · 크기 = 그 종목의 오늘 기사 수 전부 · 색 = 오늘 등락률</p>
+          <p className="page-sub">오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률</p>
         </div>
       </div>
       <section className="card map-page" aria-label={`오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>

@@ -3,7 +3,7 @@
 // 부품 출처: V7 adapters.toUiArticle + ArticleInfoBadges·sourceLabelOf (main frontend/src/pages/DashboardPageV7.jsx)
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ExternalLink, FileText, MessageCircle, Newspaper, Scale, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ChevronDown, ExternalLink, FileText, MessageCircle, Newspaper } from 'lucide-react';
 import { groupStories } from '../lib/stories';
 import { relativeTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
@@ -116,20 +116,12 @@ export function StockChips({ stocks, focusCode, max = 3 }) {
 /**
  * 글 한 줄. others 가 있으면(같은 소식 묶음) "같은 소식 다른 기사 n건" 을 눌러 펼침 — 목록은 소식 단위로 짧게
  */
-/** 줄 왼쪽 큰 그림 칸: 좋은·나쁜 소식이면 그 색과 손 모양, 아니면 공시·SNS·뉴스 종류 (11/16 사용자: '나쁜 소식' 표시가 제목 위에 작아 와닿지 않음)
- *  화살표(↑↓)는 주가 등락으로 읽혀서 쓰지 않음 */
+/** 줄 왼쪽 큰 그림 칸 (11/16 사용자: '나쁜 소식' 표시가 제목 위에 작아 와닿지 않음)
+ *  그림 = 늘 글 종류(신문·공시 문서·SNS 말풍선), 칸 색 = AI 판단(좋은 소식 초록·나쁜 소식 주황)
+ *  엄지 위·아래는 증권 앱에서 '추천·매수'로 읽혀서, 화살표는 주가 등락으로 읽혀서 쓰지 않음 (11/16 PM 리뷰) */
 function KindIcon({ tone, article: a }) {
-  const [Icon, kind] = tone
-    ? tone.kind === 'pos'
-      ? [ThumbsUp, 'good']
-      : tone.kind === 'neg'
-        ? [ThumbsDown, 'bad']
-        : [Scale, 'mixed']
-    : a.isDisclosure
-      ? [FileText, 'disc']
-      : a.sourceType === 'SNS'
-        ? [MessageCircle, 'sns']
-        : [Newspaper, 'news'];
+  const Icon = a.isDisclosure ? FileText : a.sourceType === 'SNS' ? MessageCircle : Newspaper;
+  const kind = tone ? (tone.kind === 'pos' ? 'good' : tone.kind === 'neg' ? 'bad' : 'mixed') : a.isDisclosure ? 'disc' : 'news';
   return (
     <span className={`feed-icon fi-${kind}`} aria-hidden="true">
       <Icon />
@@ -197,7 +189,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
       {others.length > 0 && (
         <div className="story-more">
           <button type="button" className="story-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-            같은 소식 다른 기사 {others.length}건
+            같은 소식 기사 {others.length + 1}건 모두 보기
             <ChevronDown className="icon-sm chev" aria-hidden="true" />
           </button>
           {open && (

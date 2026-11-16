@@ -5617,7 +5617,7 @@ mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit;
 .brief-topics li { display: grid; grid-template-columns: 92px minmax(0, 1fr) 40px; align-items: center; gap: 10px; font-size: var(--fs-sm); }
 .brief-topics .bt-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brief-topics .bt-bar { height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; }
-.brief-topics .bt-bar i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+.brief-topics .bt-bar i { display: block; height: 100%; border-radius: 5px; background: var(--text-3); }
 .brief-topics .bt-n { text-align: right; color: var(--text-2); font-weight: 600; }
 
 /* 홈 소식 지도: 칸의 주인공은 소식(제목), 종목은 작은 꼬리표 — 종목이 주인공인 시장 지도와 한눈에 다르게 (11/16 사용자) */
@@ -5629,12 +5629,13 @@ mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit;
   white-space: nowrap;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
   font-weight: 700;
   line-height: 18px;
 }
-.nm-tile.nm-none .nm-stock { background: var(--surface); border: 1px solid var(--line); }
+.nm-tile.nm-none .nm-stock { border: 1px solid var(--line); }
 .nm-tile .nm-headline {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -5645,3 +5646,26 @@ mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit;
 }
 .nm-tile .nm-count { margin-top: auto; font-size: 13px; }
 .nm-tile .nm-count b { font-size: 15px; }
+
+/* 판단은 칸 색 + 왼쪽 띠 (그림은 글 종류) */
+.feed-row-v2.tone-row-pos { box-shadow: inset 4px 0 0 var(--good); }
+.feed-row-v2.tone-row-neg { box-shadow: inset 4px 0 0 var(--bad); }
+.fi-good, .fi-bad { box-shadow: inset 0 0 0 1.5px currentColor; }
+/* 공시 칸 파랑이 하락 파랑과 겹쳐 회색 (디자이너 리뷰) */
+.fi-disc { background: var(--surface-3); color: var(--text-2); }
+
+.nm-explain { margin: -4px 0 12px; font-size: var(--fs-xs); color: var(--text-3); }
+/* 휴대폰 순위 표: 하한가 배지가 등락률 칸을 밀어 잘림 -> 배지는 아래 줄 */
+@media (max-width: 768px) {
+  td.change .limit-badge { display: block; margin: 2px 0 0 auto; width: max-content; }
+}
+/* 화제 종목 카드: 숫자가 주인공 - 등락률 크게, 20일 흐름선 카드 너비로 (디자이너 리뷰 '밋밋함') */
+.brief:not(.brief-compact) .brief-rate { font-size: var(--fs-lg); padding: 3px 10px; }
+.brief:not(.brief-compact) .brief-price b { font-size: var(--fs-xl); }
+.brief-spark .spark-wide { flex: 1; min-width: 0; }
+.brief-spark .spark-wide svg { width: 100%; height: 40px; display: block; }
+
+/* 글 화면 오른쪽 칸: 화면보다 길면 칸 안에서 스크롤 (sticky 로 아래쪽이 가려지지 않게) */
+@media (min-width: 1100px) {
+  .ad-grid > .ad-link { max-height: calc(100vh - 92px); overflow: auto; }
+}

@@ -101,8 +101,8 @@ function WatchTone({ t, count }) {
     <span className="wl-tone num" title={`${lean.text} · 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 판단 없음 ${neu}` : ''}`}>
       {count}건
       {/* 글자 없는 링 → 글자 (홈 카드와 같게, 11/16 3차 리뷰) */}
-      {pos > 0 && <b className="good">좋은 {pos}</b>}
-      {neg > 0 && <b className="bad">나쁜 {neg}</b>}
+      {pos > 0 && <b className="good">좋은 소식 {pos}건</b>}
+      {neg > 0 && <b className="bad">나쁜 소식 {neg}건</b>}
     </span>
   );
 }

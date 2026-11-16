@@ -23,7 +23,7 @@ const RANGES = [
   { key: '1m', label: '1분', unit: '1m', bars: 120 },
   { key: '5m', label: '5분', unit: '5m' },
   { key: '30m', label: '30분', unit: '30m', minBars: 40 },
-  { key: '60m', label: '1시간', unit: '60m', minBars: 30 },
+  { key: '60m', label: '60분', unit: '60m', minBars: 30 },
   { key: 'day', label: '일', unit: 'day', bars: 65 },
   { key: 'week', label: '주', unit: 'week', bars: 78 },
   { key: 'month', label: '월', unit: 'month' },
@@ -55,7 +55,7 @@ function toHourly(items) {
       last.close = it.close;
       last.volume += it.volume;
     } else {
-      out.push({ ...it, hourKey, time: `${hourKey}:00:00${t.slice(19)}` });
+      out.push({ ...it, hourKey, time: `${hourKey}:00:00${(t.match(/(Z|[+-]\d\d:?\d\d)$/) || [''])[0]}` });
     }
   }
   return out.map(({ hourKey, ...rest }) => rest); // eslint-disable-line no-unused-vars
@@ -78,6 +78,13 @@ function showRange(timeScale, total, bars) {
   if (bars) timeScale.setVisibleLogicalRange({ from: total - bars, to: total - 1 + 2 });
   else timeScale.fitContent();
 }
+/** 오늘 봉인가: 일봉은 날짜 문자열, 분봉은 (한국 시각으로 옮긴) 초 → 날짜 */
+const isTodayBar = (r, unit) => {
+  if (!r) return false;
+  const today = kstDate(new Date().toISOString());
+  if (unit === 'day') return r.t === today;
+  return isIntraday(unit) && typeof r.t === 'number' && new Date(r.t * 1000).toISOString().slice(0, 10) === today;
+};
 const hasMa = (unit) => unit === 'day' || unit === 'week' || unit === 'month';
 
 const dayBefore = (ymd) => {
@@ -476,13 +483,32 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const minBars = RANGES.find((r) => r.unit === unit)?.minBars || 0;
     const first = isIntraday(unit)
       ? fetchIntradayDay(stockCode, unit, null, 0, controller.signal).then(async (r) => {
-          let { items, date: cursor, tried } = r;
-          while (minBars && items.length > 0 && items.length < minBars && tried < MAX_INTRADAY_DAYS) {
-            const o = await fetchIntradayDay(stockCode, unit, prevWeekday(cursor), tried, controller.signal);
-            tried = o.tried;
-            if (!o.items.length) break;
-            items = mergeOlder(o.items, items);
-            cursor = o.date;
+          let { items, date: cursor } = r;
+          const { tried } = r;
+          if (minBars && items.length > 0 && items.length < minBars) {
+            // 하루 봉 수로 모자란 날 수를 셈 (오늘이 덜 끝났으면 하루치보다 적으므로 넉넉히 +1). 공휴일은 빈 날로 그냥 넘어감
+            const perDay = unit === '60m' ? 7 : 13;
+            const need = Math.min(6, Math.ceil((minBars - items.length) / perDay) + 1);
+            const days = [];
+            for (let d = cursor, i = 0; i < need; i += 1) {
+              d = prevWeekday(d);
+              days.push(d);
+            }
+            const olders = await Promise.all(
+              days.map((d) =>
+                quoteApi
+                  .chart(stockCode, apiUnit(unit), { date: d }, { signal: controller.signal })
+                  .then((res) => (unit === '60m' ? toHourly(res.items || []) : res.items || []))
+                  .catch((e) => {
+                    if (e.name === 'AbortError') throw e;
+                    return []; // 하루 실패는 건너뜀
+                  })
+              )
+            );
+            olders.forEach((o) => {
+              if (o.length) items = mergeOlder(o, items);
+            });
+            cursor = days[days.length - 1];
           }
           return { items, cursor, tried, more: items.length > 0 && tried < MAX_INTRADAY_DAYS };
         })
@@ -497,7 +523,10 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           };
         });
     first
-      .then((r) => setData({ key, error: null, ...r }))
+      .then((r) => {
+        if (controller.signal.aborted) return; // 단위를 바꾼 뒤 늦게 온 결과는 버림
+        setData({ key, error: null, ...r });
+      })
       .catch((err) => {
         if (err.name !== 'AbortError') setData({ ...EMPTY, key, error: err });
       });
@@ -646,7 +675,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
   useEffect(() => {
     const ref = chartRef.current;
     const last = rowsRef.current[rowsRef.current.length - 1];
-    if (!ref || unit !== 'day' || livePrice == null || !last || last.t !== kstDate(new Date().toISOString())) return;
+    if (!ref || livePrice == null || !isTodayBar(last, unit) || (isIntraday(unit) && !tradingNow())) return;
     ref.candles.update({ time: last.t, open: last.open, high: Math.max(last.high, livePrice), low: Math.min(last.low, livePrice), close: livePrice });
   }, [livePrice, unit, data]);
 
@@ -693,9 +722,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     if (found >= 0) idx = found;
   }
   // 오늘 일봉은 위 현재가(실시간 시세)로 맞춤 — 차트 봉은 10분 캐시라 값 줄의 '현재'가 머리의 현재가와 달랐음 (11/16 리뷰)
-  const todayKey = kstDate(new Date().toISOString());
   const liveBar = (r) =>
-    r && unit === 'day' && r.t === todayKey && liveQuote?.price
+    r && r === rows[rows.length - 1] && isTodayBar(r, unit) && (unit === 'day' || tradingNow()) && liveQuote?.price
       ? { ...r, close: liveQuote.price, high: Math.max(r.high, liveQuote.price), low: Math.min(r.low, liveQuote.price) }
       : r;
   const bar = idx >= 0 ? liveBar(rows[idx]) : null;
@@ -777,6 +805,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
               <b>{fmt(bar.close)}</b>
               {diffRate != null && (
                 <span className={diffRate > 0 ? 'up' : diffRate < 0 ? 'down' : 'flat'} style={{ marginLeft: 4 }}>
+                  {isIntraday(unit) && <span className="k">전 봉 대비 </span>}
                   {diffRate > 0 ? '+' : ''}
                   {diffRate.toFixed(2)}%
                 </span>

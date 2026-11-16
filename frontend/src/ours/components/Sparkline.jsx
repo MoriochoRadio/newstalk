@@ -6,7 +6,7 @@ import { wantSpark } from '../lib/spark';
 const W = 72;
 const H = 28;
 
-export default function Sparkline({ code, name, disabled = false }) {
+export default function Sparkline({ code, name, disabled = false, wide = false }) {
   const boxRef = useRef(null);
   const [visible, setVisible] = useState(false);
   const [entry, setEntry] = useState(null);
@@ -36,9 +36,12 @@ export default function Sparkline({ code, name, disabled = false }) {
   const failed = entry?.status === 'failed';
   useEffect(() => {
     if (!failed) return undefined;
-    const t = setTimeout(() => setRetry((n) => n + 1), 61_000);
+    const t = setTimeout(() => {
+      setEntry(null); // 다시 받는 동안은 기다림 상태 → 또 실패하면 failed 가 다시 참이 되어 타이머가 또 걸림
+      setRetry((n) => n + 1);
+    }, 61_000);
     return () => clearTimeout(t);
-  }, [failed]);
+  }, [failed, retry]);
   useEffect(() => {
     if (!visible || disabled) return undefined;
     return wantSpark(code, (e) => setEntry({ status: e.status, data: e.data }));
@@ -61,11 +64,12 @@ export default function Sparkline({ code, name, disabled = false }) {
   const dir = rate > 0 ? 'up' : rate < 0 ? 'down' : 'flat';
   const label = `${name} 최근 ${vals.length}거래일 종가 추이, 처음보다 ${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`;
   return (
-    <span className={`spark spark-${dir}`} ref={boxRef} title={label}>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
+    <span className={`spark spark-${dir} ${wide ? 'spark-wide' : ''}`} ref={boxRef} title={label}>
+      {/* wide: 카드 너비만큼 늘림 (선 굵기는 그대로) - 화제 종목 카드 */}
+      <svg width={wide ? undefined : W} height={wide ? undefined : H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio={wide ? 'none' : undefined} role="img" aria-label={label}>
         <path d={area} className="spark-area" />
-        <path d={line} className="spark-line" />
-        <circle cx={pts[pts.length - 1][0] - 1.5} cy={pts[pts.length - 1][1]} r="2" className="spark-dot" />
+        <path d={line} className="spark-line" vectorEffect={wide ? 'non-scaling-stroke' : undefined} />
+        {!wide && <circle cx={pts[pts.length - 1][0] - 1.5} cy={pts[pts.length - 1][1]} r="2" className="spark-dot" />}
       </svg>
     </span>
   );

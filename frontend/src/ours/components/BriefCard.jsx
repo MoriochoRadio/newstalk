@@ -27,10 +27,10 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
   const text = dropPriceSentences(summary?.newsSummary || '');
   // '실적 3 · 외국인·기관 2' 꼬리표가 무슨 숫자인지 몰랐음 (11/16 사용자) → 큰 카드는 '오늘 나온 소식' 막대 그림, 작은 카드는 '실적 소식 3개'
   const topics = (digest?.topics || []).slice(0, 3);
-  const topicMax = Math.max(1, ...topics.map((t) => t.count));
+  const topicBase = Math.max(1, digest?.newsCount || 0, ...topics.map((t) => t.count)); // 오늘 기사 수 대비 (카드 안 최댓값 대비면 3건·8건이 둘 다 꽉 찼음)
   const tags = [
     ...(digest?.disclosureTypes || []).map((t) => ({ key: `d-${t}`, label: `공시 · ${t}`, kind: 'accent' })),
-    ...(compact ? topics.map((t) => ({ key: `t-${t.label}`, label: `${t.label} 소식 ${t.count}개`, kind: '' })) : []),
+    ...(compact ? topics.map((t) => ({ key: `t-${t.label}`, label: `${t.label} 기사 ${t.count}건`, kind: '' })) : []),
   ].slice(0, compact ? 2 : 3);
   const count = articleCount ?? digest?.newsCount ?? 0;
 
@@ -52,7 +52,7 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
       </Link>
       {!compact && (
         <div className="brief-spark">
-          <Sparkline code={code} name={name} disabled={priceOff} />
+          <Sparkline code={code} name={name} disabled={priceOff} wide />
           {!priceOff && <span className="muted">20일</span>}
         </div>
       )}
@@ -92,15 +92,15 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
       {digest === null && !compact && <div className="skeleton sk-line" style={{ width: '60%', height: 64 }} />}
       {!compact && topics.length > 0 && (
         <div className="brief-topics">
-          <span className="bt-k">오늘 나온 소식 종류</span>
+          <span className="bt-k">오늘 기사 {digest?.newsCount || 0}건은 어떤 내용?</span>
           <ul>
             {topics.map((t) => (
               <li key={t.label}>
                 <span className="bt-label">{t.label}</span>
                 <span className="bt-bar" aria-hidden="true">
-                  <i style={{ width: `${(t.count / topicMax) * 100}%` }} />
+                  <i style={{ width: `${(t.count / topicBase) * 100}%` }} />
                 </span>
-                <span className="bt-n num">{t.count}개</span>
+                <span className="bt-n num">{t.count}건</span>
               </li>
             ))}
           </ul>

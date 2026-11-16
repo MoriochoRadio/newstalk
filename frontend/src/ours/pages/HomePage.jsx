@@ -89,8 +89,8 @@ function WatchStrip({ quotes }) {
                 {/* 글자 없는 22px 링은 '불러오는 중' 표시처럼 보였음 → 짧은 글자로 (11/16 디자이너 2차 리뷰, WCAG 1.4.1).
                     줄은 늘 두어 판단이 늦게 와도 카드 높이가 그대로 */}
                 <span className="ws-tone num">
-                  {pos > 0 && <b className="good">좋은 {pos}</b>}
-                  {neg > 0 && <b className="bad">나쁜 {neg}</b>}
+                  {pos > 0 && <b className="good">좋은 소식 {pos}건</b>}
+                  {neg > 0 && <b className="bad">나쁜 소식 {neg}건</b>}
                   {!pos && !neg && <span aria-hidden="true">&nbsp;</span>}
                 </span>
                 <span className="ws-price num">
@@ -149,9 +149,10 @@ export default function HomePage() {
             <span><i className="nm-pos" />좋은 소식</span>
             <span><i className="nm-neg" />나쁜 소식</span>
             <span><i className="nm-none" />판단 없음</span>
-            <span className="hide-mobile">칸 = 소식 하나 · 크기 = 같은 소식을 쓴 기사 수</span>
           </span>
         </div>
+        {/* 시장 지도(종목 순위)와 1등이 다른 이유를 화면에서 바로 (11/16 사용자·PM 리뷰: 휴대폰에선 설명이 숨겨져 있었음) */}
+        <p className="nm-explain">같은 내용을 쓴 기사가 많은 소식부터 크게 보여요 · 종목 순위가 아니에요 (종목 순위는 시장 지도)</p>
         {feed.error && !feed.data ? (
           <ErrorBox error={feed.error} onRetry={feed.reload} />
         ) : feed.data && newsArticles.length === 0 ? (
@@ -227,8 +228,8 @@ export default function HomePage() {
         <Link to="/news?period=today" className="home-link">
           <Newspaper className="icon" aria-hidden="true" />
           <span>
-            <b>오늘 소식 전체</b>
-            <small>뉴스·공시 {(feed.data?.total || 0).toLocaleString('ko-KR')}건</small>
+            <b>오늘 기사·공시 전체</b>
+            <small>{(feed.data?.total || 0).toLocaleString('ko-KR')}건</small>
           </span>
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>
