@@ -267,7 +267,7 @@ export default function HomePage() {
                 {/* ② 종목 지도: 시가총액 지도. 서버가 아직 모르면(백엔드 브랜치 합치기 전) 같은 모양으로 '오늘 기사 많은 종목'(크기 = 기사 수) */}
                 {capMap.data?.items?.length ? (
                   <>
-                    <CapMap items={capMap.data.items} news={capNews} height={540} />
+                    <CapMap items={capMap.data.items} news={capNews} height={540} maxShare={0.16} />
                     <CapLegend />
                   </>
                 ) : capMap.error || issueItems.length ? (
@@ -323,6 +323,7 @@ export default function HomePage() {
                     }
                     height={400}
                     limit={16}
+                    maxShare={0.16}
                   />
                   <CapLegend size={capMap.data?.items?.length ? '시가총액 (업종별 지도는 시장 지도)' : '오늘 기사 수'} grouped={false} />
                 </div>

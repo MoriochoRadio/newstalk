@@ -49,7 +49,7 @@ export function capText(eok) {
  * items: [{ stockCode, stockName, sector, marketCap, changeRate, priceLimit }]
  * news: { [code]: { count, top: { id, title } } } — 오늘 기사 수와 대표 제목
  */
-export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
+export default function CapMap({ items, news = {}, height = 520, limit = 20, maxShare = 0.24 }) {
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
   const [tip, setTip] = useState(null);
@@ -70,17 +70,32 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
       .filter((s) => s.total > 0)
       .sort((a, b) => b.total - a.total);
     // 시가총액 차이가 매우 커서(삼성전자 1,150조 vs 코스닥 3조) 그대로면 작은 종목이 안 보임 → 제곱근에 가깝게 눌러 줌 (0.6제곱)
-    const weight = (v) => Math.max(1, v) ** 0.6;
+    const raw = new Map(list0.map((x) => [x.stockCode, Math.max(1, x.marketCap) ** 0.6]));
+    // 칸 하나가 지도의 maxShare 를 넘지 않게 (11/16 사용자: 삼성전자·SK하이닉스 두 칸이 지도 절반) — 크기 순서는 그대로,
+    // 넘친 넓이는 나머지에 나눔. c = maxShare × Σmin(w, c) 를 만족하는 상한 c 를 이분 탐색
+    const ws = [...raw.values()];
+    let capW = Math.max(...ws);
+    if (ws.length * maxShare >= 1 && capW > maxShare * ws.reduce((t, v) => t + v, 0)) {
+      let lo = 0;
+      let hi = capW;
+      for (let i = 0; i < 40; i += 1) {
+        const mid = (lo + hi) / 2;
+        if (mid - maxShare * ws.reduce((t, v) => t + Math.min(v, mid), 0) > 0) hi = mid;
+        else lo = mid;
+      }
+      capW = lo;
+    }
+    const weightOf = (x) => Math.min(raw.get(x.stockCode), capW);
     // 칸마다 오른쪽·아래 여백(GAP)을 빼므로 전체를 GAP 만큼 크게 나눠야 끝이 상자 끝과 맞음
-    const secRects = squarify(sectors.map((s) => s.list.reduce((t, x) => t + weight(x.marketCap), 0)), width + GAP, height + GAP);
+    const secRects = squarify(sectors.map((s) => s.list.reduce((t, x) => t + weightOf(x), 0)), width + GAP, height + GAP);
     return secRects.map((r) => {
       const s = sectors[r.i];
       const showHead = Boolean(s.name) && r.h >= HEAD + 30 && r.w >= 60;
       const top = showHead ? HEAD : 0;
-      const inner = squarify(s.list.map((x) => weight(x.marketCap)), Math.max(0, r.w), Math.max(0, r.h - top));
+      const inner = squarify(s.list.map((x) => weightOf(x)), Math.max(0, r.w), Math.max(0, r.h - top));
       return { ...r, name: s.name, showHead, tiles: inner.map((t) => ({ ...t, it: s.list[t.i] })) };
     });
-  }, [items, width, height, limit]);
+  }, [items, width, height, limit, maxShare]);
 
   return (
     <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)}>
