@@ -126,7 +126,14 @@ function SummaryCard({ code, summary }) {
     try {
       const res = await stockApi.regenerate(code);
       if (res?.summary) setOverride(res.summary);
-      toast(res?.regenerated ? '오늘 기사로 요약을 새로 만들었어요.' : '10분 안에 만든 요약이 있거나 오늘 기사가 없어 저장된 요약을 보여 드려요.');
+      // regenerated=false 는 '10분 안에 이미 요청함(앞 요청이 실패했어도 비용 때문에 다시 안 부름)' 또는 '오늘 기사 없음' (11/16 점검)
+      toast(
+        res?.regenerated
+          ? '오늘 기사로 요약을 새로 만들었어요.'
+          : res?.summary?.newsSummary
+            ? '방금(10분 안) 요청했거나 오늘 기사가 없어 저장된 요약을 그대로 보여 드려요.'
+            : '오늘 기사가 아직 없거나 방금 요청해서 새로 만들지 않았어요.'
+      );
     } catch (err) {
       if (!handleAuthError(err)) setError(errorText(err, '요약을 다시 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
     } finally {
