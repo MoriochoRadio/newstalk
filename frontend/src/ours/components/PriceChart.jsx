@@ -275,7 +275,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const c = readColors();
     const chart = createChart(boxRef.current, {
       autoSize: true,
-      layout: { textColor: c.text, background: { color: 'transparent' }, attributionLogo: true, fontFamily: 'Pretendard Variable, Pretendard, system-ui, sans-serif' },
+      layout: { textColor: c.text, background: { color: 'transparent' }, attributionLogo: true, fontFamily: 'Pretendard Variable, Pretendard, system-ui, sans-serif', panes: { separatorColor: c.grid, separatorHoverColor: c.grid } }, // 칸 나눔 선: 어두운 화면에서 흰 선이 튀어서 격자 색으로 (11/16)
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
       // entireTextOnly: 칸 끝에서 반쯤 잘리는 눈금 글자는 안 그림 (11/13 QA: 맨 위 '325,000' 이 반만 보였음)
       rightPriceScale: { borderVisible: false, entireTextOnly: true },
@@ -348,7 +348,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     // 라이트/다크가 바뀌면(<html data-theme> 또는 운영체제 설정) 차트 색도 따라감
     const recolor = () => {
       const n = readColors();
-      chart.applyOptions({ layout: { textColor: n.text }, grid: { vertLines: { color: n.grid }, horzLines: { color: n.grid } } });
+      chart.applyOptions({ layout: { textColor: n.text, panes: { separatorColor: n.grid, separatorHoverColor: n.grid } }, grid: { vertLines: { color: n.grid }, horzLines: { color: n.grid } } });
       candles.applyOptions({ upColor: n.up, downColor: n.down, borderUpColor: n.up, borderDownColor: n.down, wickUpColor: n.up, wickDownColor: n.down });
       MA.forEach((m) => maSeries[m.n].applyOptions({ color: n.ma[m.n] }));
       news.applyOptions({ color: n.news });

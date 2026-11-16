@@ -94,22 +94,25 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
     return () => ro.disconnect();
   }, []);
 
-  const rects = width ? squarify(tiles.map((t) => Math.max(1, t.articleCount)), width, height) : [];
-  const tipTile = tip != null ? tiles[tip] : null;
+  // 휴대폰처럼 좁으면 위 16종목만 (11/16: 30칸이면 'G…'·'H…' 처럼 이름이 다 잘림. 나머지는 아래 등락 목록·종목 화면에서)
+  const shown = width && width < 520 ? tiles.slice(0, 16) : tiles;
+  const rects = width ? squarify(shown.map((t) => Math.max(1, t.articleCount)), width, height) : [];
+  const tipTile = tip != null ? shown[tip] : null;
   const tipRect = tip != null ? rects.find((r) => r.i === tip) : null;
 
   return (
     <div className="map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)}>
       <ul className="map-tiles" aria-label="오늘의 이슈 종목 지도">
         {rects.map((r) => {
-          const t = tiles[r.i];
+          const t = shown[r.i];
           const level = priceReady ? heatLevel(t.rate) : 'none';
           const w = r.w - GAP;
           const h = r.h - GAP;
           const big = w >= 160 && h >= 110;
           const showRate = w >= 64 && h >= 52;
           const showName = w >= 44 && h >= 30;
-          const nameSize = Math.round(Math.min(22, Math.max(13, Math.sqrt(w * h) / 9)));
+          // 이름이 칸 너비를 넘지 않게 (한글 한 자 ≈ 1em, 좌우 여백 약 20px). 최소 11px
+          const nameSize = Math.round(Math.max(11, Math.min(22, Math.sqrt(w * h) / 9, (w - 20) / (Math.max(2, t.name.length) * 0.95))));
           const label = `${t.name}, 오늘 기사 ${t.articleCount}건${t.rate != null ? `, 등락률 ${fmtRate(t.rate)}` : ''}${t.why ? `. ${t.why.title}` : ''}`;
           return (
             <li key={t.code} style={{ left: r.x, top: r.y, width: w, height: h, animationDelay: `${Math.min(r.i, 12) * 30}ms` }} className="map-cell">
