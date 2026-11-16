@@ -99,6 +99,9 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
               const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8)));
               // 이름이 칸 너비에 다 들어갈 때만 (잘린 이름 '삼성엔지니…' 대신 빈 칸 + 마우스를 올리면 정보)
               const showName = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
+              // 좁고 긴 칸: 한 줄에 안 들어가는 긴 이름(한화에어로스페이스 등)은 두세 줄로 접어서 (빈 칸으로 남던 것 — 11/16)
+              const wrapSize = Math.round(Math.max(11, Math.min(14, ((w - 8) * 2.6) / len)));
+              const wrapName = !showName && w >= 40 && h >= wrapSize * 3.6 + 8;
               const rateSize = Math.max(10, Math.round(nameSize * 0.72));
               const showRate = showName && h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44;
               const newsSize = roomy ? Math.max(14, Math.min(18, Math.round(nameSize * 0.66))) : Math.max(12, Math.min(16, Math.round(nameSize * 0.6)));
@@ -120,6 +123,11 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
                     <span className="cm-main">
                       {showName && (
                         <span className="cm-name" style={{ fontSize: nameSize }}>
+                          {it.stockName}
+                        </span>
+                      )}
+                      {wrapName && (
+                        <span className="cm-name cm-name-wrap" style={{ fontSize: wrapSize }}>
                           {it.stockName}
                         </span>
                       )}

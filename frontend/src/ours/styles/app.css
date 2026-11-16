@@ -6276,3 +6276,9 @@ a.hs-bl:hover { color: var(--accent-text); }
 ::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
 html { caret-color: var(--accent); scrollbar-color: color-mix(in srgb, var(--text-3) 45%, transparent) transparent; }
 a { text-underline-offset: 3px; }
+.cm-name.cm-name-wrap { white-space: normal; word-break: break-all; text-align: center; line-height: 1.2; max-width: 100%; }
+/* 홈 시안 단추(임시)가 휴대폰에서 줄바꿈 → 가로로 넘겨 보기 */
+.home-variant { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.home-variant > span { white-space: nowrap; }
+.home-variant .segmented { flex: none; flex-wrap: nowrap; }
+.home-variant .segmented button { white-space: nowrap; }

@@ -46,6 +46,7 @@ const VARIANTS = [
   { key: 'list', label: '요약 + 목록' },
   { key: 'cloud', label: '단어 구름' },
   { key: 'stock', label: '종목 지도' },
+  { key: 'mapcap', label: '뉴스 지도 + 종목' },
 ];
 const VARIANT_KEY = 'snm_home_variant';
 function useHomeVariant() {
@@ -172,9 +173,9 @@ export default function HomePage() {
   const tileStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_TILES) : []), [feed.data]);
   const mapStories = tileStories.slice(0, MAP_STORIES);
   // 시안 '종목 지도': 시가총액 지도 + 칸마다 오늘 기사 수 (11/16 저녁 사용자: FINVIZ 지도처럼)
-  const capMap = useApi((signal) => quoteApi.marketMap({ signal }), [variant], { enabled: variant === 'stock' });
+  const capMap = useApi((signal) => quoteApi.marketMap({ signal }), [variant], { enabled: variant === 'stock' || variant === 'mapcap' });
   const capNews = useMemo(() => {
-    if (!feed.data || variant !== 'stock') return {};
+    if (!feed.data || (variant !== 'stock' && variant !== 'mapcap')) return {};
     const out = {};
     const news = feed.data.items.filter((a) => !a.isDisclosure);
     (capMap.data?.items || []).forEach((it) => {
@@ -219,7 +220,7 @@ export default function HomePage() {
         <div className="card-head">
           <h2 className="card-title" id="hero-title">
             <Newspaper className="icon" aria-hidden="true" />
-            {variant === 'map' ? '오늘 뉴스 한눈에' : variant === 'cloud' ? '오늘 시장, 단어로 한눈에' : variant === 'stock' ? '오늘 시장 지도' : '오늘 한눈에'}
+            {variant === 'map' ? '오늘 뉴스 한눈에' : variant === 'mapcap' ? '오늘 시장 한눈에' : variant === 'cloud' ? '오늘 시장, 단어로 한눈에' : variant === 'stock' ? '오늘 시장 지도' : '오늘 한눈에'}
           </h2>
           {variant === 'map' && (
             <span className="nm-legend" aria-hidden="true">
@@ -297,6 +298,36 @@ export default function HomePage() {
                   </div>
                 )}
               </>
+            ) : variant === 'mapcap' ? (
+              // 뉴스 지도 시안 구성(왼쪽 지도 + 오른쪽 숫자 칸) 그대로, 지도만 시가총액 주요 종목(업종 묶음 없이 한 덩어리).
+              // 업종별 자세한 지도는 시장 지도 화면. 서버가 시총 지도를 모르면 오늘 기사 많은 종목으로 대신
+              <div className="hero-grid">
+                <div style={{ minWidth: 0 }}>
+                  <CapMap
+                    items={
+                      capMap.data?.items?.length
+                        ? capMap.data.items.map((it) => ({ ...it, sector: '' }))
+                        : issueItems.map((it) => ({
+                            stockCode: it.stockCode,
+                            stockName: it.stockName,
+                            sector: '',
+                            marketCap: it.articleCount,
+                            changeRate: quotes[it.stockCode]?.changeRate ?? null,
+                            priceLimit: { up: 'UPPER', down: 'LOWER' }[limitOf(quotes[it.stockCode])] ?? null,
+                          }))
+                    }
+                    news={
+                      capMap.data?.items?.length
+                        ? capNews
+                        : Object.fromEntries(issueItems.map((it) => [it.stockCode, { count: it.articleCount, top: pickWhy(newsArticles, it.stockCode) }]))
+                    }
+                    height={400}
+                    limit={16}
+                  />
+                  <CapLegend size={capMap.data?.items?.length ? '시가총액 (업종별 지도는 시장 지도)' : '오늘 기사 수'} grouped={false} />
+                </div>
+                <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
+              </div>
             ) : variant === 'map' ? (
               <div className="hero-grid">
                 <NewsMap stories={tileStories} variant="stock" />
@@ -321,7 +352,7 @@ export default function HomePage() {
       {hasWatch && <WatchStrip quotes={quotes} />}
 
       {/* 2) 자세히: 많이 보도된 소식을 큼직한 목록으로 (지도·카드판 대신 — 긴 제목이 다 읽히게) */}
-      {(variant === 'map' || variant === 'stock') && feed.data && (
+      {(variant === 'map' || variant === 'stock' || variant === 'mapcap') && feed.data && (
         <TopStories
           stories={topStories}
           quotes={quotes}
@@ -333,7 +364,7 @@ export default function HomePage() {
           }
         />
       )}
-      {variant !== 'map' && variant !== 'stock' && !(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
+      {variant !== 'map' && variant !== 'stock' && variant !== 'mapcap' && !(feed.data && newsArticles.length === 0) && !(feed.error && !feed.data) && (
         <section className="card" aria-labelledby="rank-title">
           <div className="card-head">
             <h2 className="card-title" id="rank-title">
