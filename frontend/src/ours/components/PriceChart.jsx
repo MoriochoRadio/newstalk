@@ -121,7 +121,7 @@ function movingAverage(rows, n) {
  * 받은 봉의 종가로 화면에서 계산 (서버 변경 없음). 일반적인 기본값: MACD(12, 26, 9), RSI(14, Wilder 평균) */
 function ema(values, n) {
   const k = 2 / (n + 1);
-  const out = new Array(values.length).fill(null);
+  const out = Array.from({ length: values.length }, () => null);
   let prev = null;
   for (let i = 0; i < values.length; i += 1) {
     if (i < n - 1) continue;
@@ -137,7 +137,7 @@ export function macd(rows, fast = 12, slow = 26, sig = 9) {
   const s = ema(closes, slow);
   const line = closes.map((_, i) => (f[i] != null && s[i] != null ? f[i] - s[i] : null));
   const start = line.findIndex((v) => v != null);
-  const signal = new Array(rows.length).fill(null);
+  const signal = Array.from({ length: rows.length }, () => null);
   if (start >= 0) ema(line.slice(start), sig).forEach((v, j) => (signal[start + j] = v));
   return rows.map((r, i) => ({ time: r.t, macd: line[i], signal: signal[i], hist: line[i] != null && signal[i] != null ? line[i] - signal[i] : null }));
 }
@@ -277,7 +277,8 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       autoSize: true,
       layout: { textColor: c.text, background: { color: 'transparent' }, attributionLogo: true, fontFamily: 'Pretendard Variable, Pretendard, system-ui, sans-serif' },
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
-      rightPriceScale: { borderVisible: false },
+      // entireTextOnly: 칸 끝에서 반쯤 잘리는 눈금 글자는 안 그림 (11/13 QA: 맨 위 '325,000' 이 반만 보였음)
+      rightPriceScale: { borderVisible: false, entireTextOnly: true },
       timeScale: { borderVisible: false },
       crosshair: { mode: 0 },
       localization: { locale: 'ko-KR', priceFormatter: fmt, timeFormatter: formatTime },

@@ -116,7 +116,7 @@ export default function HomePage() {
   const hasWatch = Boolean(user && watchlist.loaded && watchlist.items.length);
   const watchCodes = hasWatch ? watchlist.items.slice(0, WATCH_N).map((w) => w.stockCode) : [];
   const storyCodes = topStories.flatMap((st) => st.lead.relatedStocks.filter((s) => s.role === 'MAIN').map((s) => s.code));
-  const { quotes, loading: quoteLoading, disabled: priceOff } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
+  const { quotes } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
   const newsArticles = feed.data ? feed.data.items.filter((a) => !a.isDisclosure) : [];
   const newsCount = newsArticles.length;
   const mapStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_STORIES) : []), [feed.data]);
