@@ -142,12 +142,12 @@ export default function NewsPage() {
   const showNew = () => {
     clearNew();
     all.reload();
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const goPage = (n) => {
     update({ page: n > 1 ? String(n) : '' });
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); // smooth 스크롤이면 새 목록이 오는 동안 중간에서 멈춤
   };
 
   return (
@@ -227,12 +227,19 @@ export default function NewsPage() {
         )}
         {!loading && !error && items.length === 0 && (isAll || filtered.done) && (
           <Empty
-            title={q ? `‘${q}’${iGa(q)} 들어간 ${tab === 'disclosure' ? '공시가' : '글이'} 없어요` : '조건에 맞는 글이 없어요'}
+            title={
+              q
+                ? `‘${q}’${iGa(q)} 들어간 ${tab === 'disclosure' ? '공시가' : '글이'} 없어요`
+                : periodKey === 'today'
+                  ? `오늘 나온 ${tab === 'disclosure' ? '공시가' : '글이'} 아직 없어요`
+                  : '조건에 맞는 글이 없어요'
+            }
             desc={period ? '기간을 넓혀 보세요.' : undefined}
             action={
+              // 기본값이 '오늘'이라 기간을 비우면 다시 오늘이 됨 → '전체 기간'을 주소에 넣음 (3차 코드 리뷰: 눌러도 그대로였음)
               q || period ? (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => update({ q: '', period: '' })}>
-                  조건 지우기
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => update({ q: '', period: 'all' })}>
+                  {q ? '조건 지우기' : '전체 기간 보기'}
                 </button>
               ) : null
             }

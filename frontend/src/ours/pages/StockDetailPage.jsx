@@ -457,8 +457,8 @@ const SECTIONS = [
   { id: 'sec-summary', label: 'AI 요약' },
   { id: 'sec-chart', label: '차트' },
   { id: 'big-moves', label: '움직인 날' }, // 11/16 F-17 카드 연결
+  { id: 'sec-mention', label: '언급량' }, // 화면 순서와 같게 (언급량이 기사 목록보다 위)
   { id: 'related-news', label: '뉴스·공시' },
-  { id: 'sec-mention', label: '언급량' },
   { id: 'sec-board', label: '토론' },
 ];
 // 이동 + 주소 # 바꾸기 + 키보드 포커스도 그 칸으로 (11/12 점검: 예전엔 포커스가 바로 가기 줄에 남음.
@@ -575,6 +575,15 @@ function StockDetail({ code }) {
           차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사.
           넓은 화면도 11/16 밤부터 [AI 요약 | 좋은/나쁜 소식] → 차트 → [움직인 날 | 언급량] → 기사 (디자이너: AI 요약이 y≈1128) — CSS .stock-flow */}
       <div className="stock-flow">
+        {/* 순서 = 화면 순서 = Tab 순서 (11/16 밤 3차 리뷰: CSS 로만 자리를 바꿔 Tab 이 위아래로 오갔음, WCAG 2.4.3)
+            넓은 화면(1081px~): [AI 요약 | 좋은/나쁜 소식] → 차트 → [움직인 날 | 언급량] → 기사. 그보다 좁으면 한 줄씩. 휴대폰은 CSS order 로 좋은/나쁜 소식부터 */}
+        <div className="sf-summary">
+          <div id="sec-summary" className="sec-anchor" />
+          <SummaryCard code={code} summary={summary} />
+        </div>
+        <div className="sf-sent">
+          <SentimentCard summary={summary} />
+        </div>
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
           <ErrorBoundary compact label="차트" key={code}>
@@ -583,27 +592,13 @@ function StockDetail({ code }) {
           </Suspense>
           </ErrorBoundary>
         </div>
-        <div className="grid-2 sf-grid">
-          <div className="stack sf-stack">
-            <div className="sf-summary">
-              <div id="sec-summary" className="sec-anchor" />
-              <SummaryCard code={code} summary={summary} />
-            </div>
-            <div className="sf-moves">
-              <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} todayRate={shownQuote?.changeRate ?? null} />
-            </div>
-          </div>
-          <div className="stack sf-stack">
-            <div className="sf-sent">
-              <SentimentCard summary={summary} />
-            </div>
-            <div className="sf-mention stack">
-              <div id="sec-mention" className="sec-anchor" />
-              <MentionCard code={code} />
-            </div>
-          </div>
+        <div className="sf-moves">
+          <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} todayRate={shownQuote?.changeRate ?? null} />
         </div>
-        {/* 관련 뉴스는 두 칸 아래 전체 너비로 (11/16 디자이너 리뷰: 왼쪽 칸만 길어 오른쪽이 900px 비었음) */}
+        <div className="sf-mention stack">
+          <div id="sec-mention" className="sec-anchor" />
+          <MentionCard code={code} />
+        </div>
         <div className="sf-news">
           <RelatedNews code={code} name={stock?.stockName} />
         </div>

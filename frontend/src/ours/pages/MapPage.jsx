@@ -50,6 +50,9 @@ export default function MapPage() {
     () => (capReady ? [...capMap.data.items].sort((a, b) => b.marketCap - a.marketCap).slice(0, CAP_LIMIT).map((it) => ({ ...it, sector: '', sectorName: it.sector })) : []),
     [capReady, capMap.data]
   );
+  // 지도가 실제로 그린 칸 수 (넓은 화면 24, 휴대폰 16) — 목록·부제를 지도와 같은 종목으로
+  const [drawn, setDrawn] = useState(CAP_LIMIT);
+  const shownCap = useMemo(() => capItems.slice(0, drawn), [capItems, drawn]);
   const capQuotes = useMemo(() => Object.fromEntries(capItems.map((it) => [it.stockCode, { price: it.price, changeRate: it.changeRate, priceLimit: it.priceLimit }])), [capItems]);
   const capNews = useMemo(() => {
     const out = {};
@@ -89,7 +92,7 @@ export default function MapPage() {
           </h1>
           <p className="page-sub">
             {showCap
-              ? `시가총액 상위 ${CAP_LIMIT}종목 · 색 = 오늘 등락률 · 칸을 누르면 종목 화면`
+              ? `시가총액 상위 ${shownCap.length || CAP_LIMIT}종목 · 색 = 오늘 등락률 · 칸을 누르면 종목 화면`
               : '오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률'}
           </p>
         </div>
@@ -106,13 +109,13 @@ export default function MapPage() {
           />
         )}
       </div>
-      <section className="card map-page" aria-label={showCap ? `시가총액 상위 ${CAP_LIMIT}종목 지도` : `오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>
+      <section className="card map-page" aria-label={showCap ? `시가총액 상위 ${shownCap.length || CAP_LIMIT}종목 지도` : `오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>
         {showNews && issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}
         {(capPending || (showNews && issues.loading && !issues.data)) && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
         {showCap && (
           <>
             {/* 업종 상자로 나누면 칸이 잘게 깨져 글자가 안 들어감 (11/16 사용자) → 한 덩어리, 업종은 마우스를 올린 설명에 */}
-            <CapMap items={capItems} news={capNews} height={height} maxShare={0.12} limit={CAP_LIMIT} />
+            <CapMap items={capItems} news={capNews} height={height} maxShare={0.12} limit={CAP_LIMIT} onDrawn={setDrawn} />
             <CapLegend size="시가총액 (큰 종목은 줄여 그림)" grouped={false} asOf={capMap.data.fetchedAt} />
           </>
         )}
@@ -134,7 +137,7 @@ export default function MapPage() {
       {/* 종목이 있을 때만: 실패·0개일 때 "오른 종목이 없어요"가 같이 나와 헷갈렸음 */}
       {showCap ? (
         <div style={{ marginTop: 16 }}>
-          <Movers issues={capItems} quotes={capQuotes} top={5} title={`지도 ${capItems.length}종목 중 많이 오른·내린`} />
+          <Movers issues={shownCap} quotes={capQuotes} top={5} title={`지도 ${shownCap.length}종목 중 많이 오른·내린`} />
         </div>
       ) : (
         showNews &&

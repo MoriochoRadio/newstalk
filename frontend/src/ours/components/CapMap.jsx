@@ -60,7 +60,7 @@ export function capText(eok) {
  * items: [{ stockCode, stockName, sector, marketCap, changeRate, priceLimit }]
  * news: { [code]: { count, top: { id, title } } } — 오늘 기사 수와 대표 제목
  */
-export default function CapMap({ items, news = {}, height: height0 = 520, limit = 20, maxShare = 0.24, sizeKind = 'cap' }) {
+export default function CapMap({ items, news = {}, height: height0 = 520, limit = 20, maxShare = 0.24, sizeKind = 'cap', onDrawn }) {
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
   // 휴대폰(좁은 폭)은 칸 16개가 들어가게 높이를 최소 520 으로
@@ -120,6 +120,12 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
       return { ...r, w: bw, h: bh, name: sct.name, grouped, showHead, top, pad, avg, newsSum, tiles: inner.map((t) => ({ ...t, it: sct.list[t.i] })) };
     });
   }, [items, width, height, limit, maxShare, news]);
+
+  // 실제로 그린 칸 수 (휴대폰은 16) → 시장 지도 화면의 '많이 오른·내린'·부제가 같은 종목을 쓰게 (11/16 밤 3차 리뷰: 지도 16칸인데 목록은 24종목)
+  const drawn = layout.reduce((t, sec) => t + sec.tiles.length, 0);
+  useEffect(() => {
+    if (drawn && onDrawn) onDrawn(drawn);
+  }, [drawn, onDrawn]);
 
   return (
     <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)} onKeyDown={(e) => e.key === 'Escape' && setTip(null)}>

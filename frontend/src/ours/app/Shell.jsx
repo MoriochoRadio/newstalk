@@ -226,15 +226,44 @@ export default function Shell() {
   // 뒤로 가기 위치 (11/16 밤 액터: 목록을 1000px 내려 기사를 열고 돌아오면 188px).
   // 목록은 돌아온 뒤 다시 받아서 처음엔 짧음 → 브라우저가 위치를 못 맞춤. 화면마다(location.key) 위치를 적어 두고,
   // 뒤로 가기면 목록이 그만큼 길어질 때까지(최대 3초) 기다렸다가 맞춤
-  const scrollPos = useRef(new Map());
-  const keyRef = useRef(location.key);
+  // 키 = 기록 key + 주소: 건너뛰기 링크(#main)처럼 해시만 바꾸면 react-router 가 key 'default'(첫 화면과 같은 값)를 줘서
+  // 첫 화면 위치(예: 1500px)로 끌려갔음 (3차 코드 리뷰). 새로고침해도 기억하게 sessionStorage 에 같이 둠
+  const posKey = (loc) => `${loc.key}|${loc.pathname}${loc.search}`;
+  const scrollPos = useRef(null);
+  if (!scrollPos.current) {
+    let saved = [];
+    try {
+      saved = JSON.parse(sessionStorage.getItem('snm_scroll_pos') || '[]');
+    } catch {
+      saved = [];
+    }
+    scrollPos.current = new Map(Array.isArray(saved) ? saved : []);
+  }
+  const keyRef = useRef(posKey(location));
+  const pathRef = useRef(null); // 직전 화면 주소 (첫 화면은 없음)
+  // 첫 화면은 새로고침·브라우저 뒤로/앞으로로 왔을 때만 되살림 (주소를 새로 쳐서 왔으면 맨 위). 개발 모드 이중 실행에도 같은 답이 되게 한 번만 셈
+  const firstKey = useRef(null);
+  if (firstKey.current === null) {
+    const type = performance.getEntriesByType?.('navigation')?.[0]?.type;
+    firstKey.current = { loc: location, restore: type === 'reload' || type === 'back_forward' }; // 같은 기록으로 나중에 돌아온 것과 구분하려고 위치 객체를 비교
+  }
   useEffect(() => {
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
     // 타이머로 (requestAnimationFrame 은 가려진 창에서 멈춰 위치가 안 적혔음)
     let timer = 0;
     const onScroll = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => scrollPos.current.set(keyRef.current, window.scrollY), 60);
+      timer = setTimeout(() => {
+        const m = scrollPos.current;
+        m.delete(keyRef.current);
+        m.set(keyRef.current, window.scrollY);
+        while (m.size > 50) m.delete(m.keys().next().value); // 오래된 것부터 지움
+        try {
+          sessionStorage.setItem('snm_scroll_pos', JSON.stringify([...m]));
+        } catch {
+          // 저장 못 해도 이번 창에서는 기억함
+        }
+      }, 60);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
@@ -243,12 +272,19 @@ export default function Shell() {
     };
   }, []);
   // 화면이 바뀌면 그리기 전에 '지금 화면' 표시부터 바꿈: 새 화면이 짧아 브라우저가 스크롤을 줄일 때 그 값이 이전 화면 위치를 덮어썼음
+  const hashOnly = useRef(false);
   useLayoutEffect(() => {
-    keyRef.current = location.key;
-  }, [location.key]);
+    keyRef.current = posKey(location);
+    const path = `${location.pathname}${location.search}`;
+    // 같은 화면 안에서 해시만 바뀜 (건너뛰기 링크·바로 가기). 같은 기록을 다시 실행(개발 모드 이중 실행)한 것은 제외
+    const prev = pathRef.current;
+    if (!prev || prev.key !== location.key) hashOnly.current = Boolean(prev) && prev.path === path;
+    pathRef.current = { key: location.key, path };
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (navType !== 'POP') return undefined;
-    const target = scrollPos.current.get(location.key) || 0;
+    if (navType !== 'POP' || hashOnly.current) return undefined;
+    if (location === firstKey.current.loc && !firstKey.current.restore) return undefined;
+    const target = scrollPos.current.get(posKey(location)) || 0;
     if (!target) return undefined;
     let timer = 0;
     const until = performance.now() + 3000;
@@ -285,7 +321,15 @@ export default function Shell() {
 
   return (
     <div className="shell">
-      <a href="#main" className="skip-link">
+      <a
+        href="#main"
+        className="skip-link"
+        onClick={(e) => {
+          e.preventDefault();
+          const main = document.getElementById('main');
+          main?.focus();
+        }}
+      >
         본문으로 건너뛰기
       </a>
       <aside className="sidenav" aria-label="사이드바">
