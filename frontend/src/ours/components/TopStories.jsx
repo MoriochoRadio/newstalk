@@ -177,8 +177,11 @@ export default function TopStories({ stories, quotes, titles = false, list = fal
 }
 
 /** 오늘 글 → 많이 다룬 소식 순 (공시 제외). 같은 크기면 최근 것 먼저 */
+// 순위·지도에서 뺄 머리말: 게시판·인사·부고·알림 같은 공지성 기사 (11/16 리뷰: '[게시판] … 출시'가 3위). 목록에는 그대로 남음
+const NOTICE_HEAD = /^\s*\[(게시판|인사|부고|알림|사고|정정|공지)\]/;
+
 export function rankStories(groupStories, items, n = 4) {
-  return groupStories((items || []).filter((a) => !a.isDisclosure))
+  return groupStories((items || []).filter((a) => !a.isDisclosure && !NOTICE_HEAD.test(a.title || '')))
     .sort((x, y) => (y.size || 1) - (x.size || 1) || (y.lead.publishedAtIso > x.lead.publishedAtIso ? 1 : -1))
     .slice(0, n);
 }

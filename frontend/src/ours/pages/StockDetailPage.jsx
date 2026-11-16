@@ -8,7 +8,7 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { dirClass, fmtAmount, fmtPrice, fmtRate, marketKo, relativeTime, shortTime } from '../lib/format';
+import { dirClass, fmtAmount, fmtPrice, fmtRate, marketKo, shortTime } from '../lib/format';
 import { errorText } from '../lib/errors';
 import { StoryFeed } from '../components/ArticleRow';
 import PriceChart from '../components/PriceChart';
@@ -214,7 +214,7 @@ function SentimentCard({ summary }) {
               return <b className={lean.kind === 'pos' ? 'tb-pos' : lean.kind === 'neg' ? 'tb-neg' : ''}>{lean.text}</b>;
             })()}
           </div>
-          <div className="ratio-bar" role="img" aria-label={`좋은 소식 ${ratio.positive}%, 중립 ${ratio.neutral}%, 나쁜 소식 ${ratio.negative}%`}>
+          <div className="ratio-bar" role="img" aria-label={`좋은 소식 ${ratio.positive}%, 판단 없음 ${ratio.neutral}%, 나쁜 소식 ${ratio.negative}%`}>
             <span className="ratio-pos" style={{ width: `${ratio.positive}%` }} />
             <span className="ratio-neu" style={{ width: `${ratio.neutral}%` }} />
             <span className="ratio-neg" style={{ width: `${ratio.negative}%` }} />
@@ -226,7 +226,7 @@ function SentimentCard({ summary }) {
             </span>
             <span>
               <i className="ratio-neu" />
-              중립 {ratio.neutral}%
+              판단 없음 {ratio.neutral}%
             </span>
             <span>
               <i className="ratio-neg" />
@@ -238,9 +238,12 @@ function SentimentCard({ summary }) {
           </p>
         </>
       )}
-      <p className="card-note">
-        {basis === 'event' && '같은 소식을 여러 언론이 써도 한 번만 셌어요. '}
-        AI가 오늘 기사·공시 내용이 이 회사에 좋은 소식인지 나쁜 소식인지 나눈 비율이에요. 주가 예측이 아니에요.
+      {/* 설명 문장 두 줄 → 짧은 꼬리표 한 줄, 자세한 뜻은 마우스를 올리면 (11/16 리뷰 8번) */}
+      <p
+        className="card-note"
+        title={`${basis === 'event' ? '같은 소식을 여러 언론이 써도 한 번만 셌어요. ' : ''}AI가 오늘 기사·공시 내용이 이 회사에 좋은 소식인지 나쁜 소식인지 나눈 비율이에요.`}
+      >
+        AI 판단 · 주가 예측 아님
       </p>
     </section>
   );
@@ -404,6 +407,7 @@ function QuickSwitch({ code }) {
 const SECTIONS = [
   { id: 'sec-chart', label: '차트' },
   { id: 'sec-summary', label: 'AI 요약' },
+  { id: 'big-moves', label: '움직인 날' }, // 11/16 F-17 카드 연결
   { id: 'related-news', label: '뉴스·공시' },
   { id: 'sec-mention', label: '언급량' },
   { id: 'sec-board', label: '토론' },
@@ -476,7 +480,7 @@ function StockDetail({ code }) {
       <div className="stock-flow">
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
-          <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} />
+          <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} liveQuote={quotes[code] || null} />
         </div>
         <div className="grid-2 sf-grid">
           <div className="stack sf-stack">
@@ -498,9 +502,6 @@ function StockDetail({ code }) {
             <div className="sf-mention stack">
               <div id="sec-mention" className="sec-anchor" />
               <MentionCard code={code} />
-              {summary.data?.generatedAt && (
-                <p className="status-line">요약 갱신 {relativeTime(summary.data.generatedAt)}</p>
-              )}
             </div>
           </div>
         </div>

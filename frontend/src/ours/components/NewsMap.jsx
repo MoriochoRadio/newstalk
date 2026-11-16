@@ -59,8 +59,10 @@ export function NewsMap({ stories, height = 380 }) {
           // 이름이 칸 너비를 넘지 않게 (휴대폰 '삼성바이오로…' 잘림): 한글 한 자 ≈ 1em
           const nameLen = Math.max(2, (main?.name || '').length);
           const nameSize = Math.round(Math.max(13, Math.min(30, Math.sqrt(w * h) / 8, (w - 28) / (nameLen * 0.95))));
-          const showWord = word && h >= 60 && w >= 80;
-          const showCount = h >= 80 && w >= 80;
+          // 칸 높이에 들어가는 줄만 (11/16 리뷰: 낮은 칸에서 이름·낱말·기사 수가 겹쳐 잘림). 위아래 여백 20, 낱말 22, 기사 수 26
+          const nameH = nameSize * 1.2;
+          const showCount = w >= 80 && h >= 20 + nameH + 26;
+          const showWord = Boolean(word) && w >= 80 && h >= 20 + nameH + 22 + (showCount ? 26 : 0);
           return (
             <li key={a.id} className="nm-cell" style={{ left: r.x, top: r.y, width: w, height: h }}>
               <Link
@@ -91,11 +93,15 @@ export function NewsMap({ stories, height = 380 }) {
 
 /** 옆 칸: 오늘 뉴스 상태 숫자 */
 export function NewsPulse({ articles, storyCount, topics = [] }) {
-  const tone = countsOf(
+  const judged = countsOf(
     (articles || [])
       .filter((a) => !a.titleOnly && !a.disclosurePending)
       .map((a) => (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment)
   );
+  // 세 수의 합 = 위 '오늘 뉴스 n건' (11/16 리뷰: 132건인데 링은 29+11+51=91 이라 숫자가 안 맞았음)
+  // 제목만 받은 기사·요약 전 기사도 '판단 없음'에 넣음 (지도 범례의 '판단 없음'과 같은 말)
+  const total = (articles || []).length;
+  const tone = { pos: judged.pos, neg: judged.neg, neu: Math.max(0, total - judged.pos - judged.neg) };
   return (
     <div className="news-pulse">
       <div className="np-total">
@@ -119,7 +125,7 @@ export function NewsPulse({ articles, storyCount, topics = [] }) {
           </li>
           <li>
             <i className="np-dot neu" />
-            중립 <b>{tone.neu}</b>
+            판단 없음 <b>{tone.neu}</b>
           </li>
         </ul>
       </div>

@@ -3105,7 +3105,8 @@ a.feed-title:hover {
 
 .lmap-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 종목이 1개면 칸을 꽉 채움 (11/16 리뷰 12번: 1개일 때 오른쪽 2/3이 빔), 넓으면 2열 */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
@@ -3751,6 +3752,7 @@ a.topic-example:hover {
   margin-bottom: -16px;
 }
 .sec-anchor-box,
+#big-moves,
 #related-news {
   scroll-margin-top: 120px;
 }
@@ -3921,6 +3923,7 @@ html {
 }
 .sec-anchor:focus,
 .sec-anchor-box:focus,
+#big-moves:focus,
 #related-news:focus {
   outline: none; /* 바로 가기로 옮긴 칸 자체에는 테두리 없음 (그 안의 버튼·링크는 평소대로 테두리) */
 }
@@ -4058,6 +4061,7 @@ html {
   /* 바로 가기 줄도 같은 순서 */
   .sec-nav .sn-sec-summary { order: 1; }
   .sec-nav .sn-sec-chart { order: 2; }
+  .sec-nav .sn-big-moves { order: 3; }
   .sec-nav .sn-related-news { order: 3; }
   .sec-nav .sn-sec-mention { order: 4; }
   .sec-nav .sn-sec-board { order: 5; }
@@ -5201,3 +5205,25 @@ html {
   justify-content: center;
   gap: 8px;
 }
+
+/* 11/16 리뷰 5번: 파랑은 국내 관례로 '내림'이라 순위 숫자·'주인공' 표시에서 뺌 → 먹색. 링크·쪽 번호의 강조 파랑은 그대로 */
+.rank,
+.rank-list li:first-child .st-rank {
+  color: var(--text);
+}
+.brief-rank {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.chip.chip-main {
+  background: var(--surface-2);
+}
+.chip.chip-main .role,
+.lmap-head .badge-accent {
+  background: var(--text);
+  color: var(--surface);
+}
+.chip.focus.chip-main {
+  box-shadow: inset 0 0 0 1.5px var(--text);
+}
+

@@ -120,6 +120,15 @@ function UserMenu() {
 // 왼쪽 메뉴 접기·펼치기 (11/12 사용자: "사이드바가 공간을 과하게 차지, 원래 꺼냈다 닫았다 하는 게 기본")
 // 접으면 아이콘만 남는 좁은 띠(64px). 고른 값은 이 브라우저에 기억, 처음엔 화면이 좁으면(1280 미만) 접힌 채로
 const NAV_KEY = 'snm_nav_collapsed';
+const SHOW_DEV_LINKS = (() => {
+  if (!import.meta.env.DEV) return false;
+  try {
+    if (new URLSearchParams(window.location.search).has('dev')) localStorage.setItem('snm_dev', '1');
+    return localStorage.getItem('snm_dev') === '1';
+  } catch {
+    return false;
+  }
+})();
 function useNavCollapsed() {
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -232,8 +241,9 @@ export default function Shell() {
             <ThemeIcon className="icon" aria-hidden="true" />
             <span className="nav-text">{themeLabel}</span>
           </button>
-          {/* 개발용 비교 링크: 일반 사용자에겐 'V7'이 무슨 뜻인지 모름 (11/13 키보드 점검) → 개발 서버에서만. 주소 /v7 은 그대로 열림 */}
-          {import.meta.env.DEV && (
+          {/* 개발용 비교 링크: 일반 사용자에겐 'V7'이 무슨 뜻인지 모름 (11/13 키보드 점검) → 개발 서버에서만.
+              11/16 리뷰 3번: 시연을 개발 서버로 해도 안 보이게, 주소에 ?dev 를 한 번 붙여 열어야 보임. 주소 /v7 은 그대로 열림 */}
+          {SHOW_DEV_LINKS && (
             <a className="nav-link" href="/v7" title={navCollapsed ? '이전 화면(V7) 비교' : undefined}>
               <Newspaper className="icon" aria-hidden="true" />
               <span className="nav-text">이전 화면(V7) 비교</span>

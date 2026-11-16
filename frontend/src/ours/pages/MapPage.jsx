@@ -35,6 +35,14 @@ export default function MapPage() {
   const items = issues.data?.items || [];
   const { quotes, loading, disabled } = useQuotes(items.map((i) => i.stockCode));
   const height = useMapHeight();
+  // 칸마다 대표 제목: 같은 기사가 두 칸에 나오면 뒤 칸은 그 종목의 다른 기사로 (11/16 리뷰 14번: 삼성전자·SK하이닉스 칸 제목이 같았음)
+  const usedWhy = new Set();
+  const whyOf = (code) => {
+    if (!feed.data) return null;
+    const pick = pickWhy(feed.data.items.filter((a) => !usedWhy.has(a.id)), code);
+    if (pick) usedWhy.add(pick.id);
+    return pick;
+  };
   const tiles = items.map((it) => ({
     code: it.stockCode,
     name: it.stockName,
@@ -42,7 +50,7 @@ export default function MapPage() {
     eventCount: it.eventCount,
     disclosureCount: it.disclosureCount,
     rate: quotes[it.stockCode]?.changeRate ?? null,
-    why: feed.data ? pickWhy(feed.data.items, it.stockCode) : null,
+    why: whyOf(it.stockCode),
   }));
 
   return (

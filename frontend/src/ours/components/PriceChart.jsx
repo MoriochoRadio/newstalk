@@ -240,7 +240,7 @@ function tradingNow(now = new Date()) {
   return day >= 1 && day <= 5 && min >= 9 * 60 && min < 15 * 60 + 30;
 }
 
-export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null, moves = null }) {
+export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null, moves = null, liveQuote = null }) {
   const [rangeKey, setRangeKey] = useState('3m');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[2];
   const unit = range.unit;
@@ -281,12 +281,15 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       rightPriceScale: { borderVisible: false, entireTextOnly: true },
       timeScale: { borderVisible: false },
       crosshair: { mode: 0 },
-      localization: { locale: 'ko-KR', priceFormatter: fmt, timeFormatter: formatTime },
+      // 가격 글자 모양은 시리즈마다 (차트 전체 priceFormatter 는 거래량 칸까지 덮어써서 '25,000,000' 이 됐음)
+      localization: { locale: 'ko-KR', timeFormatter: formatTime },
       // 그냥 휠은 페이지 스크롤에 양보. 확대는 Ctrl+휠·두 손가락·가격 축 끌기
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
     });
+    const priceFmt = { type: 'custom', formatter: fmt, minMove: 1 };
     const candles = chart.addSeries(CandlestickSeries, {
+      priceFormat: priceFmt,
       upColor: c.up,
       downColor: c.down,
       borderUpColor: c.up,
@@ -299,6 +302,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
         m.n,
         chart.addSeries(LineSeries, {
           color: c.ma[m.n],
+          priceFormat: priceFmt,
           lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
@@ -306,7 +310,11 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
         }),
       ])
     );
-    const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false }, 1);
+    // 거래량 눈금: 2,500만·1.2억 처럼 (11/16 리뷰: '25,000,000' 그대로라 읽기 힘듦)
+    const volFmt = (v) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : v >= 1e4 ? `${Math.round(v / 1e4).toLocaleString('ko-KR')}만` : `${Math.round(v)}`);
+    const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'custom', formatter: volFmt }, priceLineVisible: false, lastValueVisible: false }, 1);
+    // 가격 칸 위아래 여백을 줄여 봉이 칸을 더 채우게 (기본 위 20%·아래 10% 라 가운데에 눌려 보였음)
+    candles.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.08 } });
     // 거래량 칸 위쪽에 여백을 둬서 가격 칸 아래 눈금 글자와 겹치지 않게
     volume.priceScale().applyOptions({ scaleMargins: { top: 0.2, bottom: 0 } });
     // 맨 아래 칸: 그날(그 봉) 기사 수 = 뉴스 거래량 (v3)
@@ -540,6 +548,15 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     showRange(ref.chart.timeScale(), rowsRef.current.length, range.bars);
   }, [rangeKey, key, range.bars]);
 
+  // 오늘 일봉을 실시간 현재가로 고쳐 그림 (값 줄과 차트 봉이 머리의 현재가와 같게)
+  const livePrice = liveQuote?.price ?? null;
+  useEffect(() => {
+    const ref = chartRef.current;
+    const last = rowsRef.current[rowsRef.current.length - 1];
+    if (!ref || unit !== 'day' || livePrice == null || !last || last.t !== kstDate(new Date().toISOString())) return;
+    ref.candles.update({ time: last.t, open: last.open, high: Math.max(last.high, livePrice), low: Math.min(last.low, livePrice), close: livePrice });
+  }, [livePrice, unit, data]);
+
   // 크게 움직인 날 표시: 받은 봉 안에 있는 날만 (일봉일 때). 다른 단위로 바꾸면 지움
   const movesKey = `${key}:${rows.length}:${(moves || []).map((m) => `${m.date}${m.direction}`).join(',')}`;
   useEffect(() => {
@@ -579,7 +596,13 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     const found = rows.findIndex((r) => (typeof r.t === 'number' ? r.t === hover : r.t === formatTime(hover) || r.t === hover));
     if (found >= 0) idx = found;
   }
-  const bar = idx >= 0 ? rows[idx] : null;
+  // 오늘 일봉은 위 현재가(실시간 시세)로 맞춤 — 차트 봉은 10분 캐시라 값 줄의 '현재'가 머리의 현재가와 달랐음 (11/16 리뷰)
+  const todayKey = kstDate(new Date().toISOString());
+  const liveBar = (r) =>
+    r && unit === 'day' && r.t === todayKey && liveQuote?.price
+      ? { ...r, close: liveQuote.price, high: Math.max(r.high, liveQuote.price), low: Math.min(r.low, liveQuote.price) }
+      : r;
+  const bar = idx >= 0 ? liveBar(rows[idx]) : null;
   const prev = idx > 0 ? rows[idx - 1] : null;
   // 보조지표 값 줄 (십자선이 가리키는 봉)
   const indAt = {

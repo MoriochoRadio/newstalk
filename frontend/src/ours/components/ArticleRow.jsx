@@ -121,7 +121,8 @@ export default function ArticleRow({ article: a, others = [], focusCode, compact
   const sns = a.sourceType === 'SNS';
   // 공시도 원문을 AI 가 요약함 (11/13 지난 공시까지 채움). 요약 전 공시는 어댑터가 hasSummary=false 로 줌 → 요약 줄 생략
   const summary = showSummary && a.hasSummary ? a.summary.join(' ') : '';
-  const tags = ArticleTags({ article: a });
+  // 펼침 단추('같은 소식 다른 기사 n건')가 있으면 '같은 소식 n건' 칩은 뺌 — 2건·1건이 다른 숫자처럼 보였음 (11/16 리뷰 9번)
+  const tags = ArticleTags({ article: a }).filter((t) => !(others.length > 0 && t.key === 's'));
   const tone = toneOf(a, focusCode);
   return (
     <article className={`feed-row ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>

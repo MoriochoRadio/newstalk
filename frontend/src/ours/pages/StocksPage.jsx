@@ -1,6 +1,7 @@
 // 종목 메인: 종목 찾기 → 오늘의 이슈 순위(서버 집계) → 이슈 종목 중 많이 오른·내린 → 관심 종목
 // v2: 종목마다 최근 20거래일 추세선(보일 때만, 한 번에 2개씩 부름)과 기사 수 막대
 // 시장 필터는 넣지 않음: 이슈 순위 API 에 시장 칸이 없어 V7 처럼 거르면 틀린 결과(KOSDAQ 0건)가 나옴
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, LogIn, Star } from 'lucide-react';
 import { stockApi } from '../../api';
@@ -78,6 +79,9 @@ export default function StocksPage() {
   const items = issues.data?.items || [];
   const { quotes, loading: quoteLoading, disabled } = useQuotes(items.map((i) => i.stockCode));
   const maxCount = Math.max(1, ...items.map((i) => i.articleCount));
+  // 처음엔 15줄 + '더 보기' (11/16 리뷰 11번: 30줄이라 화면이 3,400px 넘게 길었음)
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? items : items.slice(0, 15);
 
   return (
     <>
@@ -129,7 +133,7 @@ export default function StocksPage() {
                     <th scope="col" className="r">
                       기사
                     </th>
-                    <th scope="col" className="r hide-mobile">
+                    <th scope="col" className="r hide-mobile" title="같은 내용을 여러 언론사가 쓴 것을 한 번으로 센 수. 공시는 순위에 넣지 않고 따로 표시">
                       소식
                     </th>
                     {!disabled && (
@@ -145,7 +149,7 @@ export default function StocksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it) => {
+                  {rows.map((it) => {
                     const q = quotes[it.stockCode];
                     return (
                       <tr key={it.stockCode} onClick={(e) => openRow(e, it.stockCode)} style={{ cursor: 'pointer' }}>
@@ -187,8 +191,10 @@ export default function StocksPage() {
               </table>
             </div>
           )}
-          {items.length > 0 && (
-            <p className="card-note">소식은 같은 내용을 여러 언론사가 쓴 것을 한 번으로 센 수예요. 공시는 순위에 넣지 않고 따로 표시해요.</p>
+          {items.length > rows.length && (
+            <button type="button" className="story-toggle" onClick={() => setShowAll(true)}>
+              {items.length - rows.length}종목 더 보기
+            </button>
           )}
         </section>
         {/* 휴대폰에선 등락을 순위표(30줄) 위로 (11/13 사용자 눈으로: '오늘 많이 내린 종목'을 찾다가 표 밑에 있어 못 찾음) */}
