@@ -71,4 +71,9 @@ def test_step8_rules():
     assert _line(side) == "브랜드 가치가 올랐다.", "조연은 다른 종목 요약을 쓰지 않음"
     assert counts([main, side]) == {"pos": 1, "neg": 0, "neu": 1}
     with mock.patch("hk_llm.steps.step8_daily.ChatOpenAI", side_effect=AssertionError("1건이면 LLM 안 부름")):
-        assert combine("삼성전자", ["한 줄이다."]) == "한 줄이다."
+        assert combine("삼성전자", ["삼성전자가 한 줄을 냈다."]) == "삼성전자가 한 줄을 냈다."
+    # 그 줄에 종목 이름이 없으면 주어를 밝히게 LLM 에 맡김 (11/16 밤: SK스퀘어 요약 주어가 SK하이닉스)
+    fake = mock.MagicMock()
+    with mock.patch("hk_llm.steps.step8_daily.llm_call", return_value="삼성전자는 한 줄을 냈다.") as called:
+        assert combine("삼성전자", ["한 줄이다."], llm=fake) == "삼성전자는 한 줄을 냈다."
+        assert called.called, "이름 없는 1줄은 LLM 을 부름"
