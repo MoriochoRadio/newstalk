@@ -15,6 +15,7 @@ import { errorText } from '../lib/errors';
 import { fmtRate } from '../lib/format';
 import { Segmented } from './ui';
 import { marketState } from '../lib/market';
+import { moveLead } from '../lib/priceSentence';
 
 // 기간 버튼: 봉 단위는 기간에서 정함 (bars = 처음 보여 줄 봉 수, 거래일 기준). 오늘 = 5분봉, 5년 = 주봉
 // 봉 단위 (11/16 사용자: '1개월' 기본이 불편, 보통 1분·5분·1시간·일로 봄) → 기간 대신 증권 앱처럼 봉 단위로 고름.
@@ -924,8 +925,14 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
                 };
                 // 크게 움직인 날이면 '크게 움직인 날' 카드와 같은 기사 (같은 날 두 칸 제목이 달랐음)
                 const move = unit === 'day' && typeof bar.t === 'string' ? (moves || []).find((m) => m.date === bar.t) : null;
-                const moveTop = move?.articles?.find((a) => !a.priceMoveTitle) || null;
-                if (moveTop) return <Link to={`/news/${moveTop.articleId}`}>{moveTop.title}</Link>;
+                const lead = moveLead(move);
+                if (lead)
+                  return (
+                    <>
+                      {lead.isPrice && <span className="tag-mini">주가 기사</span>}
+                      <Link to={`/news/${lead.article.articleId}`}>{lead.article.title}</Link>
+                    </>
+                  );
                 const pick = [...barNews.items].sort((a, b) => score(b) - score(a))[0] || barNews.items[0];
                 return pick ? <Link to={`/news/${pick.id}`}>{pick.title}</Link> : null;
               })()}

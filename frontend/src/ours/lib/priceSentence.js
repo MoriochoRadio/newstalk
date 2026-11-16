@@ -9,6 +9,15 @@ const NUMBER = /\d[\d,.]*\s*(%|원)/;
 const PRICE_MOVE = /특징주|급등|급락|상한가|하한가|강세|약세|상승|하락|뛰|올랐|내렸|떨어|치솟|곤두박질|반등|폭락|폭등|신고가|52주|매물폭탄|매물 폭탄|매도 폭탄|매도세|매수세|투매|패닉/; // 11/16 밤: 매물폭탄·매도세·투매 등 (백엔드와 같게)
 export const isPriceMoveTitle = (title) => PRICE_MOVE.test(String(title || ''));
 
+/** 크게 움직인 날의 대표 기사: 서버가 준 첫 기사(그날 가장 많이 다뤄진 소식부터) + 주가 기사인지.
+ *  주가 기사도 대표가 될 수 있고, 그때는 화면이 '주가 기사' 표시를 붙여 원인이 아니라 그날 움직임을 다룬 기사임을 밝힘 (11/16 밤 사용자 결정)
+ *  서버가 priceMoveTitle 을 주면 그대로, 옛 서버면 같은 낱말 규칙 */
+export function moveLead(move) {
+  const a = move?.articles?.[0];
+  if (!a) return null;
+  return { article: a, isPrice: a.priceMoveTitle !== undefined && a.priceMoveTitle !== null ? a.priceMoveTitle : isPriceMoveTitle(a.title) };
+}
+
 export function isPriceSentence(s) {
   return PRICE_WORD.test(s) && NUMBER.test(s);
 }
