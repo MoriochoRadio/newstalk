@@ -210,11 +210,19 @@
             <arg column="press" javaType="String"/>
             <arg column="published_at" javaType="java.time.LocalDateTime"/>
             <arg column="relevance" javaType="java.math.BigDecimal"/>
+            <arg column="group_article_id" javaType="Long"/>
+            <arg column="same_news_count" javaType="Integer"/>
         </constructor>
     </resultMap>
 
+    <!-- 같은 소식 묶음(V13)과 그 묶음의 화면에 나가는(DONE) 기사 수: 그날 가장 많이 다뤄진 소식을 대표로 고르려고 (11/16 밤) -->
     <select id="findArticlesOnDays" resultMap="bigMoveArticleRow">
-        SELECT DATE(a.published_at) AS day, a.article_id, a.title, a.source_type, a.press, a.published_at, s.relevance
+        SELECT DATE(a.published_at) AS day, a.article_id, a.title, a.source_type, a.press, a.published_at, s.relevance,
+               s.group_article_id,
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
+                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
+                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE')
+               END AS same_news_count
         FROM article_stock s
         JOIN article a ON a.article_id = s.article_id
         WHERE s.stock_code = #{stockCode}

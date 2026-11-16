@@ -59,18 +59,29 @@ class BigMoveServiceTest extends ApiTestSupport {
     }
 
     @Test
-    void 주가_움직임_기사는_뒤로_보내고_표시를_붙임() {
+    void 같은_소식이_많은_기사부터_같은_소식은_하나만_주가_기사는_표시() {
         LocalDate up = LocalDate.of(2026, 10, 14);
         List<KisCandle> candles = List.of(day(up.minusDays(1), 100000), day(up, 108000), day(TODAY, 108000));
-        link(insertArticle("특징주 기아 8% 급등", "NEWS", "DONE", up.atTime(10, 0)), KIA, 0.95);
-        link(insertArticle("기아 주가 급등에 개미들 환호", "NEWS", "DONE", up.atTime(10, 30)), KIA, 0.93);
-        link(insertArticle("기아 미국 공장 증설 발표", "NEWS", "DONE", up.atTime(9, 0)), KIA, 0.7);
+        long g1 = insertArticle("특징주 기아 8% 급등", "NEWS", "DONE", up.atTime(10, 0));
+        long g2 = insertArticle("기아 8%대 급등…신고가", "NEWS", "DONE", up.atTime(10, 10));
+        long g3 = insertArticle("기아, 장중 8% 올라", "NEWS", "DONE", up.atTime(10, 20));
+        long solo = insertArticle("기아 미국 공장 증설 발표", "NEWS", "DONE", up.atTime(9, 0));
+        long other = insertArticle("기아 노조 임단협", "NEWS", "DONE", up.atTime(8, 0));
+        link(g1, KIA, 0.7);
+        link(g2, KIA, 0.8);
+        link(g3, KIA, 0.6);
+        link(solo, KIA, 0.95);
+        link(other, KIA, 0.5);
+        // g1~g3 = 같은 소식 3건 (묶음 대표 g1)
+        jdbc.update("UPDATE article_stock SET group_article_id = ? WHERE article_id IN (?, ?, ?) AND stock_code = ?", g1, g1, g2, g3, KIA);
 
         BigMoveResponse.Day d = service.build(KIA, candles, BigMovePeriod.ONE_YEAR, 5, TODAY).items().get(0);
 
+        // 같은 소식 3건 묶음이 먼저(그 안에서는 관련도 높은 g2 하나만), 그다음 관련도 순
         assertThat(d.articles()).extracting(BigMoveResponse.Article::title)
-                .containsExactly("기아 미국 공장 증설 발표", "특징주 기아 8% 급등", "기아 주가 급등에 개미들 환호");
-        assertThat(d.articles()).extracting(BigMoveResponse.Article::priceMoveTitle).containsExactly(false, true, true);
+                .containsExactly("기아 8%대 급등…신고가", "기아 미국 공장 증설 발표", "기아 노조 임단협");
+        assertThat(d.articles()).extracting(BigMoveResponse.Article::priceMoveTitle).containsExactly(true, false, false);
+        assertThat(d.articleCount()).isEqualTo(5);
     }
 
     @Test

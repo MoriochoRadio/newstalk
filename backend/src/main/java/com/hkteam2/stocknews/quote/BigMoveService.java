@@ -5,7 +5,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -62,10 +64,13 @@ public class BigMoveService {
 
         List<BigMoveResponse.Day> items = moves.stream().map(m -> {
             List<BigMoveArticleRow> rows = byDay.getOrDefault(m.date(), List.of());
-            // 주가 움직임 기사(…폭락에 개미들 비명)는 뒤로: 등락률 옆에 오면 그 기사 때문에 움직인 것처럼 읽히고,
-            // 큰 등락일엔 이런 기사가 관련도 위쪽을 채워 3건이 모두 시세 기사가 되기 쉬움 (2026-11-16 화면 점검). 같은 종류끼리는 원래 순서
+            // 그날 가장 많이 다뤄진 소식부터 (같은 소식 기사 수 많은 순, 같으면 관련도 순 = SQL 순서), 같은 소식은 하나만.
+            // 예전엔 주가 기사를 뒤로 보냈는데, 삼성전자 11/16(-5.34%)에 '수능 고사장 에어컨 서비스'가 대표로 나와 엉뚱했음
+            // → 주가 기사도 그대로 두고 화면이 '주가 기사' 표시를 붙여 원인이 아니라 그날 움직임을 다룬 기사임을 밝힘 (11/16 밤 사용자 결정)
+            Set<Long> seenGroups = new HashSet<>();
             List<BigMoveResponse.Article> top = rows.stream()
-                    .sorted(Comparator.comparing((BigMoveArticleRow r) -> ArticleLabels.priceMoveTitle(r.title())))
+                    .sorted(Comparator.comparingInt((BigMoveArticleRow r) -> r.sameNewsCount() == null ? 1 : r.sameNewsCount()).reversed())
+                    .filter(r -> r.groupArticleId() == null || seenGroups.add(r.groupArticleId()))
                     .limit(ARTICLES_PER_DAY)
                     .map(r -> new BigMoveResponse.Article(r.articleId(), r.title(), r.sourceType(), r.press(),
                             TimeUtils.toKst(r.publishedAt()),
