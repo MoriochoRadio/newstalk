@@ -40,7 +40,8 @@ export default function HotStocks({ issues, quotes, quoteLoading, priceOff, n = 
     return (
       <div className="brief-grid">
         {Array.from({ length: n }, (_, i) => (
-          <div key={i} className="brief">
+          // 받은 뒤 카드 높이만큼 자리를 미리 (11/16 화면 밀림: 짧은 뼈대 → 카드 315px 로 커지며 아래 순위 표가 245px 밀림)
+          <div key={i} className="brief brief-skel">
             <SkeletonRows rows={2} compact />
           </div>
         ))}

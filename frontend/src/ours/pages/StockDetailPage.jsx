@@ -1,5 +1,5 @@
 // 종목 상세: 머리(이름·코드·시장·현재가) → 캔들 차트 → 오늘 AI 요약(다시 만들기) · 감성 비율 · 언급량 → 관련 뉴스(페이지) → 토론
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Sparkles, Star } from 'lucide-react';
 import { articleApi, quoteApi, stockApi } from '../../api';
@@ -11,7 +11,8 @@ import { useTitle } from '../lib/hooks';
 import { dirClass, fmtAmount, fmtPrice, fmtRate, marketKo, shortTime } from '../lib/format';
 import { errorText } from '../lib/errors';
 import { StoryFeed } from '../components/ArticleRow';
-import PriceChart from '../components/PriceChart';
+// 차트(차트 라이브러리 약 50KB)는 따로 받음 — 화면 묶음을 다 받을 때까지 API 요청이 시작되지 않아 느린 휴대폰에서 첫 글이 3.9초 (11/16 측정)
+const PriceChart = lazy(() => import('../components/PriceChart'));
 import MentionChart from '../components/MentionChart';
 import Board from '../components/Board';
 import { ToneRing, leanOf } from '../components/Tone';
@@ -83,7 +84,8 @@ function StockHeader({ code, info, quote, quoteState }) {
             </p>
           </>
         ) : quoteState.loading ? (
-          <div className="skeleton" style={{ width: 160, height: 44 }} />
+          // 받은 뒤의 높이(현재가·등락·기준 시각 세 줄)만큼 자리를 미리 (11/16 화면 밀림: 44px → 103px 로 커지며 아래가 밀림)
+          <div className="skeleton" style={{ width: 160, height: 96 }} />
         ) : (
           <p className="muted">{quoteState.disabled ? '시세 준비 중' : '시세를 받지 못했어요'}</p>
         )}
@@ -204,7 +206,7 @@ function SentimentCard({ summary }) {
           />
         )}
       </div>
-      {summary.loading && !s && <SkeletonRows rows={1} compact />}
+      {summary.loading && !s && <div className="skeleton" style={{ height: 114, borderRadius: 'var(--radius-sm)' }} />}
       {s && count === 0 && <p className="sub">오늘 좋은·나쁜 소식을 판단한 기사가 아직 없어요.</p>}
       {s && count > 0 && (
         <>
@@ -379,9 +381,11 @@ export default function StockDetailPage() {
 
 /** 관심 종목 빠른 전환 (V7 장점): 담은 종목을 칩으로, 지금 종목은 진하게. 로그인·담은 종목이 없으면 안 보임 */
 function QuickSwitch({ code }) {
-  const { user, watchlist } = useSession();
+  const { user, checking, watchlist } = useSession();
   const items = user ? watchlist.items.slice(0, 10) : [];
   const { quotes } = useQuotes(items.map((w) => w.stockCode));
+  // 로그인 확인·관심 종목을 받는 동안 같은 높이의 빈 자리 (11/16 화면 밀림 측정: 줄이 늦게 생겨 아래가 59px 밀림)
+  if (checking || (user && !watchlist.loaded)) return <div className="quick-placeholder" aria-hidden="true" />;
   if (items.length === 0) return null;
   return (
     <nav className="quick" aria-label="관심 종목 바로 가기">
@@ -443,7 +447,10 @@ function StockDetail({ code }) {
   const summary = useApi((signal) => stockApi.summary(code, {}, { signal }), [code]);
   // 차트 위 기사 표시 재료: 최근 30일 날마다 기사 수(서버 집계) + 최근 기사 100건(제목·시각)
   const days = useApi((signal) => stockApi.mentions(code, '30d', { signal }), [code]);
-  const recent = useApi((signal) => articleApi.list({ stockCode: code, size: 100 }, { signal }), [code]);
+  // 최근 기사 100건(차트 분봉 위 기사 표시용, 약 90KB)은 AI 요약이 온 뒤에 받음 — 느린 휴대폰에서 첫 화면 글(LCP)과 대역폭을 다퉜음 (11/16 측정)
+  const recent = useApi((signal) => articleApi.list({ stockCode: code, size: 100 }, { signal }), [code], {
+    enabled: Boolean(summary.data || summary.error),
+  });
   const dayCounts = days.data ? (days.data.items || []).map((p) => ({ date: String(p.time).slice(0, 10), count: p.totalCount })) : null;
   const recentArticles = recent.data ? (recent.data.items || []).map(toUiArticle) : null;
   const { quotes, loading, disabled } = useQuotes([code], { live: true });
@@ -481,7 +488,9 @@ function StockDetail({ code }) {
       <div className="stock-flow">
         <div className="sf-chart">
           <div id="sec-chart" className="sec-anchor" />
-          <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} liveQuote={quotes[code] || null} />
+          <Suspense fallback={<section className="card" aria-busy="true"><div className="skeleton" style={{ height: 556, borderRadius: 'var(--radius-sm)' }} /></section>}>
+            <PriceChart key={code} stockCode={code} stockName={stock?.stockName || code} dayCounts={dayCounts} articles={recentArticles} moves={moves.data?.items || null} liveQuote={quotes[code] || null} />
+          </Suspense>
         </div>
         <div className="grid-2 sf-grid">
           <div className="stack sf-stack">

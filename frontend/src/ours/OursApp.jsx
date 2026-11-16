@@ -37,7 +37,12 @@ const NotFoundPage = lazy(pages.notFound);
 
 if (typeof window !== 'undefined') {
   const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
-  const prefetch = () => idle(() => Object.values(pages).forEach((load) => load().catch(() => {})));
+  // 첫 화면 데이터가 다 온 뒤에 받도록 4초 미룸 (11/16 측정: 느린 휴대폰에서 첫 화면 API 와 대역폭을 다퉜음). 데이터 절약 모드면 안 받음
+  const saveData = navigator.connection?.saveData;
+  const prefetch = () => {
+    if (saveData) return;
+    setTimeout(() => idle(() => Object.values(pages).forEach((load) => load().catch(() => {}))), 4000);
+  };
   // 이 파일 자체가 나중에 받아지므로 load 가 이미 지났을 수 있음
   if (document.readyState === 'complete') prefetch();
   else window.addEventListener('load', prefetch, { once: true });

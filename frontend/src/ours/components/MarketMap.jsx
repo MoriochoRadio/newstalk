@@ -135,7 +135,8 @@ export default function MarketMap({ tiles, height = 320, priceReady = true }) {
                     {w >= 120 && <span className="map-count"> 기사 {t.articleCount}</span>}
                   </span>
                 )}
-                {big && t.why && <span className="map-why">{t.why.title}</span>}
+                {/* 칸 안 기사 제목은 넓은 화면에서만 (11/16: 휴대폰에선 늦게 오는 제목 때문에 첫 화면이 4초, 좁은 칸에선 등락의 원인처럼 읽힘) */}
+                {big && t.why && width >= 520 && <span className="map-why">{t.why.title}</span>}
               </Link>
             </li>
           );

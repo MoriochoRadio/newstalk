@@ -5301,3 +5301,31 @@ html {
   background: var(--bar-news);
 }
 
+/* ===== 11/16 전문가 기준 점검: 화면 밀림(CLS) 줄이기 =====
+   측정(휴대폰 조건): 종목 화면 0.45 · 종목 목록 0.40 · 글 화면 0.26 (기준 0.1 이하, web.dev Core Web Vitals) */
+/* 1) 내용이 오기 전 짧은 화면에 보이던 맨 아래 안내가 내용이 차며 밀려남(가장 큼 0.27~0.29) → 본문 칸이 화면 한 장 이상 */
+.content {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* 2) 종목 화면: 관심 종목 줄이 늦게 나타나며 아래 전부가 밀림 → 로그인 확인 중엔 같은 높이 자리 */
+.quick-placeholder {
+  height: 44px;
+  margin-bottom: 4px;
+}
+.brief.brief-skel {
+  min-height: 300px;
+}
+/* 휴대폰 '오늘 좋은·나쁜 소식' 머리: 글꼴(Pretendard)이 늦게 오면 줄바꿈이 바뀌어 카드 아래가 36px 밀림 (11/16 CLS 측정)
+   → 기준 토글을 늘 다음 줄에 두어 글꼴과 상관없이 같은 높이 */
+@media (max-width: 768px) {
+  .sf-sent .card-head {
+    flex-wrap: wrap;
+  }
+  .sf-sent .card-head > .segmented {
+    flex-basis: 100%;
+    width: max-content;
+    flex-grow: 0;
+  }
+}
+

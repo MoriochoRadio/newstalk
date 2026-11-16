@@ -83,8 +83,10 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
         )}
       </div>
 
-      <BriefTone sentiment={summary?.sentiment} />
+      {/* 요약을 받는 동안 좋은·나쁜 줄 자리를 미리 (11/16 화면 밀림 측정: 받은 뒤 카드가 커져 아래 카드가 50px씩 밀림) */}
+      {summary === undefined ? <div className="skeleton sk-line" style={{ width: '42%', height: 22 }} /> : <BriefTone sentiment={summary?.sentiment} />}
 
+      {digest === null && !compact && <div className="skeleton sk-line" style={{ width: '30%', height: 26 }} />}
       {tags.length > 0 && (
         <div className="tags brief-tags">
           {tags.map((t) => (
