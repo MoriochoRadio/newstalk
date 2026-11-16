@@ -5549,3 +5549,8 @@ html:has(.sec-nav) {
 @media (max-width: 768px) {
   .rank-list .st-meta { row-gap: 2px; column-gap: 10px; } /* 줄바꿈된 '좋은 소식'이 멀리 떨어져 보였음 */
 }
+
+/* 4차 리뷰: 휴대폰 종목 머리의 '오늘 주가 기사' 줄이 화면 밖에서 잘림 */
+.stock-head .stock-price { max-width: 100%; min-width: 0; }
+.price-news { max-width: min(520px, 100%); }
+.tag-mini { display: inline-block; margin-right: 6px; padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }

@@ -162,7 +162,8 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
           {/* 같은 소식 묶음은 대표가 첫 보도(더 오래됨)라 목록이 '2시간 전 → 4시간 전 → 2시간 전'으로 섞여 보였음
               → 줄 자리(최신순)와 맞게 묶음의 가장 최근 시각 (11/16 3차 리뷰) */}
           <time className="dot num" dateTime={latestIso || undefined}>
-            {relativeTime(latestIso)}
+            {/* 언론사는 대표(첫 보도) 것이라, 시각이 다른 기사 것이면 '최근' 을 붙여 같은 기사 시각으로 읽히지 않게 (4차 리뷰) */}
+            {latestIso !== a.publishedAtIso ? `최근 ${relativeTime(latestIso)}` : relativeTime(latestIso)}
           </time>
         </div>
       </div>

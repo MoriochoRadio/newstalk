@@ -830,7 +830,11 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
               <span className="badge badge-outline num">
                 {unit === 'day' ? `${dayRangeLabel(prev?.t, bar.t)} 기사 ${barNews.count}건` : `이 봉 기사 ${barNews.count}건`}
               </span>
-              {barNews.items[0] && <Link to={`/news/${barNews.items[0].id}`}>{barNews.items[0].title}</Link>}
+              {/* 이 종목이 중심인 기사를 먼저 ('함께 언급' 기사가 대표로 나왔음 — 4차 리뷰) */}
+              {(() => {
+                const pick = barNews.items.find((x) => x.relatedStocks?.some((s) => s.code === stockCode && s.role === 'MAIN')) || barNews.items[0];
+                return pick ? <Link to={`/news/${pick.id}`}>{pick.title}</Link> : null;
+              })()}
             </>
           ) : (
             <span className="muted">{hover != null ? '이 봉에는 연결된 기사가 없어요' : ''}</span>

@@ -15,6 +15,7 @@ const inflight = new Set();
 const failedAt = new Map(); // code → 실패 시각 (15초 동안 다시 부르지 않고 '–')
 // 실패는 15초 뒤 다시: 1분 동안 빈칸으로 남아 고장처럼 보였음 (11/16 3차 리뷰). 받은 값은 그대로 1분
 const FAIL_RETRY_MS = 15_000;
+const failCount = new Map(); // code → 연속 실패 횟수
 const listeners = new Set();
 let disabled = false;
 
@@ -31,12 +32,22 @@ function fetchCodes(codes) {
       .many(chunk)
       .then((res) => {
         const now = Date.now();
-        (res?.items || []).forEach((q) => cache.set(q.stockCode, { q, at: now }));
-        chunk.filter((c) => !cache.has(c)).forEach((c) => failedAt.set(c, now));
+        (res?.items || []).forEach((q) => {
+          cache.set(q.stockCode, { q, at: now });
+          failCount.delete(q.stockCode);
+        });
+        chunk.filter((c) => !cache.has(c)).forEach((c) => {
+          failedAt.set(c, now);
+          failCount.set(c, (failCount.get(c) || 0) + 1);
+        });
       })
       .catch((e) => {
         if (e?.code === 'QUOTE_DISABLED') disabled = true;
-        else chunk.forEach((c) => failedAt.set(c, Date.now()));
+        else
+          chunk.forEach((c) => {
+            failedAt.set(c, Date.now());
+            failCount.set(c, (failCount.get(c) || 0) + 1);
+          });
       })
       .finally(() => {
         chunk.forEach((c) => inflight.delete(c));
@@ -49,7 +60,8 @@ const isFresh = (c, now) => {
   const e = cache.get(c);
   if (e && now - e.at < REFRESH_MS) return true;
   const f = failedAt.get(c);
-  return Boolean(f && now - f < FAIL_RETRY_MS);
+  // 실패가 이어지면 15초 → 30초 → 60초로 간격을 늘림 (시세 서버가 막혔을 때 30종목을 15초마다 다시 부르지 않게)
+  return Boolean(f && now - f < Math.min(REFRESH_MS, FAIL_RETRY_MS * 2 ** Math.max(0, (failCount.get(c) || 1) - 1)));
 };
 
 export function useQuotes(codes, { live = false } = {}) {

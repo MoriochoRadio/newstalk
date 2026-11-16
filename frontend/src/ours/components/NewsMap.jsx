@@ -49,12 +49,13 @@ export function NewsMap({ stories, height = 380 }) {
         {rects.map((r) => {
           const st = shown[r.i];
           const a = st.lead;
-          const tone = toneOfStory(st);
+          const word = storyWord(st);
+          // '주가 급변' 칸은 색을 안 칠함: 주가 기사에 좋은·나쁜을 붙이면 순환 논리 (11/16 4차 리뷰 — 제목에 시세 낱말이 없어 priceMoveTitle 로는 못 걸렀음)
+          const tone = word === '주가 급변' ? null : toneOfStory(st);
           const w = r.w - GAP;
           const h = r.h - GAP;
           const main = (a.relatedStocks || []).find((x) => x.role === 'MAIN') || a.relatedStocks?.[0];
           const big = w >= 200 && h >= 130;
-          const word = storyWord(st);
           // 칸: 종목 이름(크게) + 한두 낱말 + 기사 수. 글자 크기는 칸 크기에 맞춤
           // 이름이 칸 너비를 넘지 않게 (휴대폰 '삼성바이오로…' 잘림): 한글 한 자 ≈ 1em
           const nameLen = Math.max(2, (main?.name || '').length);

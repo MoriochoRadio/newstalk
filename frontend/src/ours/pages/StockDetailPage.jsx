@@ -305,7 +305,9 @@ function dayLabel(date) {
 
 /** 크게 움직인 날 (F-17 과거 급등·급락 이력): 최근 1년 하루 등락률 ±n% 이상인 날 + 그날 이 종목 기사
  *  11/16: 백엔드에 있던 API 를 화면에 연결. 말은 조심스럽게 — 그날 나온 기사일 뿐 "때문에" 가 아님 */
-function BigMovesCard({ moves, level, onLevel }) {
+const todayKst = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+
+function BigMovesCard({ moves, level, onLevel, todayRate }) {
   const [open, setOpen] = useState(false);
   if (moves.error?.code === 'QUOTE_DISABLED') return null; // 시세가 꺼진 서버: 칸을 숨김
   const items = moves.data?.items || [];
@@ -330,21 +332,29 @@ function BigMovesCard({ moves, level, onLevel }) {
           {shown.map((m) => {
             // 등락률 옆에 '…폭락에 개미들 비명' 같은 시세 기사가 오면 그 기사 때문에 움직인 것처럼 읽힘 (11/16 PM 2차 리뷰)
             // → 시세 기사가 아닌 첫 기사. 그날 기사가 시세 기사뿐이면 제목 대신 건수만
-            const top = m.articles?.find((a) => !isPriceMoveTitle(a.title));
+            // 받은 3건이 모두 시세 기사면 첫 기사를 '시세 기사' 꼬리표와 함께 (모호한 안내 문장 대신 — 11/16 4차 리뷰)
+            const nonPrice = m.articles?.find((a) => !isPriceMoveTitle(a.title));
+            const top = nonPrice || m.articles?.[0];
+            // 오늘 줄은 머리의 실시간 값으로 (서버 일봉은 캐시라 -7.07% vs 머리 -7.44% 처럼 달랐음 — 4차 리뷰)
+            const isToday = m.date === todayKst();
+            const rate = isToday && todayRate != null ? todayRate : m.changeRate;
             return (
               <li key={m.date} className="move-row">
-                <span className="move-day num">{dayLabel(m.date)}</span>
-                <b className={`move-rate num ${dirClass(m.changeRate)}`}>{fmtRate(m.changeRate)}</b>
+                <span className="move-day num">
+                  {dayLabel(m.date)}
+                  {isToday && marketState().key === 'open' && <small className="muted"> 장중</small>}
+                </span>
+                <b className={`move-rate num ${dirClass(rate)}`}>{fmtRate(rate)}</b>
                 <span className="move-news">
                   {top ? (
-                    <Link to={`/news/${top.articleId}`} className="move-title">
-                      {top.title}
-                    </Link>
+                    <>
+                      {!nonPrice && <span className="tag-mini">시세 기사</span>}
+                      <Link to={`/news/${top.articleId}`} className="move-title">
+                        {top.title}
+                      </Link>
+                    </>
                   ) : (
-                    <span className="muted">
-                      {/* 서버는 날마다 3건만 줌 → 전부 받은 경우에만 '시세 기사만'이라고 말함 (11/16 3차 코드 리뷰) */}
-                      {m.articleCount === 0 ? '그날 연결된 기사 없음' : m.articleCount <= (m.articles?.length || 0) ? '그날은 주가를 다룬 기사만 있어요' : '앞쪽 기사는 주가를 다룬 기사예요'}
-                    </span>
+                    <span className="muted">그날 연결된 기사 없음</span>
                   )}
                 </span>
                 {m.articleCount > 0 && <span className="move-count num">기사 {m.articleCount}건</span>}
@@ -566,7 +576,7 @@ function StockDetail({ code }) {
               <SummaryCard code={code} summary={summary} />
             </div>
             <div className="sf-moves">
-              <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} />
+              <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} todayRate={shownQuote?.changeRate ?? null} />
             </div>
           </div>
           <div className="stack sf-stack">
