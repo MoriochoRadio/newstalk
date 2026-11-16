@@ -6350,3 +6350,21 @@ a { text-underline-offset: 3px; }
     color-mix(in srgb, var(--up) 8%, var(--surface)) 52%,
     color-mix(in srgb, var(--up) 52%, var(--surface)));
 }
+
+/* ===== 지도 색 더 진하게 (11/16 밤): 12~90%, 가장 진한 칸(80% 이상)은 흰 글자 =====
+   어두운 화면은 밝은 빨강·파랑을 90% 섞으면 밝은 글자가 안 읽혀서 진한 빨강·파랑을 섞음 (밝은 글자 대비 5 이상) */
+.cm-tile.cm-up { background: color-mix(in srgb, var(--map-up, var(--up)) var(--heat), var(--surface)); }
+.cm-tile.cm-down { background: color-mix(in srgb, var(--map-down, var(--down)) var(--heat), var(--surface)); }
+.cm-tile.cm-deep, .cm-tile.cm-deep .cm-name, .cm-tile.cm-deep .cm-rate, .cm-tile.cm-deep .cm-name-wrap { color: var(--map-deep-text, #fff); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --map-up: #c8202f; --map-down: #2563eb; --map-deep-text: var(--text); }
+}
+:root[data-theme='dark'] { --map-up: #c8202f; --map-down: #2563eb; --map-deep-text: var(--text); }
+.cm-scale2 i {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--map-down, var(--down)) 90%, var(--surface)),
+    color-mix(in srgb, var(--map-down, var(--down)) 12%, var(--surface)) 48%,
+    color-mix(in srgb, var(--text-3) 14%, var(--surface)) 50%,
+    color-mix(in srgb, var(--map-up, var(--up)) 12%, var(--surface)) 52%,
+    color-mix(in srgb, var(--map-up, var(--up)) 90%, var(--surface)));
+}

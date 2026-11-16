@@ -28,14 +28,15 @@ function useWidth(ref) {
   return w;
 }
 
-/** 등락률 → 색. 등락 폭에 비례해 진하기가 이어짐: 0% 회색 · 1% 옅게 … 5% 이상 가장 진하게 (바탕에 섞는 비율 8~52%)
+/** 등락률 → 색. 등락 폭에 비례해 진하기가 이어짐: 0% 회색 · 1% 옅게 … 5% 이상 가장 진하게 (바탕에 섞는 비율 12~90%)
  *  11/16 사용자: '많이 떨어지면 더 진하게, 적게 떨어지면 연하게' — 예전 7단계는 1%와 2.9%가 같은 색이었음 */
 export function capHeatStyle(rate) {
-  if (rate == null || Number.isNaN(Number(rate))) return { cls: 'cm-na', style: undefined, strong: false };
+  if (rate == null || Number.isNaN(Number(rate))) return { cls: 'cm-na', style: undefined, strong: false, deep: false };
   const r = Number(rate);
-  if (Math.abs(r) < 0.05) return { cls: 'cm-0', style: undefined, strong: false };
-  const heat = Math.round(8 + Math.min(1, Math.abs(r) / 5) * 44);
-  return { cls: r > 0 ? 'cm-up' : 'cm-down', style: { '--heat': `${heat}%` }, strong: heat > 26 };
+  if (Math.abs(r) < 0.05) return { cls: 'cm-0', style: undefined, strong: false, deep: false };
+  // 11/16 사용자: 더 진하게, 크게 떨어진 건 확실히 → 12~90%, 작은 폭도 눈에 띄게 굽은 곡선 (1% 34 · 2% 49 · 3% 63 · 5% 이상 90)
+  const heat = Math.round(12 + Math.pow(Math.min(1, Math.abs(r) / 5), 0.8) * 78);
+  return { cls: r > 0 ? 'cm-up' : 'cm-down', style: { '--heat': `${heat}%` }, strong: heat > 30, deep: heat >= 80 };
 }
 
 /** (예전 단계 이름 — 다른 곳에서 쓰면 그대로) */
@@ -170,7 +171,7 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
                 <li key={it.stockCode} style={{ left: t.x, top: t.y, width: w, height: h }}>
                   <Link
                     to={`/stocks/${it.stockCode}`}
-                    className={`cm-tile ${heat.cls} ${heat.strong ? 'cm-strong' : ''} ${roomy ? 'cm-roomy' : ''}`}
+                    className={`cm-tile ${heat.cls} ${heat.strong ? 'cm-strong' : ''} ${heat.deep ? 'cm-deep' : ''} ${roomy ? 'cm-roomy' : ''}`}
                     style={heat.style}
                     aria-label={label}
                     onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
