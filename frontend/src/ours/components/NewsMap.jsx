@@ -122,7 +122,7 @@ export function NewsMap({ stories, height = 380, variant = 'headline' }) {
 }
 
 /** 옆 칸: 오늘 뉴스 상태 숫자 */
-export function NewsPulse({ articles, storyCount, topics = [], disclosureCount = 0 }) {
+export function NewsPulse({ articles, topics = [], disclosureCount = 0 }) {
   const judged = countsOf(
     (articles || [])
       .filter((a) => !a.titleOnly && !a.disclosurePending)
@@ -135,30 +135,33 @@ export function NewsPulse({ articles, storyCount, topics = [], disclosureCount =
   return (
     <div className="news-pulse">
       <div className="np-total">
-        <span className="np-k">오늘 뉴스</span>
+        <span className="np-k">오늘 기사</span>
         <span className="np-v num">
           {(articles || []).length.toLocaleString('ko-KR')}
           <small>건</small>
         </span>
         {/* 아래 '뉴스·공시 n건'과 맞춰 보이게 공시 수도 (11/16 리뷰: 173건 vs 182건) */}
-        <span className="np-sub num">같은 소식끼리 묶으면 {storyCount}개{disclosureCount ? ` · 공시 ${disclosureCount}건 따로` : ''}</span>
+        {/* 숫자 줄이기 (11/16 밤 리뷰: 한 화면에 416·279·97·301·513) → 묶은 소식 수는 빼고 공시만 */}
+        {disclosureCount > 0 && <span className="np-sub num">공시 {disclosureCount}건은 따로</span>}
       </div>
+      {/* '좋은 소식 100건'(기사)과 '소식 92개'(묶음)가 같은 말로 섞였음 (11/16 밤 PM) → 머리말에 '기사 n건 중'을 밝히고 줄에는 숫자만 */}
+      <span className="np-k np-tone-k num">AI가 읽은 기사 {read}건 중</span>
       <div className="np-tone">
         <ToneRing pos={tone.pos} neu={tone.neu} neg={tone.neg} size={84} />
         <ul className="np-tone-list num">
           <li>
             <i className="np-dot pos" />
-            좋은 소식 <b>{tone.pos}</b>건
+            좋은 소식 <b>{tone.pos}</b>
           </li>
           <li>
             <i className="np-dot neu" />
-            판단 없음 <b>{tone.neu}</b>건
+            판단 없음 <b>{tone.neu}</b>
           </li>
           <li>
             <i className="np-dot neg" />
-            나쁜 소식 <b>{tone.neg}</b>건
+            나쁜 소식 <b>{tone.neg}</b>
           </li>
-          <li className="np-read">AI가 읽은 기사 {read}건 기준</li>
+          <li className="np-read">AI 판단 · 주가 예측 아님</li>
         </ul>
       </div>
       {/* 시간대별 보도량은 뺌 (11/13 피드백: 투자자는 몇 시에 기사가 많았는지 궁금하지 않음) → 오늘 무슨 일이 많았나 */}

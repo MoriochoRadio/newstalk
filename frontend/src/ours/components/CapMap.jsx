@@ -7,7 +7,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { squarify } from './MarketMap';
-import { fmtRate } from '../lib/format';
+import { fmtRate, shortTime } from '../lib/format';
+import { marketState } from '../lib/market';
 
 const HEAD = 28; // 업종 머리줄 높이 (이름 · 평균 등락 · 기사 수)
 const PAD = 6; // 업종 상자 안 여백
@@ -28,15 +29,19 @@ function useWidth(ref) {
   return w;
 }
 
-/** 등락률 → 색. 등락 폭에 비례해 진하기가 이어짐: 0% 회색 · 1% 옅게 … 5% 이상 가장 진하게 (바탕에 섞는 비율 12~90%)
+/** 등락률 → 색. 등락 폭에 비례해 진하기가 이어짐: 0% 회색 · 1% 옅게 … 5% 이상 가장 진하게 (바탕에 섞는 비율 12~90%, 67~73 은 건너뜀)
  *  11/16 사용자: '많이 떨어지면 더 진하게, 적게 떨어지면 연하게' — 예전 7단계는 1%와 2.9%가 같은 색이었음 */
 export function capHeatStyle(rate) {
   if (rate == null || Number.isNaN(Number(rate))) return { cls: 'cm-na', style: undefined, strong: false, deep: false };
   const r = Number(rate);
   if (Math.abs(r) < 0.05) return { cls: 'cm-0', style: undefined, strong: false, deep: false };
   // 11/16 사용자: 더 진하게, 크게 떨어진 건 확실히 → 12~90%, 작은 폭도 눈에 띄게 굽은 곡선 (1% 34 · 2% 49 · 3% 63 · 5% 이상 90)
-  const heat = Math.round(12 + Math.pow(Math.min(1, Math.abs(r) / 5), 0.8) * 78);
-  return { cls: r > 0 ? 'cm-up' : 'cm-down', style: { '--heat': `${heat}%` }, strong: heat > 30, deep: heat >= 80 };
+  let heat = Math.round(12 + Math.pow(Math.min(1, Math.abs(r) / 5), 0.8) * 78);
+  // 글자 대비 4.5 (11/16 밤 리뷰: 밝은 화면에서 옅은 칸 빨강·파랑 글자 3.3, 진한 칸 흰 글자 3.6).
+  // 밝은 화면 지도는 짙은 빨강 #a8141f·파랑 #1e40af 를 섞고: 27% 이하 = 빨강·파랑 글자, 28~66% = 본문색, 74% 이상 = 흰 글자.
+  // 67~73% 는 본문색도 흰 글자도 4.5 미만이라 가까운 쪽(66 또는 74)으로 건너뜀
+  if (heat > 66 && heat < 74) heat = heat < 70 ? 66 : 74;
+  return { cls: r > 0 ? 'cm-up' : 'cm-down', style: { '--heat': `${heat}%` }, strong: heat > 27, deep: heat >= 74 };
 }
 
 /** (예전 단계 이름 — 다른 곳에서 쓰면 그대로) */
@@ -55,16 +60,18 @@ export function capText(eok) {
  * items: [{ stockCode, stockName, sector, marketCap, changeRate, priceLimit }]
  * news: { [code]: { count, top: { id, title } } } — 오늘 기사 수와 대표 제목
  */
-export default function CapMap({ items, news = {}, height = 520, limit = 20, maxShare = 0.24 }) {
+export default function CapMap({ items, news = {}, height: height0 = 520, limit = 20, maxShare = 0.24, sizeKind = 'cap' }) {
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
+  // 휴대폰(좁은 폭)은 칸 16개가 들어가게 높이를 최소 520 으로
+  const height = width && width < 520 ? Math.max(height0, 520) : height0;
   const [tip, setTip] = useState(null);
 
   const layout = useMemo(() => {
     if (!width || !items.length) return [];
     // 휴대폰처럼 좁으면 시가총액 상위 30개만 (60개면 칸이 너무 잘아 이름이 다 잘림)
-    // 주요 종목만 (11/16 사용자: 60개가 꽉 차서 답답·눈 아픔) → 크기 순 상위 limit 개, 휴대폰은 12개
-    const list0 = [...items].sort((a, b) => b.marketCap - a.marketCap).slice(0, width < 520 ? Math.min(limit, 12) : limit);
+    // 주요 종목만 (11/16 사용자: 60개가 꽉 차서 답답·눈 아픔) → 크기 순 상위 limit 개, 휴대폰은 16개(11/16 밤: 12개면 1위 소식 종목이 빠짐)
+    const list0 = [...items].sort((a, b) => b.marketCap - a.marketCap).slice(0, width < 520 ? Math.min(limit, 16) : limit);
     const bySector = new Map();
     list0.forEach((it) => {
       const k = it.sector ?? '기타';
@@ -115,7 +122,7 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
   }, [items, width, height, limit, maxShare, news]);
 
   return (
-    <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)}>
+    <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)} onKeyDown={(e) => e.key === 'Escape' && setTip(null)}>
       {layout.map((sec) => (
         <section
           key={sec.name}
@@ -166,7 +173,10 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
               const newsLevel = n === 0 ? 0 : n >= 6 ? 3 : n >= 3 ? 2 : 1;
               const heat = capHeatStyle(it.changeRate);
               const limit = it.priceLimit === 'UPPER' ? ' 상한가' : it.priceLimit === 'LOWER' ? ' 하한가' : '';
-              const label = `${it.stockName}, ${sec.name}, 시가총액 ${capText(it.marketCap)}, ${fmtRate(it.changeRate)}${limit}, 오늘 기사 ${n}건`;
+              const rateText = it.changeRate == null || Number.isNaN(Number(it.changeRate)) ? '등락 정보 없음' : fmtRate(it.changeRate);
+              const label = [it.stockName, it.sectorName || sec.name, sizeKind === 'cap' ? `시가총액 ${capText(it.marketCap)}` : null, `${rateText}${limit}`, `오늘 기사 ${n}건`]
+                .filter(Boolean)
+                .join(', ');
               return (
                 <li key={it.stockCode} style={{ left: t.x, top: t.y, width: w, height: h }}>
                   <Link
@@ -174,8 +184,8 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
                     className={`cm-tile ${heat.cls} ${heat.strong ? 'cm-strong' : ''} ${heat.deep ? 'cm-deep' : ''} ${roomy ? 'cm-roomy' : ''}`}
                     style={heat.style}
                     aria-label={label}
-                    onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
-                    onFocus={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h })}
+                    onMouseEnter={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h, top: sec.y + sec.top + t.y })}
+                    onFocus={() => setTip({ it, sec: sec.name, n, x: sec.x + sec.pad + t.x + w / 2, y: sec.y + sec.top + t.y + h, top: sec.y + sec.top + t.y })}
                     onBlur={() => setTip(null)}
                   >
                     <span className="cm-main">
@@ -214,10 +224,14 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
         </section>
       ))}
       {tip && (
-        <div className="cm-tip" style={{ left: Math.min(Math.max(8, tip.x - 140), width - 288), top: Math.min(tip.y + 6, height - 8) }} role="presentation">
+        <div
+          className="cm-tip"
+          style={{ left: Math.max(0, Math.min(Math.max(8, tip.x - 140), width - 288)), ...(tip.y + 120 > height ? { bottom: height - tip.top + 6 } : { top: tip.y + 6 }) }}
+          role="presentation"
+        >
           <b>{tip.it.stockName}</b> <span className="muted">{tip.it.sectorName || tip.sec}</span>
           <div className="num">
-            시가총액 {capText(tip.it.marketCap)} · <span className={tip.it.changeRate > 0 ? 'up' : tip.it.changeRate < 0 ? 'down' : ''}>{fmtRate(tip.it.changeRate)}</span>
+            {sizeKind === 'cap' ? `시가총액 ${capText(tip.it.marketCap)} · ` : ''}<span className={tip.it.changeRate > 0 ? 'up' : tip.it.changeRate < 0 ? 'down' : ''}>{fmtRate(tip.it.changeRate)}</span>
           </div>
           <div className="num">오늘 기사 {tip.n}건</div>
           {news[tip.it.stockCode]?.top && <div className="cm-tip-title">{news[tip.it.stockCode].top.title}</div>}
@@ -227,18 +241,24 @@ export default function CapMap({ items, news = {}, height = 520, limit = 20, max
   );
 }
 
-/** 색 범례 + 읽는 법 */
-export function CapLegend({ size = '시가총액', grouped = true }) {
+/** 색 범례 + 읽는 법 (11/16 밤 리뷰: 색은 ±5%에서 더 진해지지 않음, 크기 상한, 기사 수와 등락은 따로 센 값, 시세 기준 시각) */
+export function CapLegend({ size = '시가총액', grouped = true, asOf = null }) {
+  const st = marketState();
   return (
-    <div className="cm-legend" aria-hidden="true">
-      <span className="cm-scale2">
-        <span className="num">-5%</span>
+    <div className="cm-legend">
+      <span className="cm-scale2" aria-hidden="true">
+        <span className="num">-5% 이하</span>
         <i />
-        <span className="num">+5%</span>
+        <span className="num">+5% 이상</span>
       </span>
-      <span>
+      {asOf && (
+        <span className="cm-asof num">
+          등락률 {shortTime(asOf)} 기준 · {st.label}
+        </span>
+      )}
+      <span aria-hidden="true">
         크기 = {size}
-        {grouped ? ' · 묶음 = 업종' : ''} · '기사 n건' = 오늘 이 종목 기사 수 (많을수록 진한 보라)
+        {grouped ? ' · 묶음 = 업종' : ''} · '기사 n건' = 오늘 이 종목 기사 수, 등락과 따로 센 값이에요
       </span>
     </div>
   );

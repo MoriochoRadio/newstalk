@@ -59,7 +59,9 @@ function useHomeVariant() {
     }
   });
   const fromUrl = params.get('home');
-  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : VARIANTS.some((x) => x.key === saved) ? saved : 'mapcap'; // 기본 = '뉴스 지도 + 종목' (11/16 저녁 사용자: 이 후보를 메인으로)
+  // 11/16 밤: 메인 확정 → 주소에 ?home= 이 없으면 늘 메인(뉴스 지도 + 종목). 시안 단추도 ?home= 일 때만 보임(시연 화면 정리)
+  const compare = params.has('home');
+  const v = VARIANTS.some((x) => x.key === fromUrl) ? fromUrl : compare && VARIANTS.some((x) => x.key === saved) ? saved : 'mapcap';
   const set = (k) => {
     setSaved(k);
     try {
@@ -71,7 +73,7 @@ function useHomeVariant() {
     p.set('home', k);
     setParams(p, { replace: true });
   };
-  return [v, set];
+  return [v, set, compare];
 }
 
 /** 화면 낭독기용 한 줄 (눈에는 지도가 말함). 데이터로 만든 문장, LLM 아님. 사실만: 기사 때문이라고 말하지 않음 */
@@ -169,7 +171,7 @@ export default function HomePage() {
   const { quotes } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
   const newsArticles = feed.data ? feed.data.items.filter((a) => !a.isDisclosure) : [];
   const newsCount = newsArticles.length;
-  const [variant, setVariant] = useHomeVariant();
+  const [variant, setVariant, compareVariants] = useHomeVariant();
   const tileStories = useMemo(() => (feed.data ? rankStories(groupStories, feed.data.items, MAP_TILES) : []), [feed.data]);
   const mapStories = tileStories.slice(0, MAP_STORIES);
   // 시안 '종목 지도': 시가총액 지도 + 칸마다 오늘 기사 수 (11/16 저녁 사용자: FINVIZ 지도처럼)
@@ -208,18 +210,20 @@ export default function HomePage() {
           {topStories.length > 0 && <p className="sr-only">{headline(newsCount, storyCount, issueItems, quotes)}</p>}
         </div>
         <LivePill className="mobile-pill" />
-        {/* 시안 비교 (임시): 팀 회의에서 고른 뒤 뺌 */}
-        <div className="home-variant">
-          <span className="muted">홈 시안</span>
-          <Segmented label="홈 시안 고르기" size="sm" options={VARIANTS} value={variant} onChange={setVariant} />
-        </div>
+        {/* 시안 비교 (임시): 주소에 ?home= 을 붙였을 때만. 팀 회의에서 고른 뒤 뺌 */}
+        {compareVariants && (
+          <div className="home-variant">
+            <span className="muted">홈 시안</span>
+            <Segmented label="홈 시안 고르기" size="sm" options={VARIANTS} value={variant} onChange={setVariant} />
+          </div>
+        )}
       </div>
 
       {/* 1) 한눈에 요약: 숫자·막대로 먼저 (11/16 저녁 사용자: "시각화로 먼저 떠먹여 주고, 그 밑에 자세히") */}
       <section className="card news-hero" aria-labelledby="hero-title">
         <div className="card-head">
           <h2 className="card-title" id="hero-title">
-            <Newspaper className="icon" aria-hidden="true" />
+            {variant === 'mapcap' || variant === 'stock' ? <LayoutGrid className="icon" aria-hidden="true" /> : <Newspaper className="icon" aria-hidden="true" />}
             {variant === 'map' ? '오늘 뉴스 한눈에' : variant === 'mapcap' ? '오늘 시장 한눈에' : variant === 'cloud' ? '오늘 시장, 단어로 한눈에' : variant === 'stock' ? '오늘 시장 지도' : '오늘 한눈에'}
           </h2>
           {variant === 'map' && (
@@ -300,32 +304,36 @@ export default function HomePage() {
               </>
             ) : variant === 'mapcap' ? (
               // 뉴스 지도 시안 구성(왼쪽 지도 + 오른쪽 숫자 칸) 그대로, 지도만 시가총액 주요 종목(업종 묶음 없이 한 덩어리).
-              // 더 많은 종목은 시장 지도 화면. 서버가 시총 지도를 모르면 오늘 기사 많은 종목으로 대신
+              // 받는 중엔 뼈대(11/16 밤 액터: 기사 지도가 먼저 떴다가 통째로 바뀜), 서버가 시총 지도를 모를 때만 오늘 기사 많은 종목으로 대신
               <div className="hero-grid">
                 <div style={{ minWidth: 0 }}>
-                  <CapMap
-                    items={
-                      capMap.data?.items?.length
-                        ? capMap.data.items.map((it) => ({ ...it, sector: '' }))
-                        : issueItems.map((it) => ({
-                            stockCode: it.stockCode,
-                            stockName: it.stockName,
-                            sector: '',
-                            marketCap: it.articleCount,
-                            changeRate: quotes[it.stockCode]?.changeRate ?? null,
-                            priceLimit: { up: 'UPPER', down: 'LOWER' }[limitOf(quotes[it.stockCode])] ?? null,
-                          }))
-                    }
-                    news={
-                      capMap.data?.items?.length
-                        ? capNews
-                        : Object.fromEntries(issueItems.map((it) => [it.stockCode, { count: it.articleCount, top: pickWhy(newsArticles, it.stockCode) }]))
-                    }
-                    height={400}
-                    limit={16}
-                    maxShare={0.16}
-                  />
-                  <CapLegend size={capMap.data?.items?.length ? '시가총액 (더 많은 종목은 시장 지도)' : '오늘 기사 수'} grouped={false} />
+                  {capMap.data?.items?.length ? (
+                    <>
+                      <CapMap items={capMap.data.items.map((it) => ({ ...it, sector: '', sectorName: it.sector }))} news={capNews} height={340} limit={16} maxShare={0.16} />
+                      <CapLegend size="시가총액 (큰 종목은 줄여 그림)" grouped={false} asOf={capMap.data.fetchedAt} />
+                    </>
+                  ) : capMap.error || capMap.data ? (
+                    <>
+                      <CapMap
+                        sizeKind="news"
+                        items={issueItems.map((it) => ({
+                          stockCode: it.stockCode,
+                          stockName: it.stockName,
+                          sector: '',
+                          marketCap: it.articleCount,
+                          changeRate: quotes[it.stockCode]?.changeRate ?? null,
+                          priceLimit: { up: 'UPPER', down: 'LOWER' }[limitOf(quotes[it.stockCode])] ?? null,
+                        }))}
+                        news={Object.fromEntries(issueItems.map((it) => [it.stockCode, { count: it.articleCount, top: pickWhy(newsArticles, it.stockCode) }]))}
+                        height={340}
+                        limit={16}
+                        maxShare={0.16}
+                      />
+                      <CapLegend size="오늘 기사 수" grouped={false} />
+                    </>
+                  ) : (
+                    <div className="skeleton" style={{ height: 340, borderRadius: 'var(--radius)' }} />
+                  )}
                 </div>
                 <NewsPulse articles={newsArticles} storyCount={storyCount} topics={topics} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
               </div>
@@ -401,7 +409,9 @@ export default function HomePage() {
           <Newspaper className="icon" aria-hidden="true" />
           <span>
             <b>오늘 기사·공시 전체</b>
-            <small>{(feed.data?.total || 0).toLocaleString('ko-KR')}건</small>
+            <small className="num">
+              기사 {newsCount.toLocaleString('ko-KR')} · 공시 {((feed.data?.items || []).length - newsCount).toLocaleString('ko-KR')}
+            </small>
           </span>
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>

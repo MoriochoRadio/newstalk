@@ -120,7 +120,8 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                     {q && q.changeRate != null && <b className={dirClass(q.changeRate)}> {fmtRate(q.changeRate)}</b>}
                   </Link>
                 )}
-                <span>기사 {st.size || 1}건</span>
+                {/* 지도 칸의 '기사 n건'(그 종목 오늘 기사 전부)과 구분 (11/16 밤 PM) */}
+                <span>같은 소식 {st.size || 1}건</span>
                 {/* 14px 링(글자 없음)이 로딩 표시처럼 보였음 → 메타 줄 끝에 짧은 글자 (11/16 디자이너 2차 리뷰) */}
                 {(c.pos > 0 || c.neg > 0) && (
                   <span className={`st-tone ${c.pos && c.neg ? 'mixed' : c.pos ? 'good' : 'bad'}`}>

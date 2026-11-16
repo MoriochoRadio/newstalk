@@ -6363,8 +6363,41 @@ a { text-underline-offset: 3px; }
 .cm-scale2 i {
   background: linear-gradient(90deg,
     color-mix(in srgb, var(--map-down, var(--down)) 90%, var(--surface)),
-    color-mix(in srgb, var(--map-down, var(--down)) 12%, var(--surface)) 48%,
+    color-mix(in srgb, var(--map-down, var(--down)) 12%, var(--surface)) 47%,
     color-mix(in srgb, var(--text-3) 14%, var(--surface)) 50%,
-    color-mix(in srgb, var(--map-up, var(--up)) 12%, var(--surface)) 52%,
+    color-mix(in srgb, var(--map-up, var(--up)) 12%, var(--surface)) 53%,
     color-mix(in srgb, var(--map-up, var(--up)) 90%, var(--surface)));
 }
+
+/* ===== 11/16 밤 리뷰 반영 (전문가 3명 + 액터 + impeccable) =====
+   밝은 화면 지도: 짙은 빨강·파랑을 섞어 글자 대비 4.5 이상. 27% 이하 = 빨강·파랑 글자, 28~66% = 본문색, 74% 이상 = 흰 글자 (CapMap capHeatStyle) */
+:root { --map-up: #a8141f; --map-down: #1e40af; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --map-up: #c8202f; --map-down: #2563eb; }
+}
+:root[data-theme='dark'] { --map-up: #c8202f; --map-down: #2563eb; }
+/* 옅은 칸 등락률 글자색: 밝은 화면 = 짙은 지도색, 어두운 화면 = 밝은 빨강·파랑 (변수로 둬서 아래 진한 칸 규칙이 늘 이김) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --map-rate-up: var(--up); --map-rate-down: var(--down); }
+}
+:root[data-theme='dark'] { --map-rate-up: var(--up); --map-rate-down: var(--down); }
+.cm-tile.cm-up .cm-rate { color: var(--map-rate-up, var(--map-up)); }
+.cm-tile.cm-down .cm-rate { color: var(--map-rate-down, var(--map-down)); }
+.cm-tile.cm-strong .cm-rate { color: var(--text); }
+.cm-tile.cm-deep .cm-rate { color: var(--map-deep-text, #fff); }
+/* 등락률 줄 높이: 자리 계산(1.25)과 맞춤 — body 1.6 을 물려받아 알약이 칸 아래로 잘렸음 */
+.cm-rate { line-height: 1.25; }
+/* '기사 n건' 알약: 바탕을 불투명하게(아래 칸 색이 비쳐 '기사 없음' 대비 3.9), 없음 글자는 text-2 */
+.cap-map .cm-tile .cm-news { background: var(--surface); }
+.cap-map .cm-tile .cm-news.cm-n0 { color: var(--text-2); }
+.cap-map .cm-tile .cm-news.cm-n3 { background: color-mix(in srgb, var(--buzz-solid) 14%, var(--surface)); }
+/* 범례: 시세 기준 시각 */
+.cm-asof { color: var(--text-2); font-weight: 600; }
+/* 오늘 많이 나온 주제: 버튼처럼 보였는데 안 눌림 (11/16 밤 액터) → 평평한 목록 줄 */
+.np-topics li { background: none; padding: 6px 0; border-radius: 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 600; }
+.np-topics li:last-child { border-bottom: 0; }
+.np-topics li b { font-size: var(--fs-md); }
+.np-topics ul { gap: 0; margin-top: 2px; }
+.np-tone-k { display: block; margin-bottom: 6px; }
+/* 휴대폰 관심 종목 카드: '좋은 소식 / 2건'으로 꺾이던 것 */
+.ws-tone b { white-space: nowrap; }

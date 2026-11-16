@@ -1,7 +1,7 @@
 // 시장 지도 전용 화면 (11/13 피드백: "시장 지도는 차라리 더 키워서 따로 큰 화면으로")
 // 오늘 기사가 많은 30종목: 칸 크기 = 오늘 기사 수, 색 = 어제 종가 대비 등락률 (빨강 오름·파랑 내림, 국내 관례)
 // 색과 크기는 사실 두 개를 나란히 보여 줄 뿐 — 기사 때문에 움직였다는 뜻이 아님 (아래 안내)
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { quoteApi, stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useQuotes } from '../lib/useQuotes';
@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 
 const LIMIT = 30;
+const CAP_LIMIT = 24; // 시가총액 지도 칸 수
 
 /** 화면 높이에 맞춘 지도 높이 (위 머리줄·제목·범례를 빼고, 최소 420) */
 function useMapHeight() {
@@ -40,15 +41,26 @@ export default function MapPage() {
   const [mode, setMode] = useState('cap');
   const capMap = useApi((signal) => quoteApi.marketMap({ signal }), []);
   const capReady = Boolean(capMap.data?.items?.length);
+  // 시총 지도를 받는 중이면 뼈대만 (11/16 밤 액터: 기사 지도가 먼저 떴다가 통째로 바뀜). 서버가 모르면(오류·빈 값) 기사 지도로
+  const capPending = mode === 'cap' && capMap.loading && !capMap.data && !capMap.error;
   const showCap = mode === 'cap' && capReady;
-  const capNews = {};
-  if (feed.data && capReady) {
+  const showNews = !showCap && !capPending;
+  // 지도에 그리는 24종목 (CapMap 과 같은 순서·개수) — 아래 '많이 오른·내린'도 이 종목으로 (11/16 밤 리뷰: 지도에 없는 종목이 1등)
+  const capItems = useMemo(
+    () => (capReady ? [...capMap.data.items].sort((a, b) => b.marketCap - a.marketCap).slice(0, CAP_LIMIT).map((it) => ({ ...it, sector: '', sectorName: it.sector })) : []),
+    [capReady, capMap.data]
+  );
+  const capQuotes = useMemo(() => Object.fromEntries(capItems.map((it) => [it.stockCode, { price: it.price, changeRate: it.changeRate, priceLimit: it.priceLimit }])), [capItems]);
+  const capNews = useMemo(() => {
+    const out = {};
+    if (!feed.data || !capItems.length) return out;
     const news = feed.data.items.filter((a) => !a.isDisclosure);
-    capMap.data.items.forEach((it) => {
+    capItems.forEach((it) => {
       const n = news.filter((a) => a.relatedStocks.some((s) => s.code === it.stockCode)).length;
-      if (n) capNews[it.stockCode] = { count: n, top: pickWhy(news, it.stockCode) };
+      if (n) out[it.stockCode] = { count: n, top: pickWhy(news, it.stockCode) };
     });
-  }
+    return out;
+  }, [feed.data, capItems]);
   // 칸마다 대표 제목: 같은 기사가 두 칸에 나오면 뒤 칸은 그 종목의 다른 기사로 (11/16 리뷰 14번: 삼성전자·SK하이닉스 칸 제목이 같았음)
   const usedWhy = new Set();
   const whyOf = (code) => {
@@ -77,7 +89,7 @@ export default function MapPage() {
           </h1>
           <p className="page-sub">
             {showCap
-              ? '코스피·코스닥 시가총액 상위 · 크기 = 시가총액 · 색 = 오늘 등락률 · 칸 안 = 오늘 기사 수'
+              ? `시가총액 상위 ${CAP_LIMIT}종목 · 색 = 오늘 등락률 · 칸을 누르면 종목 화면`
               : '오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률'}
           </p>
         </div>
@@ -94,20 +106,20 @@ export default function MapPage() {
           />
         )}
       </div>
-      <section className="card map-page" aria-label={`오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>
-        {issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}
-        {issues.loading && !issues.data && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
+      <section className="card map-page" aria-label={showCap ? `시가총액 상위 ${CAP_LIMIT}종목 지도` : `오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>
+        {showNews && issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}
+        {(capPending || (showNews && issues.loading && !issues.data)) && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
         {showCap && (
           <>
             {/* 업종 상자로 나누면 칸이 잘게 깨져 글자가 안 들어감 (11/16 사용자) → 한 덩어리, 업종은 마우스를 올린 설명에 */}
-            <CapMap items={capMap.data.items.map((it) => ({ ...it, sector: '', sectorName: it.sector }))} news={capNews} height={height} maxShare={0.12} limit={24} />
-            <CapLegend grouped={false} />
+            <CapMap items={capItems} news={capNews} height={height} maxShare={0.12} limit={CAP_LIMIT} />
+            <CapLegend size="시가총액 (큰 종목은 줄여 그림)" grouped={false} asOf={capMap.data.fetchedAt} />
           </>
         )}
-        {!showCap && items.length > 0 && <MarketMap tiles={tiles} priceReady={!disabled && !loading} height={height} />}
-        {!showCap && items.length > 0 && <MapLegend priceReady={!disabled} />}
+        {showNews && items.length > 0 && <MarketMap tiles={tiles} priceReady={!disabled && !loading} height={height} />}
+        {showNews && items.length > 0 && <MapLegend priceReady={!disabled} />}
         {/* 오늘 기사에 나온 종목이 없을 때(자정 직후·수집 멈춤): 빈 칸 대신 (11/16 QA) */}
-        {issues.data && items.length === 0 && (
+        {showNews && issues.data && items.length === 0 && (
           <Empty
             icon={LayoutGrid}
             title="오늘 기사에 나온 종목이 아직 없어요"
@@ -120,12 +132,17 @@ export default function MapPage() {
         )}
       </section>
       {/* 종목이 있을 때만: 실패·0개일 때 "오른 종목이 없어요"가 같이 나와 헷갈렸음 */}
-      {items.length > 0 && (
-        <>
+      {showCap ? (
+        <div style={{ marginTop: 16 }}>
+          <Movers issues={capItems} quotes={capQuotes} top={5} title={`지도 ${capItems.length}종목 중 많이 오른·내린`} />
+        </div>
+      ) : (
+        showNews &&
+        items.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <Movers issues={items} quotes={quotes} disabled={disabled} loading={loading} top={5} title={`${items.length}종목 중 많이 오른·내린`} />
+            <Movers issues={items} quotes={quotes} disabled={disabled} loading={loading} top={5} title={`기사 많은 ${items.length}종목 중 많이 오른·내린`} />
           </div>
-        </>
+        )
       )}
     </>
   );
