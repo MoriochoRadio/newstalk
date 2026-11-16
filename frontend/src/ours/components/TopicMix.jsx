@@ -6,7 +6,7 @@
 import { Link } from 'react-router-dom';
 import { TOPICS } from '../lib/digest';
 
-export function topicMix(stories) {
+export function topicMix(stories, n = 6) {
   const rows = TOPICS.map((t) => ({ label: t.label, count: 0, stories: [], top: null }));
   for (const st of stories || []) {
     // 대표 기사 하나의 제목·요약만 봄 (묶음 전체 요약을 합치면 한 소식이 여러 종류에 다 걸림 — 11/12 확인)
@@ -17,7 +17,7 @@ export function topicMix(stories) {
       rows[i].stories.push(st);
     });
   }
-  const shown = rows.filter((r) => r.count > 0).sort((x, y) => y.count - x.count).slice(0, 6);
+  const shown = rows.filter((r) => r.count > 0).sort((x, y) => y.count - x.count).slice(0, n);
   // 줄마다 대표 소식: 많이 다룬 순으로, 위 줄에서 이미 쓴 소식은 건너뜀 (같은 제목이 여러 줄에 반복되지 않게)
   const used = new Set();
   for (const r of shown) {

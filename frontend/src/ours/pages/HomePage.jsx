@@ -5,10 +5,10 @@
 // 4) 바로 가기: 시장 지도(/map)·종목·소식 전체
 // 이전 홈(세 칸 띠·화제 종목 카드·그 밖의 소식·소식 종류·보도량·이슈 순위)은 브랜치 test/fe-ours-1113-before-dashboard
 // 말은 조심스럽게: 호재·악재·예측·"때문에" 금지. 등락률은 어제 종가 대비 값
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, LayoutGrid, Newspaper, Star, TrendingUp } from 'lucide-react';
-import { quoteApi, stockApi } from '../../api';
+import { articleApi, quoteApi, stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
@@ -24,6 +24,7 @@ import { NewsMap, NewsPulse } from '../components/NewsMap';
 import WordCloud from '../components/WordCloud';
 import CapMap, { CapLegend } from '../components/CapMap';
 import HomeKpi from '../components/HomeKpi';
+import TopicBubbles from '../components/TopicBubbles';
 import { limitOf } from '../components/ui';
 import { pickWhy } from '../lib/todayFeed';
 import { marketTerms } from '../lib/marketTerms';
@@ -182,7 +183,18 @@ export default function HomePage() {
     });
     return out;
   }, [feed.data, capMap.data, variant]);
-  const terms = useMemo(() => (feed.data && (variant === 'cloud' || variant === 'stock') ? marketTerms(groupStories(feed.data.items.filter((a) => !a.isDisclosure))) : []), [feed.data, variant]);
+  // 오늘 기사 수를 1분마다 가볍게 물어(1건만 받음) 늘었으면 오늘 기사를 다시 받음 → 숫자가 굴러 올라감
+  const totals = useApi((signal) => articleApi.list({ period: 'today', size: 1 }, { signal }), [variant], { refreshMs: 60_000, enabled: variant === 'stock' });
+  const [feedAt, setFeedAt] = useState(null);
+  useEffect(() => {
+    if (feed.data) setFeedAt(new Date().toISOString());
+  }, [feed.data]);
+  useEffect(() => {
+    const now = totals.data?.totalCount;
+    if (now != null && feed.data && now > (feed.data.total || 0)) feed.reload();
+  }, [totals.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topicRows = useMemo(() => (feed.data && variant === 'stock' ? topicMix(groupStories(feed.data.items.filter((a) => !a.isDisclosure)), 10) : []), [feed.data, variant]);
+  const terms = useMemo(() => (feed.data && variant === 'cloud' ? marketTerms(groupStories(feed.data.items.filter((a) => !a.isDisclosure))) : []), [feed.data, variant]);
   const topics = useMemo(() => (feed.data ? topicMix(groupStories(newsArticles)) : []), [feed.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -249,11 +261,11 @@ export default function HomePage() {
             {variant === 'stock' ? (
               <>
                 {/* ① 오늘 숫자 띠 (증권 앱 지수 띠처럼) */}
-                <HomeKpi articles={newsArticles} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} />
+                <HomeKpi articles={newsArticles} disclosureCount={(feed.data?.items || []).filter((a) => a.isDisclosure).length} updatedAt={feedAt} />
                 {/* ② 종목 지도: 시가총액 지도. 서버가 아직 모르면(백엔드 브랜치 합치기 전) 같은 모양으로 '오늘 기사 많은 종목'(크기 = 기사 수) */}
                 {capMap.data?.items?.length ? (
                   <>
-                    <CapMap items={capMap.data.items} news={capNews} />
+                    <CapMap items={capMap.data.items} news={capNews} height={440} />
                     <CapLegend />
                   </>
                 ) : capMap.error || issueItems.length ? (
@@ -268,18 +280,19 @@ export default function HomePage() {
                         priceLimit: { up: 'UPPER', down: 'LOWER' }[limitOf(quotes[it.stockCode])] ?? null,
                       }))}
                       news={Object.fromEntries(issueItems.map((it) => [it.stockCode, { count: it.articleCount, top: feed.data ? pickWhy(newsArticles, it.stockCode) : null }]))}
-                      height={460}
+                      height={420}
+                      limit={15}
                     />
                     <CapLegend size="오늘 기사 수 (시가총액 지도는 새 서버를 켜면 보여요)" grouped={false} />
                   </>
                 ) : (
                   <div className="skeleton" style={{ height: 520, borderRadius: 'var(--radius)' }} />
                 )}
-                {/* ③ 오늘 많이 나온 말: '많이 나온 주제 · 소식 n개' 숫자 칸 대신 단어 구름 (11/16 사용자) */}
-                {terms.length > 0 && (
+                {/* ③ 오늘 많이 나온 주제: 막대 대신 거품 그림 (11/16 사용자: 주제 그래프를 워드클라우드 느낌으로) */}
+                {topicRows.length > 0 && (
                   <div className="home-words">
-                    <h3 className="hs-k">오늘 기사에 많이 나온 말</h3>
-                    <WordCloud terms={terms} height={240} />
+                    <h3 className="hs-k">오늘 많이 나온 주제</h3>
+                    <TopicBubbles rows={topicRows} height={280} />
                   </div>
                 )}
               </>

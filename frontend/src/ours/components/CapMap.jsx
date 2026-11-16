@@ -10,7 +10,7 @@ import { squarify } from './MarketMap';
 import { fmtRate } from '../lib/format';
 
 const HEAD = 20; // 업종 이름 줄 높이
-const GAP = 2;
+const GAP = 6; // 칸 사이 여백 (꽉 찬 느낌 줄이기)
 
 function useWidth(ref) {
   const [w, setW] = useState(0);
@@ -49,7 +49,7 @@ export function capText(eok) {
  * items: [{ stockCode, stockName, sector, marketCap, changeRate, priceLimit }]
  * news: { [code]: { count, top: { id, title } } } — 오늘 기사 수와 대표 제목
  */
-export default function CapMap({ items, news = {}, height = 520 }) {
+export default function CapMap({ items, news = {}, height = 520, limit = 20 }) {
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
   const [tip, setTip] = useState(null);
@@ -57,7 +57,8 @@ export default function CapMap({ items, news = {}, height = 520 }) {
   const layout = useMemo(() => {
     if (!width || !items.length) return [];
     // 휴대폰처럼 좁으면 시가총액 상위 30개만 (60개면 칸이 너무 잘아 이름이 다 잘림)
-    const list0 = width < 520 ? [...items].sort((a, b) => b.marketCap - a.marketCap).slice(0, 20) : items; // 휴대폰은 상위 20개
+    // 주요 종목만 (11/16 사용자: 60개가 꽉 차서 답답·눈 아픔) → 크기 순 상위 limit 개, 휴대폰은 12개
+    const list0 = [...items].sort((a, b) => b.marketCap - a.marketCap).slice(0, width < 520 ? Math.min(limit, 12) : limit);
     const bySector = new Map();
     list0.forEach((it) => {
       const k = it.sector ?? '기타';
@@ -70,15 +71,16 @@ export default function CapMap({ items, news = {}, height = 520 }) {
       .sort((a, b) => b.total - a.total);
     // 시가총액 차이가 매우 커서(삼성전자 1,150조 vs 코스닥 3조) 그대로면 작은 종목이 안 보임 → 제곱근에 가깝게 눌러 줌 (0.6제곱)
     const weight = (v) => Math.max(1, v) ** 0.6;
-    const secRects = squarify(sectors.map((s) => s.list.reduce((t, x) => t + weight(x.marketCap), 0)), width, height);
+    // 칸마다 오른쪽·아래 여백(GAP)을 빼므로 전체를 GAP 만큼 크게 나눠야 끝이 상자 끝과 맞음
+    const secRects = squarify(sectors.map((s) => s.list.reduce((t, x) => t + weight(x.marketCap), 0)), width + GAP, height + GAP);
     return secRects.map((r) => {
       const s = sectors[r.i];
       const showHead = Boolean(s.name) && r.h >= HEAD + 30 && r.w >= 60;
       const top = showHead ? HEAD : 0;
-      const inner = squarify(s.list.map((x) => weight(x.marketCap)), Math.max(0, r.w - GAP), Math.max(0, r.h - top - GAP));
+      const inner = squarify(s.list.map((x) => weight(x.marketCap)), Math.max(0, r.w), Math.max(0, r.h - top));
       return { ...r, name: s.name, showHead, tiles: inner.map((t) => ({ ...t, it: s.list[t.i] })) };
     });
-  }, [items, width, height]);
+  }, [items, width, height, limit]);
 
   return (
     <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)}>
