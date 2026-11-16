@@ -6262,3 +6262,17 @@ a.hs-bl:hover { color: var(--accent-text); }
 .cm-u2 .cm-rate, .cm-u3 .cm-rate, .cm-d2 .cm-rate, .cm-d3 .cm-rate { color: var(--text); }
 .kpi2-split-legend span { display: inline; } /* flex gap 이 '305'와 '건' 사이까지 벌려서 */
 .kpi2-split-legend i { margin-right: 8px; vertical-align: 1px; }
+
+/* ===== impeccable polish (11/16) ===== */
+/* 제목 옆 날짜 (제목 위 꼬리표 대신) */
+.title-date { margin-left: 10px; font-size: var(--fs-md); font-weight: 500; color: var(--text-3); letter-spacing: 0; white-space: nowrap; }
+/* 뉴스 줄: 판단·공시 줄은 제목 아래, 왼쪽 굵은 색 띠는 빼고(그림 칸 색이 판단을 보여 줌) */
+.feed-row-v2 .feed-context { margin: 6px 0 0; }
+.feed-row-v2.tone-row-pos, .feed-row-v2.tone-row-neg { box-shadow: none; }
+.sr-pos, .sr-neg { box-shadow: none; }
+/* 움직임은 한 곳만: 새 기사가 올 때 올라가는 숫자. 거품·단어 구름은 처음부터 보이게 */
+.tb-bubble, .wc-word { animation: none; opacity: 1; }
+/* 브라우저 기본 부분도 팔레트로: 글자 선택·입력 커서·스크롤바·밑줄 간격 */
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+html { caret-color: var(--accent); scrollbar-color: color-mix(in srgb, var(--text-3) 45%, transparent) transparent; }
+a { text-underline-offset: 3px; }

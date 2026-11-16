@@ -142,16 +142,6 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
     <article className={`feed-row feed-row-v2 ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>
       <KindIcon tone={tone} article={a} />
       <div className="feed-body">
-      {(a.isDisclosure || tone) && (
-        <div className="feed-kicker-line">
-          {a.isDisclosure && (
-            <span className="feed-kicker" title={explainDisclosure(a.disclosureType) || undefined}>
-              공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
-            </span>
-          )}
-          <Tone tone={tone} withName={!focusCode} />
-        </div>
-      )}
       {sns ? (
         <a className="feed-title" href={a.url} target="_blank" rel="noreferrer">
           <TitleText text={a.title} />
@@ -162,6 +152,16 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
         <Link className="feed-title" to={`/news/${a.id}`}>
           <TitleText text={a.title} />
         </Link>
+      )}
+      {(a.isDisclosure || tone) && (
+        <div className="feed-kicker-line feed-context">
+          {a.isDisclosure && (
+            <span className="feed-kicker" title={explainDisclosure(a.disclosureType) || undefined}>
+              공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
+            </span>
+          )}
+          <Tone tone={tone} withName={!focusCode} />
+        </div>
       )}
       {summary && !compact && (
         <p className="feed-summary">

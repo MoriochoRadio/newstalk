@@ -72,8 +72,9 @@ export default function MapPage() {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow num">{todayLabel()}</p>
-          <h1 className="page-title">시장 지도</h1>
+          <h1 className="page-title">
+            시장 지도 <span className="title-date num">{todayLabel()}</span>
+          </h1>
           <p className="page-sub">
             {showCap
               ? '코스피·코스닥 시가총액 상위 · 크기 = 시가총액 · 색 = 오늘 등락률 · 칸 안 = 오늘 기사 수'

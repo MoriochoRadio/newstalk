@@ -201,8 +201,9 @@ export default function HomePage() {
     <>
       <div className="page-head home-head dash-head">
         <div style={{ minWidth: 0 }}>
-          <p className="eyebrow num">{todayLabel()}</p>
-          <h1 className="page-title">오늘의 뉴스 브리핑</h1>
+          <h1 className="page-title">
+            오늘의 뉴스 브리핑 <span className="title-date num">{todayLabel()}</span>
+          </h1>
           {topStories.length > 0 && <p className="sr-only">{headline(newsCount, storyCount, issueItems, quotes)}</p>}
         </div>
         <LivePill className="mobile-pill" />
