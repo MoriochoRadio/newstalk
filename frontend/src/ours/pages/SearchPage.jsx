@@ -8,6 +8,7 @@ import { useApi } from '../../hooks/useApi';
 import { useTitle } from '../lib/hooks';
 import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
+import { iGa } from '../lib/josa';
 
 const SIZE = 10;
 const PERIODS = [
@@ -108,13 +109,13 @@ export default function SearchPage() {
       <section className="card" aria-labelledby="sr-articles">
         <div className="card-head">
           <h2 className="card-title" id="sr-articles">
-            ‘{q}’가 들어간 글 {res.data && <span className="count num">{articleTotal.toLocaleString('ko-KR')}건</span>}
+            ‘{q}’{iGa(q)} 들어간 글 {res.data && <span className="count num">{articleTotal.toLocaleString('ko-KR')}건</span>}
           </h2>
           <Segmented label="기간" size="sm" options={PERIODS} value={period} onChange={(k) => set({ period: k, page: '' })} />
         </div>
         {res.loading && !res.data && <SkeletonRows rows={4} />}
         {res.error && <ErrorBox error={res.error} onRetry={res.reload} />}
-        {res.data && articles.length === 0 && <p className="sub">제목·요약·키워드에 ‘{q}’가 들어간 글이 없어요.</p>}
+        {res.data && articles.length === 0 && <p className="sub">제목·요약·키워드에 ‘{q}’{iGa(q)} 들어간 글이 없어요.</p>}
         {articles.length > 0 && (
           <StoryFeed articles={articles} style={{ opacity: res.loading ? 0.5 : 1 }} />
         )}

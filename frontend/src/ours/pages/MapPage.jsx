@@ -10,7 +10,9 @@ import { todayLabel } from '../lib/format';
 import { loadTodayFeed, pickWhy } from '../lib/todayFeed';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import Movers from '../components/Movers';
-import { ErrorBox } from '../components/ui';
+import { Empty, ErrorBox } from '../components/ui';
+import { Link } from 'react-router-dom';
+import { LayoutGrid } from 'lucide-react';
 
 const LIMIT = 30;
 
@@ -56,11 +58,28 @@ export default function MapPage() {
         {issues.loading && !issues.data && <div className="skeleton" style={{ height, borderRadius: 'var(--radius)' }} />}
         {items.length > 0 && <MarketMap tiles={tiles} priceReady={!disabled && !loading} height={height} />}
         {items.length > 0 && <MapLegend priceReady={!disabled} />}
+        {/* 오늘 기사에 나온 종목이 없을 때(자정 직후·수집 멈춤): 빈 칸 대신 (11/16 QA) */}
+        {issues.data && items.length === 0 && (
+          <Empty
+            icon={LayoutGrid}
+            title="오늘 기사에 나온 종목이 아직 없어요"
+            action={
+              <Link to="/news?period=7d" className="btn btn-primary btn-sm">
+                최근 7일 소식
+              </Link>
+            }
+          />
+        )}
       </section>
-      <div style={{ marginTop: 16 }}>
-        <Movers issues={items} quotes={quotes} disabled={disabled} loading={loading} top={5} title={`${items.length || LIMIT}종목 중 많이 오른·내린`} />
-      </div>
-      <p className="home-foot">칸 크기는 오늘 기사 수, 색은 어제 종가와 비교한 지금 등락률이에요. 기사와 주가의 관계를 뜻하지 않아요.</p>
+      {/* 종목이 있을 때만: 실패·0개일 때 "오른 종목이 없어요"가 같이 나와 헷갈렸음 */}
+      {items.length > 0 && (
+        <>
+          <div style={{ marginTop: 16 }}>
+            <Movers issues={items} quotes={quotes} disabled={disabled} loading={loading} top={5} title={`${items.length}종목 중 많이 오른·내린`} />
+          </div>
+          <p className="home-foot">칸 크기는 오늘 기사 수, 색은 어제 종가와 비교한 지금 등락률이에요. 기사와 주가의 관계를 뜻하지 않아요.</p>
+        </>
+      )}
     </>
   );
 }

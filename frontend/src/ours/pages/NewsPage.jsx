@@ -11,6 +11,7 @@ import { useApi } from '../../hooks/useApi';
 import { useTitle } from '../lib/hooks';
 import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
+import { iGa } from '../lib/josa';
 
 const PAGE_SIZE = 20;
 const TABS = [
@@ -222,7 +223,7 @@ export default function NewsPage() {
         )}
         {!loading && !error && items.length === 0 && (isAll || filtered.done) && (
           <Empty
-            title={q ? `‘${q}’가 들어간 ${tab === 'disclosure' ? '공시가' : '글이'} 없어요` : '조건에 맞는 글이 없어요'}
+            title={q ? `‘${q}’${iGa(q)} 들어간 ${tab === 'disclosure' ? '공시가' : '글이'} 없어요` : '조건에 맞는 글이 없어요'}
             desc={period ? '기간을 넓혀 보세요.' : undefined}
             action={
               q || period ? (
