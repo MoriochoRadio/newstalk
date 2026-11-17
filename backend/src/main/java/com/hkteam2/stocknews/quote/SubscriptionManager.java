@@ -184,6 +184,12 @@ public class SubscriptionManager implements KisWebSocketClient.SubscriptionListe
         }
     }
 
+    /** 생중계할 종목이 있는가: 다시 접속 뒤 구독이 다 실패해도 웹소켓이 무소식 감시를 하게 (11/17) */
+    @Override
+    public synchronized boolean wantsCodes() {
+        return !active.isEmpty();
+    }
+
     // ----- 상태 -----
 
     public synchronized int capacity() {
