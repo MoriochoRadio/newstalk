@@ -54,13 +54,14 @@ export function toneOf(article, focusCode, onlyCodes) {
   // onlyCodes(관심 종목 화면): 그 종목들 판단만. 관심 없는 종목의 '좋은 소식' 배지가 맨 위에 뜨던 것 (11/16 디자이너 2차 리뷰)
   const pool = onlyCodes ? stocks.filter((x) => onlyCodes.has(x.code)) : stocks;
   const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
-  // '함께 언급'만 된 종목에는 목록에서 좋은·나쁜 표시를 안 붙임 (11/16 리뷰: 은행원 수기 글이 SK하이닉스에 '나쁜 소식'으로 보임). 글 화면 카드에는 그대로
-  if (s && s.role !== 'MAIN') return null;
+  // '함께 언급'만 된 종목: 11/16 엔 판단을 숨겼는데(은행원 수기 글이 SK하이닉스 '나쁜 소식'으로 보임) 11/17 사용자: 링은 웬만하면 다 →
+  // 링은 붙이되 글자에 '함께 언급'을 붙여 주인공 판단과 구분 (mentioned)
+  const mentioned = Boolean(s && s.role !== 'MAIN');
   // 이 기사 판단이 없으면(제목만 받은 언론사) 같은 소식 묶음의 AI 판단으로 (11/17 사용자: 목록엔 '제목만 연결'인데
   // 같은 소식의 다른 기사는 판단돼 상세에도 나옴 → 링을 보여 줘야). counts 를 함께 돌려줘 링·'AI가 읽은 기사 n건' 글자에 씀
   const g = s?.group;
   if ((article.titleOnly || !s?.sentiment) && g && (g.pos || g.neg)) {
-    return { kind: g.pos && g.neg ? 'mixed' : g.pos ? 'pos' : 'neg', name: s.name, counts: g, fromGroup: true };
+    return { kind: g.pos && g.neg ? 'mixed' : g.pos ? 'pos' : 'neg', name: s.name, counts: g, fromGroup: true, mentioned };
   }
   if (article.titleOnly) return null;
   const v = s?.sentiment || null;
@@ -68,7 +69,7 @@ export function toneOf(article, focusCode, onlyCodes) {
   const kind = v === 'POSITIVE' ? 'pos' : 'neg';
   const dir = titleDir(article.title);
   const conflict = (dir === 'down' && kind === 'pos') || (dir === 'up' && kind === 'neg');
-  return { kind: conflict ? 'mixed' : kind, name: s.name };
+  return { kind: conflict ? 'mixed' : kind, name: s.name, mentioned };
 }
 
 /** 같은 소식 묶음: 링·숫자와 같은 말이 되도록 판단 수로 정함 (좋은·나쁜 둘 다 있으면 mixed)
@@ -169,9 +170,11 @@ export default function Tone({ article, focusCode, tone, withName = true, counts
       <ToneRing {...ring} size={16} />
       <i aria-hidden="true" />
       <span>
-        {withName ? `${t.name}에 ` : ''}
+        {t.mentioned ? '함께 언급 · ' : ''}
+        {withName || t.mentioned ? `${t.name}에 ` : ''}
         {TONE_TEXT[t.kind]}
       </span>
+      <span className="sr-only">. {TONE_TIP}</span>
       {n >= 2 && (
         <span className="tone-count num">{toneCountText(counts.pos, counts.neu, counts.neg)}</span>
       )}

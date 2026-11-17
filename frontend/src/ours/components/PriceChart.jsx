@@ -372,7 +372,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
       grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
       // entireTextOnly: 칸 끝에서 반쯤 잘리는 눈금 글자는 안 그림 (11/13 QA: 맨 위 '325,000' 이 반만 보였음)
       rightPriceScale: { borderVisible: false, entireTextOnly: true },
-      timeScale: { borderVisible: false },
+      timeScale: { borderVisible: false, rightOffset: 4 }, // 마지막 봉 오른쪽 여유: 휴대폰에서 끝 시각 글자가 '09:5C'처럼 잘렸음
       crosshair: { mode: 0 },
       // 가격 글자 모양은 시리즈마다 (차트 전체 priceFormatter 는 거래량 칸까지 덮어써서 '25,000,000' 이 됐음)
       localization: { locale: 'ko-KR', timeFormatter: formatTime },

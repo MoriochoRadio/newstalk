@@ -127,7 +127,8 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                   </Link>
                 )}
                 {/* 지도 칸의 '기사 n건'(그 종목 오늘 기사 전부)과 구분 (11/16 밤 PM) */}
-                <span>같은 소식 {st.size || 1}건</span>
+                {/* 목록·글 화면과 같은 수(서버가 센 같은 소식 기사 수, 어제 보도 포함) — 홈만 오늘 받은 것만 세서 달랐음 (4차 리뷰). 순위는 오늘 기사 수 그대로 */}
+                <span>같은 소식 {Math.max(st.total || 0, st.size || 1)}건</span>
                 {/* 14px 링(글자 없음)이 로딩 표시처럼 보였음 → 메타 줄 끝에 짧은 글자 (11/16 디자이너 2차 리뷰) */}
                 {c.pos > 0 || c.neg > 0 ? (
                   <span className={`st-tone ${c.pos && c.neg ? 'mixed' : c.pos ? 'good' : 'bad'}`}>

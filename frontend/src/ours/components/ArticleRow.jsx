@@ -138,8 +138,10 @@ function quietOf(a, focusCode, toneCodes) {
   const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
   // 제목만 받은 기사: 같은 소식 묶음에 AI 가 읽은(중립) 기사가 있으면 회색 링, 없으면 '제목만 연결'
   if (a.titleOnly) return s?.group && s.group.neu > 0 ? 'neutral' : 'titleOnly';
-  if (!s || s.role !== 'MAIN') return null;
-  return s.sentiment === 'POSITIVE' || s.sentiment === 'NEGATIVE' ? null : 'neutral';
+  if (!s) return null;
+  // 함께 언급만 된 종목도 AI 가 읽고 중립이면 회색 링 (11/17), 글자에 '함께 언급'
+  if (s.sentiment === 'POSITIVE' || s.sentiment === 'NEGATIVE') return null;
+  return s.role === 'MAIN' ? 'neutral' : 'neutral-mention';
 }
 
 export default function ArticleRow({ article: a, others = [], focusCode, toneCodes, compact = false, showSummary = true }) {
@@ -186,10 +188,10 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
             </span>
           )}
           <Tone tone={tone} withName={!focusCode} counts={toneCounts} />
-          {quiet === 'neutral' && (
+          {(quiet === 'neutral' || quiet === 'neutral-mention') && (
             <span className="tone tone-quiet" title={TONE_TIP}>
               <ToneRing neu={1} size={16} />
-              <span>판단 없음</span>
+              <span>{quiet === 'neutral-mention' ? '함께 언급 · 판단 없음' : '판단 없음'}</span>
             </span>
           )}
           {quiet === 'titleOnly' && (

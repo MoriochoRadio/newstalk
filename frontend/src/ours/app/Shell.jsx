@@ -237,7 +237,8 @@ export default function Shell() {
     } catch {
       saved = [];
     }
-    scrollPos.current = new Map(Array.isArray(saved) ? saved : []);
+    // 저장값이 깨졌으면(형식이 다르면) 버림 — new Map 이 예외를 던져 화면이 깨지지 않게 (4차 코드 리뷰)
+    scrollPos.current = new Map(Array.isArray(saved) ? saved.filter((x) => Array.isArray(x) && x.length === 2 && typeof x[1] === 'number') : []);
   }
   const keyRef = useRef(posKey(location));
   const pathRef = useRef(null); // 직전 화면 주소 (첫 화면은 없음)
@@ -246,12 +247,15 @@ export default function Shell() {
   if (firstKey.current === null) {
     const type = performance.getEntriesByType?.('navigation')?.[0]?.type;
     firstKey.current = { loc: location, restore: type === 'reload' || type === 'back_forward' }; // 같은 기록으로 나중에 돌아온 것과 구분하려고 위치 객체를 비교
+    // 주소를 새로 쳐서 연 첫 화면은 기록 key 가 늘 'default' 라, 같은 탭에서 예전에 연 같은 주소의 위치가 남아 있으면 뒤로 가기 때 그리로 끌려갔음 (4차 코드 리뷰) → 지움
+    if (!firstKey.current.restore) scrollPos.current.delete(posKey(location));
   }
   useEffect(() => {
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
     // 타이머로 (requestAnimationFrame 은 가려진 창에서 멈춰 위치가 안 적혔음)
     let timer = 0;
     const onScroll = () => {
+      if (restoringRef.current) return; // 위치를 되살리는 중의 스크롤(덜 내려간 값)은 적지 않음 (4차 코드 리뷰)
       clearTimeout(timer);
       timer = setTimeout(() => {
         const m = scrollPos.current;
@@ -273,6 +277,7 @@ export default function Shell() {
   }, []);
   // 화면이 바뀌면 그리기 전에 '지금 화면' 표시부터 바꿈: 새 화면이 짧아 브라우저가 스크롤을 줄일 때 그 값이 이전 화면 위치를 덮어썼음
   const hashOnly = useRef(false);
+  const restoringRef = useRef(false);
   useLayoutEffect(() => {
     keyRef.current = posKey(location);
     const path = `${location.pathname}${location.search}`;
@@ -296,14 +301,20 @@ export default function Shell() {
       if (Math.abs(window.scrollY - want) > 2) window.scrollTo({ top: want, left: 0, behavior: 'instant' });
       steady = want === target && Math.abs(window.scrollY - target) <= 2 ? steady + 1 : 0;
       if (steady < 10 && performance.now() < until) timer = setTimeout(tryRestore, 50);
+      else restoringRef.current = false;
     };
+    restoringRef.current = true;
     timer = setTimeout(tryRestore, 0);
     // 사용자가 직접 스크롤·키보드를 쓰면 그만
-    const stop = () => clearTimeout(timer);
+    const stop = () => {
+      clearTimeout(timer);
+      restoringRef.current = false;
+    };
     const opts = { once: true, passive: true };
     ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((ev) => window.addEventListener(ev, stop, opts));
     return () => {
       clearTimeout(timer);
+      restoringRef.current = false;
       ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach((ev) => window.removeEventListener(ev, stop));
     };
   }, [location.key, navType]);

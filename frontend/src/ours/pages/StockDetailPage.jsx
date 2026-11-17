@@ -371,7 +371,8 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
                     <>
                       {lead.isPrice && <span className="tag-mini">주가 기사</span>}
                       <Link to={`/news/${top.articleId}`} className="move-title">
-                        {top.title}
+                        {/* 제목 끝의 '...'·'…'를 지움: 칸이 좁아 붙는 말줄임표와 겹쳐 '……'가 됐음 (4차 디자이너) */}
+                        {String(top.title || '').replace(/(\s*(\.{2,}|…))+$/, '')}
                       </Link>
                     </>
                   ) : (
@@ -602,7 +603,7 @@ function StockDetail({ code }) {
           </ErrorBoundary>
         </div>
         <div className="sf-moves">
-          <BigMovesCard moves={moves} level={moveLevel} onLevel={setMoveLevel} todayRate={shownQuote?.changeRate ?? null} />
+          <BigMovesCard key={moveLevel} moves={moves} level={moveLevel} onLevel={setMoveLevel} todayRate={shownQuote?.changeRate ?? null} />
         </div>
         <div className="sf-mention stack">
           <div id="sec-mention" className="sec-anchor" />

@@ -6445,3 +6445,15 @@ a { text-underline-offset: 3px; }
 /* 뉴스 목록 위 '제목만 연결' 안내 한 줄 */
 .feed-note { margin: 4px 0 8px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; }
 .feed-note b { color: var(--text); font-weight: 600; }
+
+/* ===== 11/17 남은 것 정리 ===== */
+/* 지도 칸 접은 이름: 줄 길이를 고르게 ('삼성바이오로직/스' 처럼 한 글자만 넘어가던 것) */
+.cm-name-wrap { text-wrap: balance; }
+/* 크게 움직인 날: '주가 기사' 칩을 제목과 같은 줄에 (줄 높이가 2줄·1줄로 들쭉날쭉) */
+.move-news { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.move-news .tag-mini { flex: none; }
+.move-news .move-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 휴대폰 차트 범례 되살리기 (11/16 리뷰 때 숨겨 MACD·RSI 를 켜도 값이 안 보였음 — 사라진 요소 조사) → 작게 두 줄까지 */
+@media (max-width: 768px) {
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; line-height: 1.5; }
+}

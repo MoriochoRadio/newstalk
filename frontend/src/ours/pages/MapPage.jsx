@@ -51,7 +51,7 @@ export default function MapPage() {
     [capReady, capMap.data]
   );
   // 지도가 실제로 그린 칸 수 (넓은 화면 24, 휴대폰 16) — 목록·부제를 지도와 같은 종목으로
-  const [drawn, setDrawn] = useState(CAP_LIMIT);
+  const [drawn, setDrawn] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 600 ? 16 : CAP_LIMIT)); // 휴대폰은 처음부터 16 (24 → 16 으로 바뀌어 보였음)
   const shownCap = useMemo(() => capItems.slice(0, drawn), [capItems, drawn]);
   const capQuotes = useMemo(() => Object.fromEntries(capItems.map((it) => [it.stockCode, { price: it.price, changeRate: it.changeRate, priceLimit: it.priceLimit }])), [capItems]);
   const capNews = useMemo(() => {
