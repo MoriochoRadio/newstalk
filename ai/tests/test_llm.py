@@ -77,3 +77,45 @@ def test_step8_rules():
     with mock.patch("hk_llm.steps.step8_daily.llm_call", return_value="삼성전자는 한 줄을 냈다.") as called:
         assert combine("삼성전자", ["한 줄이다."], llm=fake) == "삼성전자는 한 줄을 냈다."
         assert called.called, "이름 없는 1줄은 LLM 을 부름"
+
+def test_step8_skips_unchanged_even_with_unjudged_links():
+    """11/17: 판단 보류 연결(감성 NULL)이 있는 종목은 저장된 감성 수와 기사 수가 늘 달라 매시간 다시 만들었음"""
+    from datetime import date, datetime
+    from unittest import mock
+
+    from hk_llm.steps import step8_daily as s8
+
+    s8._LAST.clear()
+    t = datetime(2026, 11, 17, 10, 0)
+    rows = [{"stock_code": "005930", "stock_name": "삼성전자", "is_main": 1, "summary": "삼성전자 요약.", "reason": "r",
+             "sentiment": "POSITIVE", "created_at": t},
+            {"stock_code": "005930", "stock_name": "삼성전자", "is_main": 1, "summary": "전망 기사.", "reason": "r",
+             "sentiment": None, "created_at": t}]
+    engine = mock.MagicMock()
+    conn = engine.connect.return_value.__enter__.return_value
+    conn.execute.return_value = [("005930", 1)]   # 저장된 감성 수 = 1 (NULL 은 안 셈)
+    day = date(2026, 11, 17)
+    with mock.patch.object(s8, "load_rows", return_value=rows), mock.patch.object(s8, "_save_stock") as save:
+        assert s8.summarize_day(engine, day)[2] == 1, "재시작 직후: 감성 있는 연결 수가 같으면 그대로"
+        assert s8.summarize_day(engine, day)[2] == 1, "다음 시간: 기사가 그대로면 그대로"
+        assert not save.called
+        rows.append({**rows[1], "created_at": datetime(2026, 11, 17, 11, 0)})   # 판단 보류 기사가 새로 옴
+        assert s8.summarize_day(engine, day)[0] == 1, "감성 수는 같아도 새 기사가 오면 다시 만듦"
+        assert s8.summarize_day(engine, day)[2] == 1
+        assert save.call_count == 1
+    s8._LAST.clear()
+
+
+def test_step8_single_mention_needs_no_llm():
+    """함께 언급된 기사 1건뿐이면 LLM 없이 그 기사 요약 첫 문장 (이유 한 줄로 지어내던 것)"""
+    from unittest import mock
+
+    from hk_llm.steps import step8_daily as s8
+
+    row = {"stock_code": "035420", "stock_name": "NAVER", "is_main": 0, "sentiment": "NEUTRAL",
+           "summary": "A사가 NAVER에 서버를 공급한다. 계약 규모는 100억원이다.", "reason": "공급계약의 상대방이다."}
+    engine = mock.MagicMock()
+    conn = engine.begin.return_value.__enter__.return_value
+    with mock.patch.object(s8, "llm_call", side_effect=AssertionError("LLM 을 부르면 안 됨")):
+        assert s8._save_stock(engine, "035420", [row], "2026-11-17") == "함께 언급된 기사: A사가 NAVER에 서버를 공급한다."
+    assert conn.execute.call_args.args[1]["text"].startswith("함께 언급된 기사")

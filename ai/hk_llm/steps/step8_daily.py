@@ -136,7 +136,7 @@ def combine(stock_name, lines, llm=None):
 
 
 def load_rows(engine, day):
-    sql = text("""SELECT s.stock_code, i.stock_name, s.is_main, s.sentiment, s.reason, a.summary
+    sql = text("""SELECT s.stock_code, i.stock_name, s.is_main, s.sentiment, s.reason, a.summary, s.created_at
                   FROM article_stock s JOIN article a USING (article_id) JOIN stock_info i USING (stock_code)
                   WHERE a.status = 'DONE' AND a.source_type = 'NEWS' AND a.channel <> 'DART' AND a.published_at >= :d AND a.published_at < :n
                     AND a.summary IS NOT NULL  -- 제목만 연결한 기사(AI 활용 금지 언론사)는 LLM 에 넣지 않음
@@ -149,7 +149,12 @@ def _save_stock(engine, code, rows, day):
     """한 종목 요약을 만들어 저장. 기사가 2건 이상이면 LLM 호출. 답이 거부되면 기존 요약을 두고 "" 를 돌려줌
     기사 수는 저장 → 새 기사가 올 때까지 같은 답을 받으러 LLM 을 또 부르지 않음"""
     try:
-        summary = combine(rows[0]["stock_name"], [_line(r) for r in rows])
+        if len(rows) == 1 and not rows[0]["is_main"]:
+            # 11/17: 함께 언급된 기사 1건뿐이면 LLM 없이. 이유 한 줄(예: "공급계약의 상대방으로 제시됐다")만 받은 LLM 이
+            # 2~3문장을 지어내거나 뜻을 뒤집었음 (서울평가정보: 인증을 "부여한" → "부여받은")
+            summary = single_mention(rows[0])
+        else:
+            summary = combine(rows[0]["stock_name"], [_line(r) for r in rows])
     except RejectedAnswer as e:
         log.warning("%s 요약 거부, 기존 요약 유지: %s", code, e)
         keep_old = text("""INSERT INTO stock_daily_summary (stock_code, summary_date, pos_count, neg_count, neu_count)
@@ -165,6 +170,22 @@ def _save_stock(engine, code, rows, day):
     with engine.begin() as conn:
         conn.execute(upsert, {"code": code, "d": day, "text": summary, **counts(rows)})
     return summary
+
+
+def single_mention(row):
+    """함께 언급된 기사 1건뿐인 종목: 그 기사 요약의 첫 문장을 '함께 언급' 표시와 함께 (주어가 다른 회사일 수 있어 표시함)"""
+    first = re.split(r"(?<=[.다])\s+", " ".join((row["summary"] or "").split()), maxsplit=1)[0]
+    return f"함께 언급된 기사: {first}"[:MAX_LEN]
+
+
+# 이 프로세스에서 마지막으로 요약을 만든(또는 답이 거부된) 때의 기사 상태: (종목, 날짜) → (기사 수, 가장 늦은 연결 시각)
+# 11/17: 저장된 감성 수(긍정+부정+중립)와 기사 수를 비교했는데, 판단 보류·전망·소문 연결은 감성이 비어 영원히 다르게 나와
+# 새 기사가 없어도 매시간 다시 만들었음 (오늘 11종목, 그중 5종목은 매번 LLM)
+_LAST = {}
+
+
+def _fingerprint(rows):
+    return len(rows), max(r["created_at"] for r in rows)
 
 
 def regenerate(engine, code, day):
@@ -190,10 +211,14 @@ def summarize_day(engine=None, day=None):
         have = {c: t for c, t in conn.execute(text("SELECT stock_code, pos_count + neg_count + neu_count FROM stock_daily_summary WHERE summary_date = :d"), {"d": day})}
     saved = calls = skipped = failed = 0
     for code, rows in by.items():
-        if have.get(code) == len(rows):
+        fp = _fingerprint(rows)
+        known = _LAST.get((code, day))
+        # 이 프로세스가 본 상태와 같으면 그대로. 처음 보는 종목(재시작 직후)은 저장된 감성 수로 비교 (감성 있는 연결만 셈)
+        if known == fp or (known is None and have.get(code) == sum(counts(rows).values())):
+            _LAST[(code, day)] = fp
             skipped += 1
             continue
-        calls += len(rows) > 1
+        calls += len(rows) > 1  # (1건이어도 주어가 없으면 LLM 을 부르지만 여기선 대략만 셈)
         try:
             _save_stock(engine, code, rows, day)
         except STOP_ERRORS:
@@ -203,6 +228,7 @@ def summarize_day(engine=None, day=None):
             log.warning("종합 요약 실패 %s: %s", code, e)
             failed += 1
             continue
+        _LAST[(code, day)] = fp   # 답이 거부돼도 기록 → 같은 기사로 매시간 다시 부르지 않음
         saved += 1
     log.info("종합 요약 %s: 저장 %d, LLM %d번, 그대로 %d, 실패 %d", day, saved, calls, skipped, failed)
     return saved, calls, skipped
