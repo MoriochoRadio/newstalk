@@ -130,7 +130,7 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                     <ToneRing pos={c.pos} neu={c.neu} neg={c.neg} size={16} />
                     {c.pos && c.neg ? '좋은·나쁜 함께' : c.pos ? '좋은 소식' : '나쁜 소식'}
                   </span>
-                ) : a.titleOnly ? (
+                ) : a.titleOnly && !(st.others || []).some((o) => !o.titleOnly && !o.disclosurePending) ? (
                   // 약관상 AI 를 못 쓰는 언론사 묶음: '판단 없음'(AI 가 읽고 중립)과 구분 (11/17)
                   <span className="st-tone st-tone-none" title={titleOnlyReason(a.press)}>
                     제목만 연결

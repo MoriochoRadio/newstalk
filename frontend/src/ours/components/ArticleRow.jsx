@@ -8,7 +8,7 @@ import { groupStories } from '../lib/stories';
 import { titleOnlyReason } from '../lib/titleOnly';
 import { relativeTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
-import Tone, { Highlight, TONE_TIP, TitleText, ToneRing, toneOf, toneRowClass } from './Tone';
+import Tone, { Highlight, TONE_TIP, TitleText, ToneRing, storyCounts, toneOf, toneOfStory, toneRowClass } from './Tone';
 
 export const SAME_NEWS_TIP = '같은 종목·24시간 안·제목이 비슷한 기사를 같은 소식으로 묶은 수예요. 묶음은 틀릴 수 있어요.';
 const CORRECTION_TIP = '앞서 낸 공시를 고쳐 다시 낸 공시예요.';
@@ -133,7 +133,7 @@ function KindIcon({ tone, article: a }) {
 /** 링이 없는 줄의 회색 표시 종류: 'titleOnly' | 'neutral' | null */
 function quietOf(a, focusCode, toneCodes) {
   if (a.titleOnly) return 'titleOnly';
-  if (a.disclosurePending || a.priceMoveTitle) return null;
+  if (a.disclosurePending) return null;
   const stocks = a.relatedStocks || [];
   const pool = toneCodes ? stocks.filter((x) => toneCodes.has(x.code)) : stocks;
   const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
@@ -148,12 +148,19 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
   const summary = showSummary && a.hasSummary ? a.summary.join(' ') : '';
   // 펼침 단추('같은 소식 다른 기사 n건')가 있으면 '같은 소식 n건' 칩은 뺌 — 2건·1건이 다른 숫자처럼 보였음 (11/16 리뷰 9번)
   const tags = ArticleTags({ article: a }).filter((t) => !(others.length > 0 && t.key === 's'));
-  const tone = toneOf(a, focusCode, toneCodes);
+  // 대표 기사 판단이 없으면(제목만 받은 언론사 등) 같은 소식의 다른 기사가 받은 AI 판단으로 링 (11/17 사용자: 목록은 '제목만 연결'인데
+  // 들어가 보면 '나쁜 소식으로 봤어요'라 어긋났음). 관심 종목 화면처럼 종목을 거르는 곳(toneCodes·focusCode)은 대표 기사 기준 그대로
+  const own = toneOf(a, focusCode, toneCodes);
+  const storyTone = !own && others.length && !focusCode && !toneCodes ? toneOfStory({ lead: a, others }) : null;
+  const tone = own || storyTone;
+  const toneCounts = storyTone ? storyCounts({ lead: a, others }) : undefined;
   // 링 없는 줄도 같은 자리에 표시 (11/17 사용자: 어떤 줄은 링이 있고 어떤 줄은 없어 왜 없는지 모름 → 회색 링 + 글자)
   //  - AI 가 읽고 좋다·나쁘다 하지 않은 기사: 회색 링 + '판단 없음'
   //  - 약관상 AI 요약을 못 하는 언론사(제목만 받은 기사): 회색 '요약 없음'
   //  주가 기사는 '주가 기사' 꼬리표가 따로 있고, 주인공 종목이 없는 기사(함께 언급만)는 판단 대상이 아니라 그대로 둠
-  const quiet = tone || sns ? null : quietOf(a, focusCode, toneCodes);
+  // 대표가 제목만 받은 기사여도 같은 소식에 AI 가 읽은 기사가 있으면 '판단 없음'(회색 링) — '제목만 연결'은 같은 소식 전부가 제목만일 때
+  const aiSibling = !focusCode && !toneCodes && others.some((o) => !o.titleOnly && !o.disclosurePending);
+  const quiet = tone || sns ? null : a.titleOnly && aiSibling ? 'neutral' : quietOf(a, focusCode, toneCodes);
   const latestIso = [a, ...others].map((x) => x.publishedAtIso).filter(Boolean).sort().pop() || a.publishedAtIso;
   return (
     <article className={`feed-row feed-row-v2 ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>
@@ -177,7 +184,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
               공시{a.disclosureType ? ` · ${a.disclosureType}` : ''}
             </span>
           )}
-          <Tone tone={tone} withName={!focusCode} />
+          <Tone tone={tone} withName={!focusCode} counts={toneCounts} />
           {quiet === 'neutral' && (
             <span className="tone tone-quiet" title={TONE_TIP}>
               <ToneRing neu={1} size={16} />

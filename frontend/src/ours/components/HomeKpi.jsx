@@ -38,7 +38,7 @@ export default function HomeKpi({ articles, disclosureCount = 0, updatedAt }) {
   const t = countsOf(
     news
       .filter((a) => !a.titleOnly && !a.disclosurePending)
-      .map((a) => (a.priceMoveTitle ? 'NEUTRAL' : (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment))
+      .map((a) => (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment)
   );
   const read = t.pos + t.neu + t.neg;
   const pct = (n) => (read ? Math.round((n / read) * 100) : 0);

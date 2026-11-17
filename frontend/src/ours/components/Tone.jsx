@@ -47,8 +47,9 @@ export function titleDir(title) {
  *   둘 다 기사에 있는 내용이라 한쪽만 보여 주면 틀려 보임 → "좋은·나쁜 내용 함께")
  */
 export function toneOf(article, focusCode, onlyCodes) {
-  // 시세 기사는 판단을 안 붙임: '주가가 내렸다' 기사를 '나쁜 소식'이라 하면 순환 논리 (11/16 MTS PM 리뷰)
-  if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS' || article.priceMoveTitle) return null;
+  // 11/17 사용자: AI 가 판단한 기사는 링을 보여 줌 — 주가 기사도 판단을 세고, 목록에는 '주가 기사' 표시가 함께 붙음 (예전: 순환 논리라 '판단 없음'으로 셈 — 11/16 PM)
+  //  상세 화면은 이미 판단을 보여 줘서 목록('제목만 연결')과 어긋났음
+  if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS') return null;
   const stocks = article.relatedStocks || [];
   // onlyCodes(관심 종목 화면): 그 종목들 판단만. 관심 없는 종목의 '좋은 소식' 배지가 맨 위에 뜨던 것 (11/16 디자이너 2차 리뷰)
   const pool = onlyCodes ? stocks.filter((x) => onlyCodes.has(x.code)) : stocks;
@@ -125,8 +126,8 @@ export function countsOf(sentiments) {
 /** 같은 소식 묶음의 판단 수 (주인공 종목 기준, 제목만 확인한 기사 제외) */
 export function storyCounts(story) {
   const all = [story.lead, ...(story.others || [])].filter((x) => !x.titleOnly && !x.disclosurePending);
-  // 시세 기사는 '판단 없음'으로 셈 (목록 배지 toneOf 와 같은 규칙: '주가 급변' 칸이 초록으로 칠해졌음 — 11/16 3차 리뷰)
-  return countsOf(all.map((x) => (x.priceMoveTitle ? 'NEUTRAL' : (x.relatedStocks.find((s) => s.role === 'MAIN') || x.relatedStocks[0])?.sentiment)));
+  // 11/17 사용자: AI 가 판단한 기사는 링을 보여 줌 — 주가 기사도 판단을 세고, 목록에는 '주가 기사' 표시가 함께 붙음 (예전: 순환 논리라 '판단 없음'으로 셈 — 11/16 PM)
+  return countsOf(all.map((x) => (x.relatedStocks.find((s) => s.role === 'MAIN') || x.relatedStocks[0])?.sentiment));
 }
 
 const TONE_TEXT = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·나쁜 내용 함께' };

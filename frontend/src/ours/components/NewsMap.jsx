@@ -126,7 +126,7 @@ export function NewsPulse({ articles, topics = [], disclosureCount = 0 }) {
   const judged = countsOf(
     (articles || [])
       .filter((a) => !a.titleOnly && !a.disclosurePending)
-      .map((a) => (a.priceMoveTitle ? 'NEUTRAL' : (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment)) // 시세 기사는 판단 없음 (toneOf 와 같게)
+      .map((a) => (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment) // 주가 기사도 AI 판단대로 셈 (11/17, toneOf 와 같게)
   );
   // '판단 없음' = AI가 읽고 좋다·나쁘다 하지 않은 기사 (종목 화면과 같은 뜻). AI가 읽지 않은 기사(제목만·요약 전 공시)는 세지 않고
   // 'AI가 읽은 n건'을 밝혀 세 수의 합과 맞춤 (11/16 PM 2차 리뷰: 홈은 안 읽은 기사까지 '판단 없음'에 넣어 같은 말이 다른 뜻이었음)
