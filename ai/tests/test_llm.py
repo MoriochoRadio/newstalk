@@ -119,3 +119,25 @@ def test_step8_single_mention_needs_no_llm():
     with mock.patch.object(s8, "llm_call", side_effect=AssertionError("LLM 을 부르면 안 됨")):
         assert s8._save_stock(engine, "035420", [row], "2026-11-17") == "함께 언급된 기사: A사가 NAVER에 서버를 공급한다."
     assert conn.execute.call_args.args[1]["text"].startswith("함께 언급된 기사")
+
+def test_step8_etf_holding_needs_product_name():
+    """11/17: ETF 편입 소식이 '삼성전자는 … 신규 편입됐고 편입 비중을 … 확대했다' 로 회사가 한 일처럼 나옴 → 한 번 다시, 그래도면 거부"""
+    from unittest import mock
+
+    from hk_llm.steps import step8_daily as s8
+
+    news = ["한투운용은 ACE 글로벌반도체TOP4 Plus ETF 리밸런싱에서 삼성전자 편입 비중을 3.43%에서 19.75%로 올렸다.",
+            "삼성전자는 엑시노스 탑재를 늘린다."]
+    bad = "삼성전자는 엑시노스 탑재를 늘린다. 또한 편입 비중을 3.43%에서 19.75%로 크게 확대했다."
+    good = "삼성전자는 엑시노스 탑재를 늘린다. ACE 글로벌반도체TOP4 Plus ETF 가 삼성전자 편입 비중을 3.43%에서 19.75%로 늘렸다."
+    assert s8.missing_product(bad, "\n".join(news)) and not s8.missing_product(good, "\n".join(news))
+    assert not s8.missing_product("삼성전자는 매출 비중이 늘었다.", "- 매출 비중이 늘었다"), "ETF 소식이 없으면 안 봄"
+    with mock.patch.object(s8, "llm_call", side_effect=[bad, good]) as called:
+        assert s8.combine("삼성전자", news, llm=mock.MagicMock()) == good
+        assert called.call_count == 2, "한 번 다시 물음"
+    with mock.patch.object(s8, "llm_call", side_effect=[bad, bad]):
+        try:
+            s8.combine("삼성전자", news, llm=mock.MagicMock())
+            raise AssertionError("거부해야 함")
+        except s8.RejectedAnswer:
+            pass

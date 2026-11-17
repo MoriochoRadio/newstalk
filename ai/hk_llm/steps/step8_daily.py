@@ -117,6 +117,20 @@ def unknown_numbers(answer, source):
     return wrong
 
 
+PRODUCT = re.compile(r"ETF|ETN|펀드|지수|인덱스|리밸런싱")
+HOLDING = re.compile(r"편입|비중")
+PRODUCT_HINT = ("\n(다시 확인: 펀드·ETF·지수의 편입·비중 소식은 회사가 한 일이 아니다. "
+                "'○○ ETF 가 {stock} 편입 비중을 …로 늘렸다' 처럼 상품 이름을 주어로 쓴다)")
+
+
+def missing_product(answer, news):
+    """ETF·지수 편입·비중 소식인데 답의 그 문장에 상품 이름이 없으면 True (11/17: 프롬프트 규칙만으로는 지키지 않음.
+    '삼성전자는 메모리 분야 대표종목으로 신규 편입됐고 편입 비중을 3.43%에서 19.75%로 크게 확대했다' — 회사가 한 일처럼 읽힘)"""
+    if not any(PRODUCT.search(x) and HOLDING.search(x) for x in news.splitlines()):
+        return False
+    return any(HOLDING.search(x) and not PRODUCT.search(x) for x in re.split(r"(?<=[.다])\s+", answer))
+
+
 def combine(stock_name, lines, llm=None):
     """여러 줄을 한 문단으로. 1줄이면 LLM 안 부름"""
     # 1줄이면 그대로. 다만 그 줄에 종목 이름이 없으면(11/16 밤: SK스퀘어 요약이 "SK하이닉스 실적 호조 영향으로…"로 주어가 다른 회사)
@@ -125,7 +139,13 @@ def combine(stock_name, lines, llm=None):
         return lines[0][:MAX_LEN]
     news = "\n".join(f"- {_strip_tag(x)}" for x in lines[:MAX_LINES])
     llm = llm or ChatOpenAI(model=MODEL, timeout=60, max_retries=2, max_tokens=1000)
-    answer = llm_call(lambda: (PROMPT | llm | StrOutputParser()).invoke({"stock": _strip_tag(stock_name), "news": news})).strip()
+    ask = lambda extra="": llm_call(lambda: (PROMPT | llm | StrOutputParser()).invoke(
+        {"stock": _strip_tag(stock_name), "news": news + extra})).strip()
+    answer = ask()
+    if missing_product(answer, news):   # 한 번만 다시 (드문 경우라 비용 작음)
+        answer = ask(PRODUCT_HINT.replace("{stock}", _strip_tag(stock_name)))
+        if missing_product(answer, news):
+            raise RejectedAnswer("ETF·지수 편입 소식에 상품 이름이 없음")
     wrong = [y for y in re.findall(r"(?<!\d)((?:19|20)\d\d)년", answer) if y not in news]
     if wrong:
         raise RejectedAnswer(f"기사에 없는 연도: {wrong}")
