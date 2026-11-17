@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +42,10 @@ public class QuoteService {
     static final Duration PRICE_TTL = Duration.ofSeconds(5);
     static final Duration MARKET_MAP_TTL = Duration.ofSeconds(60);   // 시가총액 순위 (코스피·코스닥 2번)
     static final Duration SECTOR_TTL = Duration.ofHours(24);         // 업종은 거의 안 바뀜 → 종목당 하루 1번
+    /** 장 밖 지도 값을 거래소 현재가로 바꿀 때 캐시 (장이 끝나면 거래소 값은 다음 장까지 안 바뀜 → 길게) */
+    static final Duration OFF_HOURS_PRICE_TTL = Duration.ofMinutes(30);
+    /** 거래소 정규장 끝: 15:30 종가 단일가 체결이 들어올 여유 1분 */
+    private static final LocalTime KRX_SESSION_END = LocalTime.of(15, 31);
     static final Duration MINUTE_TTL = Duration.ofSeconds(60);
     static final Duration DAY_TTL = Duration.ofMinutes(10);
     static final Duration TICK_TTL = Duration.ofSeconds(5);
@@ -76,8 +81,15 @@ public class QuoteService {
     private final QuoteCache cache;
     private final Clock clock;
 
+    @Autowired   // 생성자가 둘이라 Spring 이 쓸 것을 표시
     public QuoteService(KisRestClient kis, KisProperties props, KisWebSocketClient realtime, TickBuffer buffer,
                         TickWriter writer, QuoteMapper mapper, SubscriptionManager subscriptions) {
+        this(kis, props, realtime, buffer, writer, mapper, subscriptions, Clock.system(TimeUtils.KST));
+    }
+
+    /** 테스트용: 시각을 고정해서 장중·장 밖을 나눠 확인 */
+    QuoteService(KisRestClient kis, KisProperties props, KisWebSocketClient realtime, TickBuffer buffer,
+                 TickWriter writer, QuoteMapper mapper, SubscriptionManager subscriptions, Clock clock) {
         this.kis = kis;
         this.props = props;
         this.realtime = realtime;
@@ -85,7 +97,7 @@ public class QuoteService {
         this.writer = writer;
         this.mapper = mapper;
         this.subscriptions = subscriptions;
-        this.clock = Clock.system(TimeUtils.KST);
+        this.clock = clock;
         this.cache = new QuoteCache(clock);
     }
 
@@ -109,22 +121,50 @@ public class QuoteService {
     /**
      * 종목 지도 재료: 코스피·코스닥 시가총액 상위 각 30개 (우선주는 보통주와 겹쳐 뺌) + 업종
      * 순위는 60초 캐시(KIS 2번), 업종은 종목마다 하루 캐시(현재가 API 의 업종 칸). 업종을 못 받으면 "기타"
+     * <p>
+     * 장 밖(평일 09:00 전·15:31 이후, 주말)에는 값과 등락률을 거래소(J) 현재가로 바꿈: 순위 API 는 장이 끝난 뒤
+     * 넥스트레이드(NXT, 20:00 까지) 체결가를 줌 → 2026-11-16 밤 삼성전자가 지도엔 195,000 −5.34%(NXT 종가),
+     * 차트·크게 움직인 날엔 196,800 −4.47%(거래소 종가)로 달랐음. 장중 순위 값은 거래소 값(거래량으로 확인)이라 그대로
      */
     public MarketMapResponse marketMap() {
-        return cache.get("market-map", MARKET_MAP_TTL, () -> {
+        boolean offHours = !krxSession(LocalDateTime.now(clock));
+        return cache.get(offHours ? "market-map:off" : "market-map", MARKET_MAP_TTL, () -> {
             List<MarketMapResponse.Item> items = new ArrayList<>();
             for (String[] m : new String[][] {{"0001", "KOSPI"}, {"1001", "KOSDAQ"}}) {
                 for (KisRestClient.CapRankRow r : kis.rankMarketCap(m[0])) {
                     if (r.code() == null || isPreferred(r.code(), r.name())) {
                         continue;
                     }
-                    items.add(new MarketMapResponse.Item(r.code(), r.name() == null ? r.code() : r.name().strip(), m[1],
-                            sectorOf(r.code()), parseLong(r.marketCap()), parseLong(r.price()),
-                            parseDecimal(r.changeRate()), priceLimit(r.changeSign())));
+                    String name = r.name() == null ? r.code() : r.name().strip();
+                    KisPrice krx = offHours ? krxPrice(r.code()) : null;
+                    if (krx != null) {
+                        items.add(new MarketMapResponse.Item(r.code(), name, m[1], sectorOf(r.code()),
+                                parseLong(r.marketCap()), krx.price(), krx.changeRate(), priceLimit(krx.changeSign())));
+                    } else {
+                        items.add(new MarketMapResponse.Item(r.code(), name, m[1], sectorOf(r.code()),
+                                parseLong(r.marketCap()), parseLong(r.price()),
+                                parseDecimal(r.changeRate()), priceLimit(r.changeSign())));
+                    }
                 }
             }
             return new MarketMapResponse(items, TimeUtils.toKst(LocalDateTime.now(clock)));
         });
+    }
+
+    /** 장 밖 거래소 현재가 (30분 캐시). 못 받으면 null → 순위 값 그대로 (지도 전체를 실패시키지 않음) */
+    private KisPrice krxPrice(String code) {
+        try {
+            return cache.get("krx-price:" + code, OFF_HOURS_PRICE_TTL, () -> kis.inquirePrice(code));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** 거래소 정규장인지: 평일 09:00 ~ 15:31 (공휴일은 모름 — 그날은 순위·현재가 모두 지난 거래일 값이라 괜찮음) */
+    static boolean krxSession(LocalDateTime now) {
+        DayOfWeek d = now.getDayOfWeek();
+        LocalTime t = now.toLocalTime();
+        return d != DayOfWeek.SATURDAY && d != DayOfWeek.SUNDAY && !t.isBefore(MARKET_OPEN) && t.isBefore(KRX_SESSION_END);
     }
 
     private String sectorOf(String code) {
@@ -304,9 +344,14 @@ public class QuoteService {
         });
     }
 
-    /** 실시간 현재가 줄이 최근(15초 안)에 갱신됐는지 = 지금 생중계로 받고 있는지 */
+    /**
+     * 실시간 현재가 줄이 최근(15초 안)에 갱신됐는지 = 지금 생중계로 받고 있는지
+     * 정규장 밖은 생중계 값을 쓰지 않음: 웹소켓이 16:00~18:00 시간외 단일가 체결도 보내서(11/16 17:33 197,100)
+     * 종가(196,800) 대신 그 값이 현재가로 보였음 → 장 밖은 거래소 현재가 REST
+     */
     boolean isLive(QuoteSnapshotRow s) {
-        return s != null && s.updatedAt().isAfter(LocalDateTime.now(clock).minus(LIVE_FRESH));
+        LocalDateTime now = LocalDateTime.now(clock);
+        return s != null && krxSession(now) && s.updatedAt().isAfter(now.minus(LIVE_FRESH));
     }
 
     /** DB 현재가 줄 → API 응답 (live=true) */
