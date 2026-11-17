@@ -184,8 +184,10 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
             </span>
           )}
           {quiet === 'titleOnly' && (
-            <span className="tone tone-quiet tone-titleonly" title="이 언론사 기사는 약관상 AI 요약·판단을 하지 않아요. 원문에서 확인해 주세요.">
-              요약 없음
+            // '요약 없음'은 기능이 안 되는 것처럼 보였음 (11/17 사용자) → 한 것(제목으로 종목 연결)과 안 한 이유(약관)를 밝힘.
+            // 연합뉴스·서울경제·연합인포맥스는 기사 끝에 'AI 학습 및 활용 금지' → 본문을 받지 않고 AI 에도 넣지 않음 (docs/decisions.md 11/05)
+            <span className="tone tone-quiet tone-titleonly" title="이 언론사는 기사에 'AI 학습 및 활용 금지'를 적어 둬서 본문을 받지 않고 AI 요약·판단을 하지 않아요. 종목은 제목으로 찾았어요.">
+              제목으로 종목 연결 · 약관상 AI 판단 안 함
             </span>
           )}
         </div>

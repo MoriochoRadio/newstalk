@@ -329,22 +329,25 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
   const [open, setOpen] = useState(false);
   if (moves.error?.code === 'QUOTE_DISABLED') return null; // 시세가 꺼진 서버: 칸을 숨김
   const items = moves.data?.items || [];
-  // 기본은 기사가 있는 날만 (AI 가 기사를 모으기 전인 10월 말 이전 날은 "기사 없음"만 줄줄이 나와서). 없으면 최근 날부터
+  // 기사 있는 날만 (11/17 사용자: '모든 날 보기'로 펼치면 대부분 기사가 없어 실망 — 기사를 모으기 전 날들).
+  // 기사 없는 날은 수만 머리에 밝힘
   const withNews = items.filter((m) => m.articleCount > 0);
-  const base = withNews.length ? withNews : items;
-  const shown = open ? items : base.slice(0, MOVES_SHOWN);
+  const shown = open ? withNews : withNews.slice(0, MOVES_SHOWN);
   return (
     <section className="card" aria-labelledby="moves-title" id="big-moves">
       <div className="card-head">
         <h2 className="card-title" id="moves-title">
           크게 움직인 날
-          {moves.data && <span className="count num">최근 1년 {items.length}일{withNews.length ? ` · 기사 있는 날 ${withNews.length}일` : ''}</span>}
+          {moves.data && items.length > 0 && <span className="count num">최근 1년 {items.length}일 중 기사 있는 날 {withNews.length}일</span>}
         </h2>
         <Segmented label="등락 기준" size="sm" options={MOVE_LEVELS} value={level} onChange={onLevel} />
       </div>
       {moves.loading && !moves.data && <SkeletonRows rows={3} compact />}
       {moves.error && <ErrorBox error={moves.error} onRetry={moves.reload} />}
       {moves.data && items.length === 0 && <Empty title={`최근 1년 동안 하루 ±${level}% 넘게 움직인 날이 없어요`} />}
+      {moves.data && items.length > 0 && withNews.length === 0 && (
+        <Empty title={`±${level}% 넘게 움직인 ${items.length}일 중 기사가 있는 날은 아직 없어요`} desc="기사를 모으기 전 날이에요. 차트에서 그날 주가는 볼 수 있어요." />
+      )}
       {shown.length > 0 && (
         <ul className="moves-list">
           {shown.map((m) => {
@@ -380,9 +383,9 @@ function BigMovesCard({ moves, level, onLevel, todayRate }) {
           })}
         </ul>
       )}
-      {items.length > shown.length || open ? (
+      {withNews.length > MOVES_SHOWN ? (
         <button type="button" className="story-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          {open ? '접기' : `모든 날 보기 (${items.length}일)`}
+          {open ? '접기' : `기사 있는 날 모두 보기 (${withNews.length}일)`}
         </button>
       ) : null}
     </section>

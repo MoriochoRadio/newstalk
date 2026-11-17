@@ -30,7 +30,7 @@ import { pickWhy } from '../lib/todayFeed';
 import { marketTerms } from '../lib/marketTerms';
 import StoryBoard from '../components/StoryBoard';
 import LivePill from '../components/LivePill';
-import { leanOf } from '../components/Tone';
+import { ToneRing, leanOf } from '../components/Tone';
 import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
 import { dirClass } from '../lib/format';
 
@@ -135,6 +135,7 @@ function WatchStrip({ quotes }) {
                 {/* 글자 없는 22px 링은 '불러오는 중' 표시처럼 보였음 → 짧은 글자로 (11/16 디자이너 2차 리뷰, WCAG 1.4.1).
                     줄은 늘 두어 판단이 늦게 와도 카드 높이가 그대로 */}
                 <span className="ws-tone num">
+                  {(pos > 0 || neg > 0) && <ToneRing pos={pos} neu={neu} neg={neg} size={18} />}
                   {pos > 0 && <b className="good">좋은 소식 {pos}건</b>}
                   {neg > 0 && <b className="bad">나쁜 소식 {neg}건</b>}
                   {!pos && !neg && <span aria-hidden="true">&nbsp;</span>}

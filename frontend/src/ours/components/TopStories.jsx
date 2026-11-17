@@ -5,7 +5,7 @@
 // - 판단을 붙이지 않음: 등락률은 어제 종가 대비 지금 값일 뿐 (기사 때문이라고 말하지 않음, 화면 맨 아래 안내와 같음)
 import { Link } from 'react-router-dom';
 import { dirClass, fmtRate, relativeTime } from '../lib/format';
-import Tone, { TitleText, storyCounts, toneOfStory, toneRowClass } from './Tone';
+import Tone, { TitleText, ToneRing, storyCounts, toneOfStory, toneRowClass } from './Tone';
 
 /** 묶음에서 요약이 있는 기사 (대표 → 나머지 순) */
 function summarized(story) {
@@ -125,10 +125,20 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                 {/* 14px 링(글자 없음)이 로딩 표시처럼 보였음 → 메타 줄 끝에 짧은 글자 (11/16 디자이너 2차 리뷰) */}
                 {c.pos > 0 || c.neg > 0 ? (
                   <span className={`st-tone ${c.pos && c.neg ? 'mixed' : c.pos ? 'good' : 'bad'}`}>
+                    {/* 11/17 사용자: 11/12 에 좋다고 한 색 섞인 링이 글자로 바뀌어 사라졌음 → 글자 옆에 링 (리뷰 지적 '글자 없는 링'은 글자가 있어 풀림) */}
+                    <ToneRing pos={c.pos} neu={c.neu} neg={c.neg} size={16} />
                     {c.pos && c.neg ? '좋은·나쁜 함께' : c.pos ? '좋은 소식' : '나쁜 소식'}
                   </span>
+                ) : a.titleOnly ? (
+                  // 약관상 AI 를 못 쓰는 언론사 묶음: '판단 없음'(AI 가 읽고 중립)과 구분 (11/17)
+                  <span className="st-tone st-tone-none" title="이 언론사는 기사에 'AI 학습 및 활용 금지'를 적어 둬서 AI 판단을 하지 않아요">
+                    AI 판단 안 함
+                  </span>
                 ) : (
-                  <span className="st-tone st-tone-none">판단 없음</span>
+                  <span className="st-tone st-tone-none">
+                    <ToneRing neu={1} size={16} />
+                    판단 없음
+                  </span>
                 )}
               </span>
             </span>

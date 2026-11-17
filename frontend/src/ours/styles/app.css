@@ -6422,3 +6422,7 @@ a { text-underline-offset: 3px; }
 .feed-row-v2 .tone.tone-quiet { color: var(--text-2); background: var(--surface-2); font-weight: 600; }
 .feed-row-v2 .tone.tone-quiet > i { display: none; }
 .feed-row-v2 .tone.tone-titleonly { color: var(--text-3); background: none; padding-left: 0; font-weight: 500; }
+
+/* 색 섞인 링 되살리기 (11/17): 글자 옆 링 정렬 */
+.st-tone, .ws-tone, .wl-tone { display: inline-flex; align-items: center; gap: 6px; }
+.st-tone .tone-ring, .ws-tone .tone-ring, .wl-tone .tone-ring { flex: none; }
