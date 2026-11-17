@@ -9,6 +9,8 @@ import java.math.BigDecimal;
  * factType (V14): 근거 문장의 사실 종류 FACT/PLAN/FORECAST/RUMOR, 없으면 null
  * 같은 소식 (V13): sameNewsCount 이 종목에서 같은 소식으로 묶인 기사 수(묶이지 않았으면 null),
  * firstReportPress 그 묶음에서 가장 먼저 발행한 언론사, firstReport 이 기사가 첫 보도인가
+ * groupPositive·groupNegative·groupNeutral (11/17): 그 묶음(화면에 나오는 DONE 글)의 AI 판단 수. 제목만 받은 기사도 같은 소식의
+ * 판단으로 링을 그리려고. 묶이지 않았으면 null
  */
 public record ArticleStockResponse(
         String stockCode,
@@ -21,13 +23,17 @@ public record ArticleStockResponse(
         String factType,
         Integer sameNewsCount,
         String firstReportPress,
-        boolean firstReport
+        boolean firstReport,
+        Integer groupPositive,
+        Integer groupNegative,
+        Integer groupNeutral
 ) {
 
     public static ArticleStockResponse from(ArticleStockRow row) {
         return new ArticleStockResponse(row.stockCode(), row.stockName(), row.matchType(),
                 toPercent(row.relevance()), row.sentiment(), row.main(), ArticleLabels.role(row.main()), row.factType(),
-                row.sameNewsCount(), row.firstPress(), row.firstReport());
+                row.sameNewsCount(), row.firstPress(), row.firstReport(),
+                row.groupPositive(), row.groupNegative(), row.groupNeutral());
     }
 
     /** 0.87 -> 87 (상세도 같이 씀) */

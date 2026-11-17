@@ -132,6 +132,27 @@ class ArticleApiTest extends ApiTestSupport {
     }
 
     @Test
+    void 같은_소식_묶음의_AI_판단_수를_준다_제목만_받은_기사도() throws Exception {
+        // 제목만 받은 기사(감성 없음)도 같은 소식의 다른 기사 판단으로 화면이 링을 그리게 (11/17)
+        long judged = insertArticle("기아 3분기 영업익 급감", "NEWS", "DONE", today(10));
+        long titleOnly = insertArticle("기아 영업익 급감", "NEWS", "DONE", today(20));
+        long alone = insertArticle("기아 신차 공개", "NEWS", "DONE", today(30));
+        link(judged, KIA, "NEGATIVE", new BigDecimal("0.90"), true);
+        link(titleOnly, KIA, null, new BigDecimal("0.90"), true);
+        link(alone, KIA, "POSITIVE", new BigDecimal("0.90"), true);
+        jdbc.update("UPDATE article_stock SET group_article_id = ? WHERE article_id IN (?, ?) AND stock_code = ?",
+                judged, judged, titleOnly, KIA);
+
+        mvc.perform(get("/api/articles"))
+                .andExpect(jsonPath("$.items[0].stocks[0].groupNegative").value(nullValue()))   // 묶이지 않음
+                .andExpect(jsonPath("$.items[1].title").value("기아 영업익 급감"))
+                .andExpect(jsonPath("$.items[1].stocks[0].sentiment").value(nullValue()))
+                .andExpect(jsonPath("$.items[1].stocks[0].groupNegative").value(1))
+                .andExpect(jsonPath("$.items[1].stocks[0].groupPositive").value(0))
+                .andExpect(jsonPath("$.items[1].stocks[0].groupNeutral").value(0));
+    }
+
+    @Test
     void 관련_종목_칩은_관련도_높은_순이고_퍼센트로_나온다() throws Exception {
         long id = insertArticle("두 종목 글", "NEWS", "DONE", today(1));
         link(id, NAVER, 0.60);

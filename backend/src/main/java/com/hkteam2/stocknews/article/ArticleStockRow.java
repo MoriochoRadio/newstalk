@@ -20,7 +20,10 @@ public record ArticleStockRow(
         String factType,
         Integer sameNewsCount,
         Long firstArticleId,
-        String firstPress
+        String firstPress,
+        Integer groupPositive,
+        Integer groupNegative,
+        Integer groupNeutral
 ) {
 
     /** 이 기사가 같은 소식 묶음의 첫 보도인가 (묶이지 않았으면 false) */

@@ -156,6 +156,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
   - `stocks[].sameNewsCount`: 이 종목에서 **같은 소식으로 묶인 기사 수** (V13 `group_article_id`, 화면에 나오는 `DONE` 글만 셈). 묶이지 않았으면 `null`
   - `stocks[].firstReportPress`: 그 묶음에서 **발행이 가장 빠른 기사**의 언론사 (같은 시각이면 글 번호가 작은 쪽). 묶이지 않았으면 `null`
   - `stocks[].firstReport`: 이 기사가 그 첫 보도인가 (`true`/`false`). 화면은 `sameNewsCount` 2 이상일 때 "같은 소식 n건 · 첫 보도 ○○" 또는 "첫 보도 · 같은 소식 n건"
+  - `stocks[].groupPositive`·`groupNegative`·`groupNeutral` (11/17): 그 같은 소식 묶음(`DONE` 글)의 AI 판단(감성) 수. 제목만 받은 기사(감성 `null`)도 같은 소식의 다른 기사가 받은 판단으로 화면이 링을 그림. 묶이지 않았으면 `null`
 - `sourceType`이 `SNS`면 "참고용 · 확인되지 않은 정보" 표시 (요구사항 N-05)
   - **SNS 글은 네이버 검색 결과 그대로 보여 주기:** `summary`는 네이버 검색 미리보기(AI 요약 아님). 카드에 관련도·직접/간접·감성을 붙이지 않고, 제목은 `url`(원문)로 바로 연결 (네이버 검색 API 약관 특약 2.1 "검색 결과에 다른 내용을 끼워 넣지 않음"). SNS 감성은 종목 화면의 감성 비율(`source=SNS`)과 `snsSummary`로 따로 보여 줌. 예: 데모 화면
   - SNS 글은 모은 지 **7일이 지나면 지워집니다** (약관 7.3 "별도 DB로 쌓아 두지 않음"). 그래서 30일 언급량 그래프의 SNS는 최근 7일만 있음. 종목 하루 요약의 `snsSummary`는 남음
