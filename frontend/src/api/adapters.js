@@ -99,6 +99,10 @@ export function toUiArticle(item) {
         sameNewsCount: Number.isInteger(s.sameNewsCount) ? s.sameNewsCount : null,
         firstReportPress: s.firstReportPress || '',
         firstReport: s.firstReport === true,
+        // 같은 소식 묶음의 AI 판단 수 (11/17 백엔드): 제목만 받은 기사도 같은 소식의 판단으로 링을 그리려고. 없으면 null
+        group: Number.isInteger(s.groupPositive)
+          ? { pos: s.groupPositive, neg: s.groupNegative || 0, neu: s.groupNeutral || 0 }
+          : null,
         matchedKeywords: s.matchedKeywords || [],
         // 목록 API에는 없고 상세 API(articleApi.get)에만 있음. 없으면 빈 값 (가짜 문장을 채우지 않음)
         reason: s.reason || '',

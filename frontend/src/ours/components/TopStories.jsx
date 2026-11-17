@@ -104,7 +104,12 @@ function StoryTitles({ stories, quotes, start = 2 }) {
       {stories.map((st, i) => {
         const a = st.lead;
         const s = summarized(st) || a;
-        const c = storyCounts(st);
+        let c = storyCounts(st);
+        // 오늘 받은 기사 안에 같은 소식의 판단이 없으면 서버가 센 묶음 판단으로 (11/17)
+        if (!c.pos && !c.neg) {
+          const g = ((a.relatedStocks || []).find((x) => x.role === 'MAIN') || a.relatedStocks?.[0])?.group;
+          if (g && (g.pos || g.neg || g.neu)) c = { pos: g.pos, neg: g.neg, neu: g.neu };
+        }
         const main = (a.relatedStocks || []).find((x) => x.role === 'MAIN') || a.relatedStocks?.[0];
         const q = main ? quotes?.[main.code] : null;
         return (

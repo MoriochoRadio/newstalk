@@ -132,11 +132,12 @@ function KindIcon({ tone, article: a }) {
 
 /** 링이 없는 줄의 회색 표시 종류: 'titleOnly' | 'neutral' | null */
 function quietOf(a, focusCode, toneCodes) {
-  if (a.titleOnly) return 'titleOnly';
   if (a.disclosurePending) return null;
   const stocks = a.relatedStocks || [];
   const pool = toneCodes ? stocks.filter((x) => toneCodes.has(x.code)) : stocks;
   const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
+  // 제목만 받은 기사: 같은 소식 묶음에 AI 가 읽은(중립) 기사가 있으면 회색 링, 없으면 '제목만 연결'
+  if (a.titleOnly) return s?.group && s.group.neu > 0 ? 'neutral' : 'titleOnly';
   if (!s || s.role !== 'MAIN') return null;
   return s.sentiment === 'POSITIVE' || s.sentiment === 'NEGATIVE' ? null : 'neutral';
 }
@@ -153,7 +154,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
   const own = toneOf(a, focusCode, toneCodes);
   const storyTone = !own && others.length && !focusCode && !toneCodes ? toneOfStory({ lead: a, others }) : null;
   const tone = own || storyTone;
-  const toneCounts = storyTone ? storyCounts({ lead: a, others }) : undefined;
+  const toneCounts = storyTone ? storyCounts({ lead: a, others }) : own?.counts;
   // 링 없는 줄도 같은 자리에 표시 (11/17 사용자: 어떤 줄은 링이 있고 어떤 줄은 없어 왜 없는지 모름 → 회색 링 + 글자)
   //  - AI 가 읽고 좋다·나쁘다 하지 않은 기사: 회색 링 + '판단 없음'
   //  - 약관상 AI 요약을 못 하는 언론사(제목만 받은 기사): 회색 '요약 없음'

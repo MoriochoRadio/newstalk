@@ -49,13 +49,20 @@ export function titleDir(title) {
 export function toneOf(article, focusCode, onlyCodes) {
   // 11/17 사용자: AI 가 판단한 기사는 링을 보여 줌 — 주가 기사도 판단을 세고, 목록에는 '주가 기사' 표시가 함께 붙음 (예전: 순환 논리라 '판단 없음'으로 셈 — 11/16 PM)
   //  상세 화면은 이미 판단을 보여 줘서 목록('제목만 연결')과 어긋났음
-  if (!article || article.titleOnly || article.disclosurePending || article.sourceType === 'SNS') return null;
+  if (!article || article.disclosurePending || article.sourceType === 'SNS') return null;
   const stocks = article.relatedStocks || [];
   // onlyCodes(관심 종목 화면): 그 종목들 판단만. 관심 없는 종목의 '좋은 소식' 배지가 맨 위에 뜨던 것 (11/16 디자이너 2차 리뷰)
   const pool = onlyCodes ? stocks.filter((x) => onlyCodes.has(x.code)) : stocks;
   const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
   // '함께 언급'만 된 종목에는 목록에서 좋은·나쁜 표시를 안 붙임 (11/16 리뷰: 은행원 수기 글이 SK하이닉스에 '나쁜 소식'으로 보임). 글 화면 카드에는 그대로
   if (s && s.role !== 'MAIN') return null;
+  // 이 기사 판단이 없으면(제목만 받은 언론사) 같은 소식 묶음의 AI 판단으로 (11/17 사용자: 목록엔 '제목만 연결'인데
+  // 같은 소식의 다른 기사는 판단돼 상세에도 나옴 → 링을 보여 줘야). counts 를 함께 돌려줘 링·'AI가 읽은 기사 n건' 글자에 씀
+  const g = s?.group;
+  if ((article.titleOnly || !s?.sentiment) && g && (g.pos || g.neg)) {
+    return { kind: g.pos && g.neg ? 'mixed' : g.pos ? 'pos' : 'neg', name: s.name, counts: g, fromGroup: true };
+  }
+  if (article.titleOnly) return null;
   const v = s?.sentiment || null;
   if (v !== 'POSITIVE' && v !== 'NEGATIVE') return null;
   const kind = v === 'POSITIVE' ? 'pos' : 'neg';
