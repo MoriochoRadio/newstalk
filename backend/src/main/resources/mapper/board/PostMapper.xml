@@ -10,6 +10,7 @@
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="comment_count" javaType="Long"/>
             <arg column="like_count" javaType="Long"/>
+            <arg column="liked_by_me" javaType="Boolean"/>
         </constructor>
     </resultMap>
 
@@ -40,7 +41,12 @@
     <!-- idx_board_post_stock_created (stock_code, created_at) 인덱스를 타는 조회 -->
     <select id="findPageByStock" resultMap="postSummaryRow">
         SELECT p.post_id, p.title, u.login_id AS author_login_id, p.created_at,
-               <include refid="counts"/>
+               <include refid="counts"/>,
+               <!-- 내가 공감했는가: 로그인 안 했으면 늘 false (11/17 QA: 예전엔 늘 빈 하트로 시작해 다시 누르면 취소됨) -->
+               <choose>
+                   <when test="userId != null">EXISTS (SELECT 1 FROM board_like m WHERE m.post_id = p.post_id AND m.user_id = #{userId})</when>
+                   <otherwise>FALSE</otherwise>
+               </choose> AS liked_by_me
         FROM board_post p
         JOIN users u ON u.user_id = p.user_id
         WHERE p.stock_code = #{stockCode}

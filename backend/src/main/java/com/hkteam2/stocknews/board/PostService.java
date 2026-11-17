@@ -24,10 +24,15 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public ListResponse<PostSummaryResponse> getPosts(String stockCode, PageQuery pageQuery) {
+        return getPosts(stockCode, pageQuery, null);
+    }
+
+    /** userId 가 있으면 글마다 내가 공감했는지(likedByMe)도 */
+    public ListResponse<PostSummaryResponse> getPosts(String stockCode, PageQuery pageQuery, Long userId) {
         requireStock(stockCode);
         long totalCount = postMapper.countByStock(stockCode);
         List<PostSummaryResponse> items = postMapper
-                .findPageByStock(stockCode, pageQuery.limit(), pageQuery.offset()).stream()
+                .findPageByStock(stockCode, pageQuery.limit(), pageQuery.offset(), userId).stream()
                 .map(PostSummaryResponse::from)
                 .toList();
         return new ListResponse<>(items, totalCount);
