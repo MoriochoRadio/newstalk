@@ -29,7 +29,7 @@ from sqlalchemy import text
 from hk_llm.core.config import KST
 from hk_llm.core.db import get_engine, to_db
 from hk_llm.core.util import get_logger
-from hk_llm.steps.step5_summary import MODEL, Sentiment, _strip_tag
+from hk_llm.steps.step5_summary import MODEL, Sentiment, _strip_tag, llm_call
 from hk_llm.steps.step6_match import load_dictionary, norm
 
 TOP_PER_THEME = 5  # 테마마다 후보 종목 수
@@ -149,9 +149,10 @@ def is_issue(title, keywords):
 def judge(title, summary, body, cands, direct_codes=(), names=None, model=INDIRECT_MODEL):
     """([검사를 통과한 IndirectLink], 토큰 사용량)"""
     llm = ChatOpenAI(model=model, timeout=60, max_retries=2, max_tokens=1500)
-    out = (PROMPT | llm.with_structured_output(IndirectResult, include_raw=True)).invoke({
+    # 하루 비용 상한 확인·기록을 거침 (11/17 QA: 예전엔 바로 불러 상한 밖이었음. 기록 단가는 nano 기준이라 mini 는 적게 잡힘)
+    out = llm_call(lambda: (PROMPT | llm.with_structured_output(IndirectResult, include_raw=True)).invoke({
         "themes": themes_text(cands), "title": _strip_tag(title), "summary": _strip_tag(summary or ""),
-        "body": _strip_tag((body or "")[:BODY_CHARS])})
+        "body": _strip_tag((body or "")[:BODY_CHARS])}))
     if out["parsed"] is None:
         raise ValueError(f"LLM 답이 형식에 안 맞음: {out['parsing_error']}")
     article_text = f"{title}\n{summary or ''}\n{body or ''}"
