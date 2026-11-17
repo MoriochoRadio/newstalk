@@ -5584,9 +5584,10 @@ mark { background: var(--accent-soft, rgba(49, 130, 246, 0.14)); color: inherit;
 .feed-row-v2 .feed-summary { font-size: 16px; line-height: 1.55; margin-top: 6px; }
 .feed-row-v2 .feed-kicker-line { margin-bottom: 6px; }
 .feed-row-v2 .feed-kicker { font-size: var(--fs-sm); font-weight: 700; }
-/* 판단 글자: 링은 왼쪽 그림 칸이 대신하므로 숨기고 글자를 굵고 크게 */
-.feed-row-v2 .tone { font-size: var(--fs-sm); font-weight: 700; padding: 4px 12px; }
-.feed-row-v2 .tone .tone-ring { display: none; }
+/* 판단 글자: 굵고 크게. 링(좋은·나쁜 비율 그림)은 다시 보임 — 왼쪽 그림 칸이 엄지 → 글 종류로 바뀌며(c4afb80) 대신하던 것이 없어져
+   목록에서 판단 그림이 사라졌음 (11/17 사용자: "링 형태로 긍정 부정 다 써 있었는데 왜 사라졌어") */
+.feed-row-v2 .tone { font-size: var(--fs-sm); font-weight: 700; padding: 4px 12px 4px 8px; }
+.feed-row-v2 .tone .tone-ring { width: 18px; height: 18px; }
 .feed-row-v2 .feed-foot { margin-top: 12px; }
 .feed-row-v2 .chip { height: 32px; padding: 0 12px; font-size: var(--fs-sm); }
 .feed-row-v2 .feed-meta { font-size: var(--fs-sm); }
