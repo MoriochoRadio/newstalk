@@ -43,7 +43,8 @@ export default function AuthModal() {
       if (e.key === 'Escape') closeRef.current();
       // 창 안에서만 Tab 이 돌게
       if (e.key === 'Tab' && dialogRef.current) {
-        const items = dialogRef.current.querySelectorAll('button, input, a[href]');
+        // 꺼진 버튼은 초점을 못 받으니 빼야 Tab 이 끝에서 처음으로 돎 (11/17 QA, lib/focusTrap 과 같은 기준)
+        const items = dialogRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]');
         const first = items[0];
         const last = items[items.length - 1];
         if (e.shiftKey && document.activeElement === first) {
