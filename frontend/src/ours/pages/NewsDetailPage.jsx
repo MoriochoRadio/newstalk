@@ -74,7 +74,9 @@ function ToneBand({ article }) {
         {/* 여러 종목이면 좋은·나쁜 소식으로 묶어 한 줄씩 (11/16: "OO에 좋은 소식"이 종목 수만큼 되풀이돼 글이 길었음) */}
         {judged.length === 1 ? (
           // '○○에 좋은 소식이에요'는 단정으로 읽힘 (11/16 밤 PM) → 누가 그렇게 봤는지 밝힘
-          <p className="tone-band-main">{`AI는 ${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}으로 봤어요`}</p>
+          // 판단한 종목이 중심 종목이 아니면 '함께 언급된'을 붙임 (11/17: 중심 종목 우진은 판단 없음인데 'AI는 우진엔텍에 나쁜 소식'만 떠
+          // 우진엔텍 기사처럼 읽혔음. 목록의 '함께 언급 · ' 꼬리표와 같은 규칙)
+          <p className="tone-band-main">{`AI는 ${lead.role === 'MAIN' ? '' : '함께 언급된 '}${lead.name}에 ${lead.sentiment === 'POSITIVE' ? '좋은 소식' : '나쁜 소식'}으로 봤어요`}</p>
         ) : (
           ['POSITIVE', 'NEGATIVE']
             .map((t) => [t, judged.filter((x) => x.sentiment === t)])
