@@ -288,7 +288,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
                     "publishedAt": "2026-10-29T10:00:00+09:00", "relevance": 92, "priceMoveTitle": false } ] }
   ```
 
-  응답 전체는 `{ stockCode, period, threshold, from, to, items: [위 모양] }`. 등락률은 KIS 일봉(수정주가) 종가로 `(그날 종가 − 전날 종가) ÷ 전날 종가`. 글은 **그날 0시~24시 작성**, `DONE`만, 관련도 높은 순 3개(`relevance`는 %, 없으면 `null`이고 뒤로)와 전체 수 `articleCount`. 단 주가 움직임 기사(`priceMoveTitle` true, 글 목록과 같은 뜻)는 뒤로 보냄 — 등락률 옆에서 원인처럼 읽히지 않게. AI가 기사를 모으기 전 날짜는 글이 없는 게 정상. 일봉은 KIS 3번 조회 + 10분 캐시
+  응답 전체는 `{ stockCode, period, threshold, from, to, items: [위 모양] }`. 등락률은 KIS 일봉(수정주가) 종가로 `(그날 종가 − 전날 종가) ÷ 전날 종가`. 글은 **그날 0시~24시 작성**, `DONE`만, **그날 가장 많이 다뤄진 소식부터 3개**(같은 소식 묶음의 그날 기사 수가 많은 순, 같으면 관련도 순. 같은 소식은 하나만)와 전체 수 `articleCount`(`relevance`는 %, 없으면 `null`). 주가 움직임 기사(`priceMoveTitle` true, 글 목록과 같은 뜻)도 순서를 바꾸지 않음 — 화면이 '주가 기사' 표시를 붙여 원인이 아니라 그날 움직임을 다룬 기사임을 밝힘 (11/16 결정). AI가 기사를 모으기 전 날짜는 글이 없는 게 정상. 일봉은 KIS 3번 조회 + 10분 캐시
 - 오류: `503 QUOTE_DISABLED`(시세 꺼짐), `429 QUOTE_BUSY`(KIS 초당 호출 초과), `429 REPLAY_BUSY`(다시 보기 동시 5개 초과), `502 QUOTE_UPSTREAM_ERROR`·`QUOTE_UNREACHABLE`(KIS 오류·연결 실패)
 - 개발 중 확인: `http://localhost:8080/demo.html` 종목 화면의 "시세" 칸
 

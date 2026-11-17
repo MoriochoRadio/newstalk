@@ -205,7 +205,7 @@ public class QuoteController {
     }
 
     @Operation(summary = "과거 급등·급락 이력 (F-17)",
-            description = "일봉으로 하루 등락률이 ±threshold% 이상인 날(최신부터)과 그날 이 종목에 연결된 글(관련도 높은 순 3개, 전체 수)."
+            description = "일봉으로 하루 등락률이 ±threshold% 이상인 날(최신부터)과 그날 이 종목에 연결된 글(그날 가장 많이 다뤄진 소식부터 3개, 같은 소식은 하나만, 전체 수)."
                     + " period 3m·6m·1y(기본), threshold 3~30(기본 5). 일봉은 KIS에서 받아 10분 캐시. 글은 작성일 기준, DONE만")
     @GetMapping("/{stockCode}/big-moves")
     public BigMoveResponse getBigMoves(@PathVariable String stockCode,

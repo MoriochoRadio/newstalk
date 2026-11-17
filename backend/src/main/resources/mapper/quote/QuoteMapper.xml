@@ -221,7 +221,8 @@
                s.group_article_id,
                CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
                    (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE')
+                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE'
+                      AND DATE(ga.published_at) = DATE(a.published_at))   -- 그날 기사만 (묶음이 자정을 넘을 수 있음, 11/17 QA)
                END AS same_news_count
         FROM article_stock s
         JOIN article a ON a.article_id = s.article_id
