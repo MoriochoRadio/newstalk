@@ -315,12 +315,9 @@ function newsByBar(rows, unit, dayCounts, articles) {
 
 const kstDate = (iso) => new Date(new Date(iso).getTime() + KST_OFFSET_SEC * 1000).toISOString().slice(0, 10);
 
-/** 지금 정규장(평일 09:00~15:30, 한국 시간)인가. 공휴일은 모름 → 공휴일엔 오늘 봉 자체가 없어 영향 없음 */
+/** 지금 정규장(평일 09:00~15:30, 수능일 10:00~16:30 등은 lib/market)인가. 공휴일은 모름 → 공휴일엔 오늘 봉 자체가 없어 영향 없음 */
 function tradingNow(now = new Date()) {
-  const k = new Date(now.getTime() + KST_OFFSET_SEC * 1000);
-  const day = k.getUTCDay();
-  const min = k.getUTCHours() * 60 + k.getUTCMinutes();
-  return day >= 1 && day <= 5 && min >= 9 * 60 && min < 15 * 60 + 30;
+  return marketState(now).key === 'open';
 }
 
 export default function PriceChart({ stockCode, stockName, dayCounts = null, articles = null, moves = null, liveQuote = null }) {
