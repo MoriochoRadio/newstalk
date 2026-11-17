@@ -67,4 +67,19 @@ class QuoteCacheTest {
         assertThat(QuoteService.direction("5")).isEqualTo("DOWN");   // 하락
         assertThat(QuoteService.direction(null)).isEqualTo("FLAT");
     }
+
+    @Test
+    void 만료된_값은_새로_넣을_때_치워진다() {
+        MutableClock clock = new MutableClock();
+        QuoteCache cache = new QuoteCache(clock);
+        for (int i = 0; i < 100; i++) {
+            cache.get("old:" + i, Duration.ofSeconds(5), () -> "v");
+        }
+        clock.now = clock.now.plusSeconds(10);   // 모두 만료
+        for (int i = 0; i < QuoteCache.PURGE_EVERY; i++) {
+            cache.get("new:" + i, Duration.ofMinutes(1), () -> "v");
+        }
+        assertThat(cache.size()).isLessThanOrEqualTo(QuoteCache.PURGE_EVERY);   // 만료된 old 100개가 빠짐
+        assertThat(cache.get("new:0", Duration.ofMinutes(1), () -> "다시 물음")).isEqualTo("v");   // 살아 있는 값은 그대로
+    }
 }
