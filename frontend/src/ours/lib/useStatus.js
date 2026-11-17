@@ -32,10 +32,14 @@ export function useStatus() {
         .then((data) => alive && setState({ data, error: null }))
         .catch((error) => alive && setState((s) => ({ ...s, error })));
     load();
-    const t = setInterval(load, REFRESH_MS);
+    // 숨긴 탭에선 쉬고, 다시 보이면 바로 한 번 (11/17 QA)
+    const t = setInterval(() => !document.hidden && load(), REFRESH_MS);
+    const onVisible = () => !document.hidden && load();
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       alive = false;
       clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
   return state;

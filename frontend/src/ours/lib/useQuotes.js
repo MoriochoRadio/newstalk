@@ -5,6 +5,7 @@
 // → 앱 전체가 함께 쓰는 보관함(1분). 이미 받은 종목은 바로 보이고, 받는 중인 종목은 다시 부르지 않고, 새로 늘어난 종목만 받음
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { quoteApi } from '../../api';
+import { usePageVisible } from '../../hooks/usePageVisible';
 import { useQuoteStream } from '../../hooks/useQuoteStream';
 
 const REFRESH_MS = 60_000;
@@ -67,6 +68,7 @@ const isFresh = (c, now) => {
 export function useQuotes(codes, { live = false } = {}) {
   const key = [...new Set((codes || []).filter(Boolean))].join(',');
   const [version, bump] = useReducer((x) => x + 1, 0);
+  const visible = usePageVisible(); // 숨긴 탭에선 조회를 쉼 (11/17 QA)
 
   useEffect(() => {
     listeners.add(bump);
@@ -74,16 +76,17 @@ export function useQuotes(codes, { live = false } = {}) {
   }, []);
 
   useEffect(() => {
-    if (!key) return undefined;
+    if (!key || !visible) return undefined;
     const list = key.split(',');
     const run = () => {
+      if (document.hidden) return;
       const now = Date.now();
       fetchCodes(list.filter((c) => !isFresh(c, now)));
     };
     run();
     const timer = setInterval(run, FAIL_RETRY_MS); // 신선한 값은 건너뛰므로 실제 호출은 실패·1분 지난 종목만
     return () => clearInterval(timer);
-  }, [key]);
+  }, [key, visible]);
 
   const onQuote = useCallback((q) => {
     cache.set(q.stockCode, { q, at: Date.now() });
