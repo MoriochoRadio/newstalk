@@ -173,7 +173,11 @@ function Post({ post, onRemoved }) {
   const { user, requireLogin, handleAuthError, toast } = useSession();
   const [confirmUi, ask] = useConfirm();
   const [open, setOpen] = useState(false);
-  const [like, setLike] = useState({ liked: false, count: post.likeCount });
+  // likedByMe: 내가 공감했는지 (11/17 QA: 예전엔 늘 빈 하트로 시작해 다시 누르면 공감이 취소됐음)
+  const [like, setLike] = useState({ liked: Boolean(post.likedByMe), count: post.likeCount });
+  const [liking, setLiking] = useState(false); // 처리 중엔 다시 못 누르게 (빠르게 두 번 누르면 원래대로 돌아갔음)
+  // 로그인·로그아웃 뒤 목록을 다시 받으면 그 값으로 맞춤
+  useEffect(() => setLike({ liked: Boolean(post.likedByMe), count: post.likeCount }), [post.likedByMe, post.likeCount]);
   const [commentCount, setCommentCount] = useState(post.commentCount);
   const body = useApi((signal) => boardApi.post(post.postId, { signal }), [post.postId], { enabled: open });
   const mine = user?.loginId === post.authorLoginId;
@@ -184,11 +188,15 @@ function Post({ post, onRemoved }) {
       requireLogin('공감은 로그인하면 누를 수 있어요.');
       return;
     }
+    if (liking) return;
+    setLiking(true);
     try {
       const res = await boardApi.toggleLike(post.postId);
       setLike({ liked: res.liked, count: res.likeCount });
     } catch (err) {
       if (!handleAuthError(err)) toast(errorText(err), 'error');
+    } finally {
+      setLiking(false);
     }
   };
 
@@ -222,7 +230,7 @@ function Post({ post, onRemoved }) {
         )}
       </div>
       <div className="post-actions">
-        <button type="button" className="btn btn-sm btn-ghost like-btn" aria-pressed={like.liked} onClick={toggleLike}>
+        <button type="button" className="btn btn-sm btn-ghost like-btn" aria-pressed={like.liked} aria-busy={liking} disabled={liking} onClick={toggleLike}>
           <Heart className="icon-sm" aria-hidden="true" />
           공감 <span className="num">{like.count}</span>
         </button>
@@ -247,7 +255,8 @@ export default function Board({ stockCode, stockName }) {
   const { user, requireLogin } = useSession();
   const [page, setPage] = useState(1);
   const [writing, setWriting] = useState(false);
-  const posts = useApi((signal) => boardApi.posts(stockCode, { page, size: PAGE_SIZE }, { signal }), [stockCode, page]);
+  // 로그인·로그아웃하면 다시 불러 likedByMe 를 맞춤
+  const posts = useApi((signal) => boardApi.posts(stockCode, { page, size: PAGE_SIZE }, { signal }), [stockCode, page, user?.loginId]);
   const items = posts.data?.items || [];
   // 2쪽 이후의 마지막 글을 지우면 빈 쪽이 남음 → 앞쪽으로 (11/16 코드 리뷰)
   useEffect(() => {

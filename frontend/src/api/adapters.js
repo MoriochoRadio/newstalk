@@ -200,7 +200,7 @@ export function toUiSummary(res) {
 
 /**
  * 종목 토론 게시판 글 → 화면 댓글 모양 (화면은 댓글형, 서버는 게시판: 댓글 하나 = 게시판 글 하나, 내용은 제목 칸)
- * likedByMe 는 목록 API에 없어서 처음에는 false, 공감을 누르면 서버 답으로 바뀜
+ * likedByMe: 목록 API 의 likedByMe (로그인 안 했으면 false, 11/17)
  */
 export function toUiBoardComment(item, stockCode) {
   return {
@@ -211,7 +211,7 @@ export function toUiBoardComment(item, stockCode) {
     content: item.title,
     createdAt: item.createdAt,
     likes: item.likeCount,
-    likedByMe: false,
+    likedByMe: Boolean(item.likedByMe),
   };
 }
 
