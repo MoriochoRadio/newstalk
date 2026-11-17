@@ -7,7 +7,7 @@ import { ChevronDown, ExternalLink, FileText, MessageCircle, Newspaper } from 'l
 import { groupStories } from '../lib/stories';
 import { relativeTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
-import Tone, { Highlight, TitleText, toneOf, toneRowClass } from './Tone';
+import Tone, { Highlight, TONE_TIP, TitleText, ToneRing, toneOf, toneRowClass } from './Tone';
 
 export const SAME_NEWS_TIP = '같은 종목·24시간 안·제목이 비슷한 기사를 같은 소식으로 묶은 수예요. 묶음은 틀릴 수 있어요.';
 const CORRECTION_TIP = '앞서 낸 공시를 고쳐 다시 낸 공시예요.';
@@ -129,6 +129,17 @@ function KindIcon({ tone, article: a }) {
   );
 }
 
+/** 링이 없는 줄의 회색 표시 종류: 'titleOnly' | 'neutral' | null */
+function quietOf(a, focusCode, toneCodes) {
+  if (a.titleOnly) return 'titleOnly';
+  if (a.disclosurePending || a.priceMoveTitle) return null;
+  const stocks = a.relatedStocks || [];
+  const pool = toneCodes ? stocks.filter((x) => toneCodes.has(x.code)) : stocks;
+  const s = (focusCode && pool.find((x) => x.code === focusCode)) || pool.find((x) => x.role === 'MAIN') || pool[0];
+  if (!s || s.role !== 'MAIN') return null;
+  return s.sentiment === 'POSITIVE' || s.sentiment === 'NEGATIVE' ? null : 'neutral';
+}
+
 export default function ArticleRow({ article: a, others = [], focusCode, toneCodes, compact = false, showSummary = true }) {
   const [open, setOpen] = useState(false);
   const sns = a.sourceType === 'SNS';
@@ -137,6 +148,11 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
   // 펼침 단추('같은 소식 다른 기사 n건')가 있으면 '같은 소식 n건' 칩은 뺌 — 2건·1건이 다른 숫자처럼 보였음 (11/16 리뷰 9번)
   const tags = ArticleTags({ article: a }).filter((t) => !(others.length > 0 && t.key === 's'));
   const tone = toneOf(a, focusCode, toneCodes);
+  // 링 없는 줄도 같은 자리에 표시 (11/17 사용자: 어떤 줄은 링이 있고 어떤 줄은 없어 왜 없는지 모름 → 회색 링 + 글자)
+  //  - AI 가 읽고 좋다·나쁘다 하지 않은 기사: 회색 링 + '판단 없음'
+  //  - 약관상 AI 요약을 못 하는 언론사(제목만 받은 기사): 회색 '요약 없음'
+  //  주가 기사는 '주가 기사' 꼬리표가 따로 있고, 주인공 종목이 없는 기사(함께 언급만)는 판단 대상이 아니라 그대로 둠
+  const quiet = tone || sns ? null : quietOf(a, focusCode, toneCodes);
   const latestIso = [a, ...others].map((x) => x.publishedAtIso).filter(Boolean).sort().pop() || a.publishedAtIso;
   return (
     <article className={`feed-row feed-row-v2 ${a.isDisclosure ? 'is-disclosure' : ''} ${toneRowClass(tone)}`}>
@@ -153,7 +169,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
           <TitleText text={a.title} />
         </Link>
       )}
-      {(a.isDisclosure || tone) && (
+      {(a.isDisclosure || tone || quiet) && (
         <div className="feed-kicker-line feed-context">
           {a.isDisclosure && (
             <span className="feed-kicker" title={explainDisclosure(a.disclosureType) || undefined}>
@@ -161,6 +177,17 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
             </span>
           )}
           <Tone tone={tone} withName={!focusCode} />
+          {quiet === 'neutral' && (
+            <span className="tone tone-quiet" title={TONE_TIP}>
+              <ToneRing neu={1} size={16} />
+              <span>판단 없음</span>
+            </span>
+          )}
+          {quiet === 'titleOnly' && (
+            <span className="tone tone-quiet tone-titleonly" title="이 언론사 기사는 약관상 AI 요약·판단을 하지 않아요. 원문에서 확인해 주세요.">
+              요약 없음
+            </span>
+          )}
         </div>
       )}
       {summary && !compact && (

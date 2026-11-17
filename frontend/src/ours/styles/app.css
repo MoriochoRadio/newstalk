@@ -6417,3 +6417,8 @@ a { text-underline-offset: 3px; }
 /* 홈 시가총액 지도 뼈대: 지도와 같은 높이 (휴대폰 지도는 520) */
 .cap-skeleton { height: 340px; }
 @media (max-width: 640px) { .cap-skeleton { height: 520px; } }
+
+/* 링 없는 줄의 회색 표시 (11/17): 판단 없음 = 회색 링 + 글자, 요약 없음 = 글자만 */
+.feed-row-v2 .tone.tone-quiet { color: var(--text-2); background: var(--surface-2); font-weight: 600; }
+.feed-row-v2 .tone.tone-quiet > i { display: none; }
+.feed-row-v2 .tone.tone-titleonly { color: var(--text-3); background: none; padding-left: 0; font-weight: 500; }
