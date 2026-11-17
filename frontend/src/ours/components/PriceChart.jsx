@@ -68,7 +68,12 @@ const MA = [
 ];
 const MA_FALLBACK = { '--ma5': '#a16207', '--ma20': '#475569', '--ma60': '#0d9488' };
 const KST_OFFSET_SEC = 9 * 3600;
-const MAX_INTRADAY_DAYS = 5;
+const MAX_INTRADAY_DAYS = 5; // 1분봉 (하루 381봉 × 5일)
+// 분봉 단위마다 받는 최대 날 수와 왼쪽으로 끌 때 한 번에 이어 받는 날 수 (11/17 사용자: 일봉은 2024년까지 나오는데 분봉은 며칠뿐 —
+// 모든 분봉이 5일에서 끊겨 30분·1시간봉은 65·35봉뿐이었음). 서버는 분봉을 하루씩 1년 전까지 줌(지난 날 1시간 캐시, 1분봉 하루 = KIS 4번)
+const INTRADAY_MAX_DAYS = { '1m': MAX_INTRADAY_DAYS, '5m': 20, '30m': 40, '60m': 60 };
+const INTRADAY_STEP_DAYS = { '1m': 1, '5m': 2, '30m': 3, '60m': 5 };
+const maxDaysOf = (unit) => INTRADAY_MAX_DAYS[unit] || MAX_INTRADAY_DAYS;
 const LOAD_MORE_MARGIN = 10;
 
 const isIntraday = (unit) => unit.endsWith('m');
@@ -100,11 +105,11 @@ const prevWeekday = (ymd) => {
   return d;
 };
 
-/** 분봉 하루치. 빈 날(장 전·주말·공휴일)이면 그 앞 평일로, 합쳐 MAX_INTRADAY_DAYS 번까지 */
+/** 분봉 하루치. 빈 날(장 전·주말·공휴일)이면 그 앞 평일로, 합쳐 단위별 최대 날 수까지 */
 async function fetchIntradayDay(stockCode, unit, date, tried, signal) {
   let day = date;
   let count = tried;
-  while (count < MAX_INTRADAY_DAYS) {
+  while (count < maxDaysOf(unit)) {
     const res = await quoteApi.chart(stockCode, apiUnit(unit), { date: day ?? undefined }, { signal });
     count += 1;
     const answered = res.date || day;
@@ -510,8 +515,9 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
               if (o.length) items = mergeOlder(o, items);
             });
             cursor = days[days.length - 1];
+            return { items, cursor, tried: tried + need, more: items.length > 0 && tried + need < maxDaysOf(unit) };
           }
-          return { items, cursor, tried, more: items.length > 0 && tried < MAX_INTRADAY_DAYS };
+          return { items, cursor, tried, more: items.length > 0 && tried < maxDaysOf(unit) };
         })
       : quoteApi.chart(stockCode, unit, {}, { signal: controller.signal }).then((res) => {
           const items = res.items || [];
@@ -541,13 +547,39 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
     setLoadingMore(true);
     const controller = new AbortController();
     moreAbortRef.current = controller;
+    // 분봉: 단위에 따라 며칠씩 한 번에 (30분·1시간봉은 하루가 13·7봉이라 하루씩이면 끌어도 거의 안 늘어남)
+    const step = Math.min(INTRADAY_STEP_DAYS[unit] || 1, Math.max(0, maxDaysOf(unit) - d.tried));
     const next = isIntraday(unit)
-      ? fetchIntradayDay(stockCode, unit, prevWeekday(d.cursor), d.tried, controller.signal).then((r) => ({
-          older: r.items,
-          cursor: r.date,
-          tried: r.tried,
-          more: r.items.length > 0 && r.tried < MAX_INTRADAY_DAYS,
-        }))
+      ? step <= 1
+        ? fetchIntradayDay(stockCode, unit, prevWeekday(d.cursor), d.tried, controller.signal).then((r) => ({
+            older: r.items,
+            cursor: r.date,
+            tried: r.tried,
+            more: r.items.length > 0 && r.tried < maxDaysOf(unit),
+          }))
+        : (() => {
+            const days = [];
+            for (let x = d.cursor, i = 0; i < step; i += 1) {
+              x = prevWeekday(x);
+              days.push(x);
+            }
+            return Promise.all(
+              days.map((day) =>
+                quoteApi
+                  .chart(stockCode, apiUnit(unit), { date: day }, { signal: controller.signal })
+                  .then((res) => (unit === '60m' ? toHourly(res.items || []) : res.items || []))
+                  .catch((e) => {
+                    if (e.name === 'AbortError') throw e;
+                    return []; // 하루 실패·공휴일은 건너뜀
+                  })
+              )
+            ).then((lists) => {
+              const older = lists.reduce((acc, l) => (l.length ? mergeOlder(l, acc) : acc), []);
+              const tried = d.tried + step;
+              // 받은 며칠이 모두 비었으면(1년 전 한도·상장 전) 더 없음
+              return { older, cursor: days[days.length - 1], tried, more: older.length > 0 && tried < maxDaysOf(unit) };
+            });
+          })()
       : quoteApi.chart(stockCode, unit, { to: dayBefore(d.cursor) }, { signal: controller.signal }).then((res) => {
           const older = res.items || [];
           return { older, cursor: older[0] ? String(older[0].time).slice(0, 10) : d.cursor, tried: 0, more: older.length > 0 };
