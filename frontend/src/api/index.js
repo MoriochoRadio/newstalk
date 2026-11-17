@@ -4,6 +4,9 @@
 
 import { apiDelete, apiGet, apiPost, apiUrl, tokenStore } from './client';
 
+// 주소 조각은 인코딩 (11/17 QA: /stocks/..%2Fauth%2Fme 같은 주소가 /api/stocks/../auth/me 를 불렀음)
+const enc = (v) => encodeURIComponent(String(v));
+
 export { ApiError, tokenStore } from './client';
 
 /** 종목 */
@@ -11,17 +14,17 @@ export const stockApi = {
   /** 종목 검색 (이름·코드·별칭, 순위는 백엔드가 정함) → { items: [{ stockCode, stockName, market, sector }], totalCount } */
   search: (q, { page = 1, size = 20 } = {}, options) => apiGet('/api/stocks', { q, page, size }, options),
   /** 종목 하나 → { stockCode, stockName, market, sector } */
-  get: (stockCode, options) => apiGet(`/api/stocks/${stockCode}`, undefined, options),
+  get: (stockCode, options) => apiGet(`/api/stocks/${enc(stockCode)}`, undefined, options),
   /** 오늘의 이슈 종목 → { items: [{ rank, stockCode, stockName, articleCount, avgRelevance, lastPublishedAt }] } */
   issues: ({ source, limit = 10 } = {}, options) => apiGet('/api/stocks/issues', { source, limit }, options),
   /** 오늘의 종합 요약·감성 비율 (요약이 아직 없으면 newsSummary·snsSummary 가 null) */
   summary: (stockCode, { source } = {}, options) =>
-    apiGet(`/api/stocks/${stockCode}/summary`, { source }, options),
+    apiGet(`/api/stocks/${enc(stockCode)}/summary`, { source }, options),
   /** 종합 요약 다시 생성 (로그인 필요). AI 서버가 같은 종목은 10분에 1번만 새로 만듦 → { regenerated, summary } */
-  regenerate: (stockCode) => apiPost(`/api/stocks/${stockCode}/summary`),
+  regenerate: (stockCode) => apiPost(`/api/stocks/${enc(stockCode)}/summary`),
   /** 언급량 추이. period: today | 7d | 30d → { unit, items: [{ time, newsCount, snsCount, totalCount }] } */
   mentions: (stockCode, period = 'today', options) =>
-    apiGet(`/api/stocks/${stockCode}/mentions`, { period }, options),
+    apiGet(`/api/stocks/${enc(stockCode)}/mentions`, { period }, options),
 };
 
 /** 뉴스·SNS 글 */
@@ -29,7 +32,7 @@ export const articleApi = {
   /** 글 목록. 조건: stockCode, source(NEWS|SNS), sort(latest|relevance), minRelevance, q, period(today|7d|30d), page, size */
   list: (params = {}, options) => apiGet('/api/articles', params, options),
   /** 글 상세 (연결 이유·근거 문장·키워드·가까운 SNS 포함) */
-  get: (articleId, options) => apiGet(`/api/articles/${articleId}`, undefined, options),
+  get: (articleId, options) => apiGet(`/api/articles/${enc(articleId)}`, undefined, options),
 };
 
 /** 통합 검색 (종목 5개 + 글 한 페이지) → { q, stocks: { items, totalCount }, articles: { items, totalCount } } */
@@ -56,20 +59,20 @@ export const watchlistApi = {
   list: (options) => apiGet('/api/watchlist', undefined, options),
   articles: (params = {}, options) => apiGet('/api/watchlist/articles', params, options),
   add: (stockCode) => apiPost('/api/watchlist', { stockCode }),
-  remove: (stockCode) => apiDelete(`/api/watchlist/${stockCode}`),
+  remove: (stockCode) => apiDelete(`/api/watchlist/${enc(stockCode)}`),
 };
 
 /** 종목 토론 게시판 */
 export const boardApi = {
   posts: (stockCode, { page = 1, size = 20 } = {}, options) =>
-    apiGet(`/api/stocks/${stockCode}/posts`, { page, size }, options),
-  post: (postId, options) => apiGet(`/api/posts/${postId}`, undefined, options),
-  write: (stockCode, title, content) => apiPost(`/api/stocks/${stockCode}/posts`, { title, content }),
-  removePost: (postId) => apiDelete(`/api/posts/${postId}`),
-  comments: (postId, options) => apiGet(`/api/posts/${postId}/comments`, undefined, options),
-  writeComment: (postId, content) => apiPost(`/api/posts/${postId}/comments`, { content }),
-  removeComment: (commentId) => apiDelete(`/api/comments/${commentId}`),
-  toggleLike: (postId) => apiPost(`/api/posts/${postId}/like`),
+    apiGet(`/api/stocks/${enc(stockCode)}/posts`, { page, size }, options),
+  post: (postId, options) => apiGet(`/api/posts/${enc(postId)}`, undefined, options),
+  write: (stockCode, title, content) => apiPost(`/api/stocks/${enc(stockCode)}/posts`, { title, content }),
+  removePost: (postId) => apiDelete(`/api/posts/${enc(postId)}`),
+  comments: (postId, options) => apiGet(`/api/posts/${enc(postId)}/comments`, undefined, options),
+  writeComment: (postId, content) => apiPost(`/api/posts/${enc(postId)}/comments`, { content }),
+  removeComment: (commentId) => apiDelete(`/api/comments/${enc(commentId)}`),
+  toggleLike: (postId) => apiPost(`/api/posts/${enc(postId)}/like`),
 };
 
 /** 데이터 상태 (마지막 수집·요약 시각) */
@@ -105,7 +108,7 @@ async function retryIfBusy(call, signal) {
 /** 시세 (서버에서 KIS_ENABLED=true 일 때만, 아니면 503 QUOTE_DISABLED → "시세 준비 중") */
 export const quoteApi = {
   get: (stockCode, options) =>
-    retryIfBusy(() => apiGet(`/api/quotes/${stockCode}`, undefined, options), options?.signal),
+    retryIfBusy(() => apiGet(`/api/quotes/${enc(stockCode)}`, undefined, options), options?.signal),
   /** 최대 10종목 */
   many: (codes, options) =>
     retryIfBusy(() => apiGet('/api/quotes', { codes: codes.join(',') }, options), options?.signal),
@@ -114,10 +117,10 @@ export const quoteApi = {
    * date: 분봉의 그날 (없으면 오늘). to: 일·주·월봉을 그 날짜(포함)까지 거꾸로 100개 (과거 이어 받기)
    */
   chart: (stockCode, unit = 'day', { date, to } = {}, options) =>
-    retryIfBusy(() => apiGet(`/api/quotes/${stockCode}/chart`, { unit, date, to }, options), options?.signal),
+    retryIfBusy(() => apiGet(`/api/quotes/${enc(stockCode)}/chart`, { unit, date, to }, options), options?.signal),
   /** 과거 급등·급락 이력 (F-17): 하루 등락률 ±threshold% 이상인 날(최신부터) + 그날 연결된 글 3개. period 3m·6m·1y */
   bigMoves: (stockCode, { period = '1y', threshold = 5 } = {}, options) =>
-    retryIfBusy(() => apiGet(`/api/quotes/${stockCode}/big-moves`, { period, threshold }, options), options?.signal),
+    retryIfBusy(() => apiGet(`/api/quotes/${enc(stockCode)}/big-moves`, { period, threshold }, options), options?.signal),
   /** 종목 지도(시가총액 지도): 코스피·코스닥 시총 상위 각 30개 + 업종·등락률 (백엔드 fix/be-quote-limit 부터) */
   marketMap: (options) => retryIfBusy(() => apiGet('/api/quotes/market-map', undefined, options), options?.signal),
   /** 실시간 방송(SSE) 주소. 최대 5종목 (docs/api.md 시세). 듣는 쪽은 hooks/useQuoteStream.js */

@@ -184,6 +184,14 @@ function LinkMap({ a, quotes, priceOff }) {
 // 글이 바뀌면(같은 소식 목록에서 이동) 화면 전체를 새로 그림
 export default function NewsDetailPage() {
   const { id } = useParams();
+  if (!/^\d+$/.test(id || '')) {
+    // 글 번호 모양이 아니면 요청을 보내지 않음 (11/17 QA)
+    return (
+      <div className="card">
+        <Empty title="글을 찾을 수 없어요" desc="주소가 잘못됐어요." action={<Link to="/news" className="btn btn-secondary btn-sm">뉴스 목록으로</Link>} />
+      </div>
+    );
+  }
   return <NewsDetail key={id} id={id} />;
 }
 
@@ -349,6 +357,7 @@ function NewsDetail({ id }) {
               <li key={s.id} className="feed-row">
                 <a href={s.url} target="_blank" rel="noreferrer" className="feed-title">
                   {s.title}
+                  <span className="sr-only">(새 창)</span>
                 </a>
                 <div className="feed-meta">
                   <span>{s.press}</span>

@@ -431,6 +431,14 @@ function RelatedNews({ code, name }) {
 // 종목이 바뀌면 화면 전체를 새로 그림 (이전 종목 숫자가 잠깐 보이던 V7 문제)
 export default function StockDetailPage() {
   const { code } = useParams();
+  // 종목코드 모양이 아니면 요청 9개·실시간 방송을 보내지 않고 바로 안내 (11/17 QA). KRX 새 종목은 영문이 섞인 6자리
+  if (!/^[0-9A-Z]{6}$/.test(code || '')) {
+    return (
+      <div className="card">
+        <Empty title={`종목 ${code}을 찾을 수 없어요`} desc="코스피·코스닥 상장 종목만 있어요." action={<Link to="/stocks" className="btn btn-secondary btn-sm">종목 찾기</Link>} />
+      </div>
+    );
+  }
   return <StockDetail key={code} code={code} />;
 }
 

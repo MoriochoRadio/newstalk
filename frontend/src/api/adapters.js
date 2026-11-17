@@ -2,6 +2,11 @@
 // 화면 조각(글 카드·상세·감성 막대 등)이 처음 만들어질 때 쓰던 칸 이름에 맞춤 → 화면 코드를 덜 고치고 연결
 // 원칙: 백엔드에 없는 값은 지어내지 않음 (가짜 감성 %·가짜 연결 이유 금지) → 비워 두고 화면에서 "준비 중"
 
+/** 원문 주소는 http(s) 만 (11/17 QA: React 는 javascript: 만 막고 data: 같은 것은 통과). 아니면 undefined → 링크에 주소가 안 붙음 */
+export function safeUrl(u) {
+  return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : undefined;
+}
+
 const EMPTY_RATIO = Object.freeze({ positive: 0, neutral: 0, negative: 0 });
 
 /**
@@ -148,7 +153,7 @@ export function toUiArticle(item) {
     publishedAt: toDisplayTime(item.publishedAt),
     publishedAtIso: item.publishedAt || null,
     daysAgo: daysAgoKst(item.publishedAt),
-    url: item.url || '',
+    url: safeUrl(item.url),
     analysisStatus: 'COMPLETED',
     summary: disclosurePending ? [] : summaryLines.slice(0, 3),
     // AI 요약이 없는 글 (AI 활용 금지 언론사·원문 요약 전 공시 등) → 화면 "AI 요약 없음 · 원문 보기"
@@ -168,7 +173,7 @@ export function toUiArticle(item) {
       publishedAt: toDisplayTime(s.publishedAt),
       time: toClock(s.publishedAt),
       sentiment: null,
-      url: s.url || '',
+      url: safeUrl(s.url),
     })),
   };
 }
