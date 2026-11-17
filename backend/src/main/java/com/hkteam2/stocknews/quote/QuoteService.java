@@ -11,14 +11,21 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import com.hkteam2.stocknews.common.TimeUtils;
@@ -39,9 +46,14 @@ import com.hkteam2.stocknews.common.TimeUtils;
 @ConditionalOnProperty(name = "KIS_ENABLED", havingValue = "true")
 public class QuoteService {
 
+    private static final Logger log = LoggerFactory.getLogger(QuoteService.class);
+
     static final Duration PRICE_TTL = Duration.ofSeconds(5);
+    /** 장 밖 현재가 캐시: 거래소 값이 안 바뀌는데 방송 보는 종목마다 밤새 5초에 한 번 묻던 것 (11/17) */
+    static final Duration OFF_HOURS_QUOTE_TTL = Duration.ofSeconds(60);
     static final Duration MARKET_MAP_TTL = Duration.ofSeconds(60);   // 시가총액 순위 (코스피·코스닥 2번)
-    static final Duration SECTOR_TTL = Duration.ofHours(24);         // 업종은 거의 안 바뀜 → 종목당 하루 1번
+    static final Duration SECTOR_TTL = Duration.ofHours(24);
+    private static final int MAP_THREADS = 8;   // 종목 지도 업종 조회 동시 수 (초당 한도는 줄 서기가 따로 지킴)         // 업종은 거의 안 바뀜 → 종목당 하루 1번
     /** 장 밖 지도 값을 거래소 현재가로 바꿀 때 캐시 (장이 끝나면 거래소 값은 다음 장까지 안 바뀜 → 길게) */
     static final Duration OFF_HOURS_PRICE_TTL = Duration.ofMinutes(30);
     /** 거래소 정규장 끝: 15:30 종가 단일가 체결이 들어올 여유 1분 */
@@ -110,7 +122,8 @@ public class QuoteService {
         if (isLive(s)) {
             return fromSnapshot(s);
         }
-        return cache.get("price:" + stockCode, PRICE_TTL, () -> {
+        Duration ttl = krxSession(LocalDateTime.now(clock)) ? PRICE_TTL : OFF_HOURS_QUOTE_TTL;
+        return cache.get("price:" + stockCode, ttl, () -> {
             KisPrice p = kis.inquirePrice(stockCode);
             return new QuoteResponse(p.stockCode(), p.price(), p.changeAmount(), p.changeRate(),
                     direction(p.changeSign()), p.open(), p.high(), p.low(), p.accVolume(),
@@ -129,26 +142,64 @@ public class QuoteService {
     public MarketMapResponse marketMap() {
         boolean offHours = !krxSession(LocalDateTime.now(clock));
         return cache.get(offHours ? "market-map:off" : "market-map", MARKET_MAP_TTL, () -> {
-            List<MarketMapResponse.Item> items = new ArrayList<>();
+            record Row(KisRestClient.CapRankRow r, String market) {
+            }
+            List<Row> rows = new ArrayList<>();
             for (String[] m : new String[][] {{"0001", "KOSPI"}, {"1001", "KOSDAQ"}}) {
                 for (KisRestClient.CapRankRow r : kis.rankMarketCap(m[0])) {
-                    if (r.code() == null || isPreferred(r.code(), r.name())) {
-                        continue;
+                    if (r.code() != null && !isPreferred(r.code(), r.name())) {
+                        rows.add(new Row(r, m[1]));
                     }
-                    String name = r.name() == null ? r.code() : r.name().strip();
-                    KisPrice krx = offHours ? krxPrice(r.code()) : null;
-                    if (krx != null) {
-                        items.add(new MarketMapResponse.Item(r.code(), name, m[1], sectorOf(r.code()),
-                                parseLong(r.marketCap()), krx.price(), krx.changeRate(), priceLimit(krx.changeSign())));
-                    } else {
-                        items.add(new MarketMapResponse.Item(r.code(), name, m[1], sectorOf(r.code()),
-                                parseLong(r.marketCap()), parseLong(r.price()),
-                                parseDecimal(r.changeRate()), priceLimit(r.changeSign())));
-                    }
+                }
+            }
+            // 종목마다 업종(·장 밖 거래소 현재가)을 동시에 물음 (11/17): 예전엔 약 58종목을 한 줄로 물어
+            // 서버를 막 켠 뒤 첫 지도가 30~60초 걸렸음. 초당 한도는 KIS 줄 서기(KisRateLimiter)가 지킴.
+            // 장 밖엔 거래소 현재가 응답에 업종도 들어 있어 같은 종목을 두 번 묻지 않음
+            List<MapExtra> extras = inParallel(rows, row -> extra(row.r().code(), offHours), MAP_THREADS);
+            List<MarketMapResponse.Item> items = new ArrayList<>();
+            for (int i = 0; i < rows.size(); i++) {
+                KisRestClient.CapRankRow r = rows.get(i).r();
+                MapExtra x = extras.get(i);
+                String name = r.name() == null ? r.code() : r.name().strip();
+                if (x.krx() != null) {
+                    items.add(new MarketMapResponse.Item(r.code(), name, rows.get(i).market(), x.sector(),
+                            parseLong(r.marketCap()), x.krx().price(), x.krx().changeRate(), priceLimit(x.krx().changeSign())));
+                } else {
+                    items.add(new MarketMapResponse.Item(r.code(), name, rows.get(i).market(), x.sector(),
+                            parseLong(r.marketCap()), parseLong(r.price()),
+                            parseDecimal(r.changeRate()), priceLimit(r.changeSign())));
                 }
             }
             return new MarketMapResponse(items, TimeUtils.toKst(LocalDateTime.now(clock)));
         });
+    }
+
+    private record MapExtra(String sector, KisPrice krx) {
+    }
+
+    /** 지도 한 칸에 더 붙일 것. 실패해도 예외 없이 ("기타", 순위 값) */
+    private MapExtra extra(String code, boolean offHours) {
+        KisPrice krx = offHours ? krxPrice(code) : null;
+        if (krx != null && krx.sector() != null && !krx.sector().isBlank()) {
+            cache.put("sector:" + code, SECTOR_TTL, krx.sector());   // 같은 응답의 업종 → 업종을 따로 묻지 않음
+        }
+        return new MapExtra(sectorOf(code), krx);
+    }
+
+    /**
+     * 서버가 켜지고 5초 뒤 종목 지도를 한 번 미리 만들어 둠 (11/17): 시연 직전에 재시작해도 첫 화면이 바로 뜨게.
+     * 업종은 하루 캐시라 그 뒤 지도는 순위 2번만 물음. 실패해도 첫 요청이 다시 만들 뿐
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmUpMarketMap() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                marketMap();
+                log.info("종목 지도 미리 만들어 둠");
+            } catch (RuntimeException e) {
+                log.warn("종목 지도 미리 만들기 실패 (첫 요청 때 다시 만듦): {}", e.getMessage());
+            }
+        }, CompletableFuture.delayedExecutor(5, TimeUnit.SECONDS));
     }
 
     /** 장 밖 거래소 현재가 (30분 캐시). 못 받으면 null → 순위 값 그대로 (지도 전체를 실패시키지 않음) */
@@ -259,10 +310,15 @@ public class QuoteService {
      * 일꾼(스레드)은 부를 때마다 구간 수만큼 만들고 끝나면 닫음. 분봉은 캐시가 있어 새로 만드는 일이 드묾
      */
     private static <T, R> List<R> inParallel(List<T> inputs, Function<T, R> call) {
+        return inParallel(inputs, call, inputs.size());
+    }
+
+    /** 일꾼을 최대 maxThreads 개만 (종목 지도처럼 입력이 수십 개일 때) */
+    private static <T, R> List<R> inParallel(List<T> inputs, Function<T, R> call, int maxThreads) {
         if (inputs.isEmpty()) {
             return List.of();
         }
-        try (ExecutorService pool = Executors.newFixedThreadPool(inputs.size())) {
+        try (ExecutorService pool = Executors.newFixedThreadPool(Math.min(inputs.size(), maxThreads))) {
             List<Future<R>> futures = inputs.stream().map(in -> pool.submit(() -> call.apply(in))).toList();
             List<R> out = new ArrayList<>();
             for (Future<R> f : futures) {

@@ -43,6 +43,11 @@ class QuoteCache {
         }
     }
 
+    /** 다른 응답에서 함께 얻은 값을 넣어 둠 (예: 거래소 현재가 응답의 업종 → 업종 캐시) */
+    void put(String key, Duration ttl, Object value) {
+        entries.put(key, new Entry(value, clock.instant().plus(ttl)));
+    }
+
     private boolean fresh(Entry e) {
         return e != null && clock.instant().isBefore(e.expiresAt());
     }

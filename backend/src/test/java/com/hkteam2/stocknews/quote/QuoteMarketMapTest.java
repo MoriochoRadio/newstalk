@@ -77,6 +77,9 @@ class QuoteMarketMapTest {
         assertThat(r.items().get(0).changeRate()).isEqualByComparingTo("-4.47");
         assertThat(r.items().get(0).marketCap()).isEqualTo(11523015L);   // 크기는 순위 값 그대로
         assertThat(r.items().get(1).price()).isEqualTo(1127000L);        // 거래소 값을 못 받으면 순위 값 (지도는 나옴)
+        // 11/17: 장 밖엔 거래소 현재가 응답의 업종을 같이 써서 종목당 KIS 를 한 번만 부름 (예전엔 두 번)
+        assertThat(r.items().get(0).sector()).isEqualTo("전기·전자");
+        verify(kis, times(1)).inquirePrice("005930");
     }
 
     @Test
