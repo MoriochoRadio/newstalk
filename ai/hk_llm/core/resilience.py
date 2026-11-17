@@ -41,6 +41,7 @@ STATE_FILE = LOG_DIR / "breaker_state.json"
 FAIL_THRESHOLD = 3  # 연속 실패 이만큼이면 쉼 (잠깐 실패 1~2번으로 쉬지 않게)
 BASE_OPEN = 10 * 60  # 처음 쉬는 시간(초) = 수집 2번
 MAX_OPEN = 60 * 60  # 가장 긴 쉬는 시간(초). RSS 가 담는 시간(최소 약 1.4시간)보다 짧게
+PROBE_TIMEOUT = 30 * 60  # 시험 요청 결과가 이만큼 안 남으면 다시 시험 (결과를 안 알린 경로가 있어도 영영 막히지 않게)
 SLOW_DOWN = {429, 503}  # "나중에 다시" 라는 응답 → 연속 실패를 기다리지 않고 바로 쉼 (Azure: accelerated circuit breaking)
 
 log = get_logger(__name__)
@@ -102,9 +103,13 @@ class Breaker:
             s = state.get(key)
             if not s or not s.get("until"):
                 return True  # closed
-            if now < s["until"] or s.get("probing"):
-                return False  # open, 또는 이미 시험 요청이 나감
+            if now < s["until"]:
+                return False  # open
+            if s.get("probing") and now < s.get("probe_at", 0) + PROBE_TIMEOUT:
+                return False  # 이미 시험 요청이 나감
+            # 시험 결과가 PROBE_TIMEOUT 안에 안 남으면(결과를 안 알린 경로·프로세스 중단) 다시 시험 (11/17 QA: 영영 막히던 것)
             s["probing"] = True  # half-open: 이 1번의 결과로 닫거나 다시 엶
+            s["probe_at"] = now
             self._save(state)
             log.info("차단기 시험 요청 %s (%s 뒤)", key, s.get("reason"))
             return True

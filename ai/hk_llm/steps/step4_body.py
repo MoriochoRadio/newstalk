@@ -153,15 +153,17 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
             done["SKIPPED"] += 1
             continue
         host = urlsplit(r.url).netloc
-        if not breaker.allow(host):  # 이 사이트가 계속 실패해서 쉬는 중 (resilience.py). 재시도 횟수는 안 올림
-            _update(engine, r.article_id, status="LISTED", error="사이트가 잠시 쉬는 중 (차단기, 다음 실행에서 다시)")
-            done["RETRY"] += 1
-            continue
-        why = site_reservation(r.url)  # 사이트 전체 AI 입력 거부 표시 (robots Content-Signal·tdmrep.json, 하루 1번) → 언론사를 제목만으로
+        # 사이트 전체 AI 입력 거부 표시 (robots Content-Signal·tdmrep.json, 하루 1번) → 언론사를 제목만으로.
+        # 11/17 QA: 차단기 시험 허용(allow) 뒤에 이 검사로 건너뛰면 시험 결과가 안 남아 그 사이트가 영영 "시험 중"이었음 → 먼저 봄
+        why = site_reservation(r.url)
         if why:
             restrict(r.press, TITLE_ONLY, why)
             _update(engine, r.article_id, status="SKIPPED", error=f"AI 이용 거부 표시 → 제목만: {why}")
             done["SKIPPED"] += 1
+            continue
+        if not breaker.allow(host):  # 이 사이트가 계속 실패해서 쉬는 중 (resilience.py). 재시도 횟수는 안 올림
+            _update(engine, r.article_id, status="LISTED", error="사이트가 잠시 쉬는 중 (차단기, 다음 실행에서 다시)")
+            done["RETRY"] += 1
             continue
         wait = last_hit.get(host, 0) + min(crawl_delay(r.url), MAX_DELAY) - time.monotonic()
         if wait > 0:
@@ -171,6 +173,9 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
             res = _get(r.url)
             html = res.content
             why = page_reservation(html, res.headers)  # 기사 끝 "AI 학습·활용 금지" 고지·TDMRep 표시 (rights.py)
+            body = None if why else extract(html, r.url)
+            if why or (body is None and PAYWALL in html):
+                breaker.success(host)  # 페이지는 정상으로 받음 → 차단기 시험 성공 (11/17: 안 부르면 "시험 중"에서 안 풀림)
             if why:  # 이 기사는 본문을 저장하지 않음. 그 언론사 자신의 고지가 서로 다른 기사 2건이면 언론사 전체를 제목만으로
                 holder = notice_holder(html)
                 if is_wire(r.press, holder):  # 다른 곳 기사를 실은 것(예: 연합 전재) → 이 기사만 건너뜀, 언론사 방침엔 안 셈
@@ -180,7 +185,6 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
                 _update(engine, r.article_id, status="SKIPPED", error=f"AI 이용 거부 고지 → 본문 안 씀: {why}")
                 done["SKIPPED"] += 1
                 continue
-            body = extract(html, r.url)
             if body is None and PAYWALL in html:
                 _update(engine, r.article_id, status="SKIPPED", error="유료 기사 (본문 안 줌)")
                 done["SKIPPED"] += 1
