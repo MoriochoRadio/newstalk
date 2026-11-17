@@ -56,8 +56,6 @@ public class QuoteService {
     private static final int MAP_THREADS = 8;   // 종목 지도 업종 조회 동시 수 (초당 한도는 줄 서기가 따로 지킴)         // 업종은 거의 안 바뀜 → 종목당 하루 1번
     /** 장 밖 지도 값을 거래소 현재가로 바꿀 때 캐시 (장이 끝나면 거래소 값은 다음 장까지 안 바뀜 → 길게) */
     static final Duration OFF_HOURS_PRICE_TTL = Duration.ofMinutes(30);
-    /** 거래소 정규장 끝: 15:30 종가 단일가 체결이 들어올 여유 1분 */
-    private static final LocalTime KRX_SESSION_END = LocalTime.of(15, 31);
     static final Duration MINUTE_TTL = Duration.ofSeconds(60);
     static final Duration DAY_TTL = Duration.ofMinutes(10);
     static final Duration TICK_TTL = Duration.ofSeconds(5);
@@ -70,9 +68,7 @@ public class QuoteService {
     /** KIS 분봉 한 번에 거꾸로 120줄 */
     private static final int MINUTE_WINDOW_MINUTES = 120;
     /** 이 시각이 지나면 오늘 분봉도 다 나온 것 (15:30 종가 단일가 봉이 들어올 여유 10분) */
-    static final LocalTime MINUTE_SETTLED_AT = LocalTime.of(15, 40);
-    private static final LocalTime MARKET_OPEN = CandleAggregator.MARKET_OPEN;
-    private static final LocalTime MARKET_CLOSE = LocalTime.of(15, 30);
+    static final java.time.Duration MINUTE_SETTLE_AFTER_CLOSE = java.time.Duration.ofMinutes(10);
     /** KIS 분봉 보관 기간 (공식 예제 주석: 최대 1년) */
     static final int MINUTE_HISTORY_DAYS = 365;
     /** KIS 일봉은 한 번에 100개까지 → 달력 140일씩 (거래일 약 96일) */
@@ -213,9 +209,10 @@ public class QuoteService {
 
     /** 거래소 정규장인지: 평일 09:00 ~ 15:31 (공휴일은 모름 — 그날은 순위·현재가 모두 지난 거래일 값이라 괜찮음) */
     static boolean krxSession(LocalDateTime now) {
-        DayOfWeek d = now.getDayOfWeek();
+        // 마감 시각의 종가 단일가 체결이 들어올 여유 1분. 장 시간은 날마다 다를 수 있음 (수능일 10:00~16:30, MarketHours)
         LocalTime t = now.toLocalTime();
-        return d != DayOfWeek.SATURDAY && d != DayOfWeek.SUNDAY && !t.isBefore(MARKET_OPEN) && t.isBefore(KRX_SESSION_END);
+        return MarketHours.weekday(now.toLocalDate()) && !t.isBefore(MarketHours.open(now.toLocalDate()))
+                && t.isBefore(MarketHours.close(now.toLocalDate()).plusMinutes(1));
     }
 
     private String sectorOf(String code) {
@@ -282,11 +279,13 @@ public class QuoteService {
         LocalDateTime now = LocalDateTime.now(clock).withNano(0);
         boolean isToday = date.equals(now.toLocalDate());
         // 오늘이라도 장이 끝나고 조금 지나면(15:40) 더 바뀌지 않으므로 지난 날처럼 길게
-        boolean settled = !isToday || !now.toLocalTime().isBefore(MINUTE_SETTLED_AT);
+        LocalTime open = MarketHours.open(date);
+        LocalTime close = MarketHours.close(date);   // 수능일은 10:00~16:30
+        boolean settled = !isToday || !now.toLocalTime().isBefore(close.plus(MINUTE_SETTLE_AFTER_CLOSE));
         return cache.get("m1:" + stockCode + ":" + date, settled ? PAST_MINUTE_TTL : MINUTE_TTL, () -> {
-            LocalTime until = isToday && now.toLocalTime().isBefore(MARKET_CLOSE) ? now.toLocalTime() : MARKET_CLOSE;
+            LocalTime until = isToday && now.toLocalTime().isBefore(close) ? now.toLocalTime() : close;
             List<LocalTime> windows = new ArrayList<>();
-            for (LocalTime t = until; !t.isBefore(MARKET_OPEN) && windows.size() < MINUTE_PAGES;
+            for (LocalTime t = until; !t.isBefore(open) && windows.size() < MINUTE_PAGES;
                  t = t.minusMinutes(MINUTE_WINDOW_MINUTES)) {
                 windows.add(t);
             }
@@ -295,7 +294,7 @@ public class QuoteService {
                 for (KisCandle c : rows) {
                     LocalTime t = c.time().toLocalTime();
                     // 장 시작 앞으로 넘어가면 전날 시간외 봉이 섞여 옴 → 그날 09:00~15:30만
-                    if (c.time().toLocalDate().equals(date) && !t.isBefore(MARKET_OPEN) && !t.isAfter(MARKET_CLOSE)) {
+                    if (c.time().toLocalDate().equals(date) && !t.isBefore(open) && !t.isAfter(close)) {
                         byTime.put(c.time(), c);
                     }
                 }

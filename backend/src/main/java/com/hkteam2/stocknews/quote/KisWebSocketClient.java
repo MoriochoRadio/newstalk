@@ -44,7 +44,7 @@ import jakarta.annotation.PreDestroy;
  *
  * 반쯤 죽은 연결 감시 (2026-11-10): 끊김 신호(onClose·onError) 없이 KIS가 조용히 보내기를 멈추는 경우가 있음
  *   (11/10 13:06 끊김 1006 → 다시 접속·구독 성공 → 13:07:48 이후 2시간 넘게 메시지 0, 상태는 "연결됨").
- *   장중(평일 09:00~15:30)에 구독 종목이 있는데 STALE_AFTER 동안 아무 메시지(체결·PINGPONG)도 없으면 끊고 다시 접속.
+ *   장중(평일 09:00~15:30, 수능일 등은 MarketHours)에 구독 종목이 있는데 STALE_AFTER 동안 아무 메시지(체결·PINGPONG)도 없으면 끊고 다시 접속.
  *   장중 고정 생중계 종목(기본 삼성전자)은 초마다 체결이 와서 정상 연결이면 60초 무소식이 거의 없음.
  *   근거: 하트비트 시간 초과로 죽은 연결을 찾는 방식 (RFC 6455 §5.5.2 Ping/Pong 은 연결이 살아 있는지 확인하는 용도)
  *
@@ -61,8 +61,6 @@ public class KisWebSocketClient {
     private static final Pattern TR_KEY = Pattern.compile("\"tr_key\"\\s*:\\s*\"([^\"]*)\"");
     private static final int MAX_RAW = 5000;
     static final Duration STALE_AFTER = Duration.ofSeconds(60);
-    private static final java.time.LocalTime MARKET_OPEN = java.time.LocalTime.of(9, 0);
-    private static final java.time.LocalTime MARKET_CLOSE = java.time.LocalTime.of(15, 30);
 
     private final KisProperties props;
     private final KisTokenManager tokens;
@@ -147,10 +145,7 @@ public class KisWebSocketClient {
         if (connectedAt == null || !subscribing) {
             return false;
         }
-        java.time.DayOfWeek day = now.getDayOfWeek();
-        java.time.LocalTime time = now.toLocalTime();
-        if (day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY
-                || time.isBefore(MARKET_OPEN) || time.isAfter(MARKET_CLOSE)) {
+        if (!MarketHours.inSession(now)) {   // 장 시간은 날마다 다를 수 있음 (수능일 10:00~16:30)
             return false;
         }
         LocalDateTime since = lastMessageAt == null || lastMessageAt.isBefore(connectedAt) ? connectedAt : lastMessageAt;

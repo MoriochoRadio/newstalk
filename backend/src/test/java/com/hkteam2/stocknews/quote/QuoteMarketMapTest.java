@@ -90,6 +90,11 @@ class QuoteMarketMapTest {
         assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-17T15:31:00"))).isFalse();
         assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-16T17:33:00"))).isFalse();  // 시간외 단일가
         assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-15T10:00:00"))).isFalse();  // 일요일
+        // 11/19(목) 수능일: 10:00~16:30 (한 시간씩 늦춤)
+        assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-19T09:30:00"))).isFalse();
+        assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-19T10:00:00"))).isTrue();
+        assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-19T16:00:00"))).isTrue();
+        assertThat(QuoteService.krxSession(LocalDateTime.parse("2026-11-19T16:31:00"))).isFalse();
     }
 
     @Test
