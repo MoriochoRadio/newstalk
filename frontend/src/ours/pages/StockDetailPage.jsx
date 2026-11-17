@@ -205,13 +205,14 @@ function SentimentCard({ summary }) {
   const s = summary.data;
   const ratio = basis === 'event' ? s?.sentimentByEvent : s?.sentiment;
   const count = ratio?.articleCount || 0;
+  const few = Boolean(s) && (s?.sentiment?.articleCount || 0) < 3;
   return (
-    <section className="card" aria-labelledby="mood-title">
+    <section className={`card ${few ? 'sent-few' : ''}`} aria-labelledby="mood-title">
       <div className="card-head">
         <h2 className="card-title" id="mood-title">
           오늘 좋은·나쁜 소식
         </h2>
-        {s?.sentimentByEvent && (
+        {s?.sentimentByEvent && !few && (
           <Segmented
             label="세는 방법"
             size="sm"
@@ -581,7 +582,8 @@ function StockDetail({ code }) {
       {/* 휴대폰에서는 순서를 바꿈 (11/13 사용자 눈으로 써 보기: "왜 떨어졌지?"의 답인 AI 요약이 화면 하나를 다 차지하는
           차트 아래에 있어 한참 내려야 했음) → 요약·좋은/나쁜 소식 → 차트 → 기사.
           넓은 화면도 11/16 밤부터 [AI 요약 | 좋은/나쁜 소식] → 차트 → [움직인 날 | 언급량] → 기사 (디자이너: AI 요약이 y≈1128) — CSS .stock-flow */}
-      <div className="stock-flow">
+      {/* 판단한 기사가 3건 미만이면 좋은·나쁜 소식 카드를 한 줄로 줄이고 AI 요약을 전체 폭으로 (4차 리뷰: 아침엔 카드 절반이 비었음) */}
+      <div className={`stock-flow ${(summary.data?.sentiment?.articleCount || 0) < 3 ? 'tone-few' : ''}`}>
         {/* 순서 = 화면 순서 = Tab 순서 (11/16 밤 3차 리뷰: CSS 로만 자리를 바꿔 Tab 이 위아래로 오갔음, WCAG 2.4.3)
             넓은 화면(1081px~): [AI 요약 | 좋은/나쁜 소식] → 차트 → [움직인 날 | 언급량] → 기사. 그보다 좁으면 한 줄씩. 휴대폰은 CSS order 로 좋은/나쁜 소식부터 */}
         <div className="sf-summary">

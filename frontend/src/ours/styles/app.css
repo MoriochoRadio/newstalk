@@ -6426,3 +6426,22 @@ a { text-underline-offset: 3px; }
 /* 색 섞인 링 되살리기 (11/17): 글자 옆 링 정렬 */
 .st-tone, .ws-tone, .wl-tone { display: inline-flex; align-items: center; gap: 6px; }
 .st-tone .tone-ring, .ws-tone .tone-ring, .wl-tone .tone-ring { flex: none; }
+
+/* ===== 11/17 4차 리뷰 반영 ===== */
+/* 휴대폰 종목 화면: CSS order 를 지워 화면 순서 = DOM 순서 = Tab 순서 (AI 요약 → 좋은·나쁜 소식 → 차트 → 움직인 날 → 언급량 → 기사) (WCAG 2.4.3) */
+@media (max-width: 768px) {
+  .sf-sent, .sf-summary, .sf-chart, .sf-moves, .sf-news, .sf-mention { order: 0; }
+  .sec-nav .sn-sec-summary, .sec-nav .sn-sec-chart, .sec-nav .sn-big-moves, .sec-nav .sn-related-news, .sec-nav .sn-sec-mention, .sec-nav .sn-sec-board { order: 0; }
+}
+/* 판단한 기사가 3건 미만: AI 요약 전체 폭, 좋은·나쁜 소식은 그 아래 한 줄 */
+@media (min-width: 1081px) {
+  .stock-flow.tone-few > .sf-summary, .stock-flow.tone-few > .sf-sent { grid-column: 1 / -1; }
+}
+.sent-few .card-head { margin-bottom: 4px; }
+.sent-few .card-note { display: none; }
+.sent-few { padding-top: 14px; padding-bottom: 14px; }
+/* 지도 칸 '기사 없음' 알약은 옅게 (아침엔 칸 대부분이 '기사 없음'이라 지도가 비어 보였음 — 표시는 사용자 요청대로 유지) */
+.cap-map .cm-tile .cm-news.cm-n0 { background: transparent; box-shadow: none; opacity: 0.75; font-weight: 500; }
+/* 뉴스 목록 위 '제목만 연결' 안내 한 줄 */
+.feed-note { margin: 4px 0 8px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; }
+.feed-note b { color: var(--text); font-weight: 600; }

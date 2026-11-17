@@ -13,11 +13,16 @@ import { dropPriceSentences } from '../lib/priceSentence';
 function BriefTone({ sentiment: t }) {
   if (!t || !t.articleCount || (!t.positiveCount && !t.negativeCount)) return null;
   const lean = leanOf(t.positiveCount, t.neutralCount || 0, t.negativeCount);
+  // 판단한 기사가 3건 미만이면 '나쁜 소식이 더 많아요' 대신 건수 (종목 화면과 같은 규칙 — 4차 PM: 2건으로 판정)
+  const few = t.articleCount < 3;
+  const text = few
+    ? [t.positiveCount ? `좋은 소식 ${t.positiveCount}건` : '', t.negativeCount ? `나쁜 소식 ${t.negativeCount}건` : ''].filter(Boolean).join(' · ')
+    : lean.text;
   return (
     // 숫자 설명("AI가 읽은 기사 2건: 좋은 0 · 나쁜 1 …")은 마우스를 올리면 (11/16 글 줄이기: 링과 한 마디로 충분)
     <p className={`brief-tone brief-tone-${lean.kind}`} title={`${toneCountText(t.positiveCount, t.neutralCount || 0, t.negativeCount)}. ${TONE_TIP}`}>
       <ToneRing pos={t.positiveCount} neu={t.neutralCount} neg={t.negativeCount} size={22} />
-      <b>{lean.text}</b>
+      <b>{text}</b>
     </p>
   );
 }

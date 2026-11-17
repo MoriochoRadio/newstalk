@@ -245,6 +245,12 @@ export default function NewsPage() {
             }
           />
         )}
+        {/* '제목만 연결' 뜻을 목록 위에 한 번 (줄마다 긴 문구를 되풀이하지 않게, 휴대폰·키보드에서도 보이게 — 4차 리뷰) */}
+        {items.some((x) => x.titleOnly) && (
+          <p className="feed-note">
+            <b>제목만 연결</b> = 연합뉴스·서울경제·연합인포맥스처럼 기사에 'AI 학습 및 활용 금지'를 적은 언론사(또는 본문을 받지 못한 기사)는 요약·판단 없이 제목으로만 종목을 찾았어요.
+          </p>
+        )}
         {items.length > 0 && (
           <StoryFeed articles={items} style={{ opacity: isAll && all.loading ? 0.5 : 1 }} />
         )}

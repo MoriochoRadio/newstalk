@@ -6,6 +6,7 @@
 import { Link } from 'react-router-dom';
 import { dirClass, fmtRate, relativeTime } from '../lib/format';
 import Tone, { TitleText, ToneRing, storyCounts, toneOfStory, toneRowClass } from './Tone';
+import { titleOnlyReason } from '../lib/titleOnly';
 
 /** 묶음에서 요약이 있는 기사 (대표 → 나머지 순) */
 function summarized(story) {
@@ -131,8 +132,9 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                   </span>
                 ) : a.titleOnly ? (
                   // 약관상 AI 를 못 쓰는 언론사 묶음: '판단 없음'(AI 가 읽고 중립)과 구분 (11/17)
-                  <span className="st-tone st-tone-none" title="이 언론사는 기사에 'AI 학습 및 활용 금지'를 적어 둬서 AI 판단을 하지 않아요">
-                    AI 판단 안 함
+                  <span className="st-tone st-tone-none" title={titleOnlyReason(a.press)}>
+                    제목만 연결
+                    <span className="sr-only"> — {titleOnlyReason(a.press)}</span>
                   </span>
                 ) : (
                   <span className="st-tone st-tone-none">
@@ -198,6 +200,12 @@ const NOTICE_HEAD = /^\s*\[(게시판|인사|부고|알림|사고|정정|공지)
 
 export function rankStories(groupStories, items, n = 4) {
   return groupStories((items || []).filter((a) => !a.isDisclosure && !NOTICE_HEAD.test(a.title || '')))
-    .sort((x, y) => (y.size || 1) - (x.size || 1) || (y.lead.publishedAtIso > x.lead.publishedAtIso ? 1 : -1))
+    // 같은 소식 수가 같으면 AI 가 읽은(요약 있는) 소식 먼저 (11/17 4차 리뷰: 아침엔 1~3위가 모두 '제목만 연결'이라 AI 가 일을 안 한 화면처럼 보였음)
+    .sort(
+      (x, y) =>
+        (y.size || 1) - (x.size || 1) ||
+        Number(!y.lead.titleOnly) - Number(!x.lead.titleOnly) ||
+        (y.lead.publishedAtIso > x.lead.publishedAtIso ? 1 : -1)
+    )
     .slice(0, n);
 }

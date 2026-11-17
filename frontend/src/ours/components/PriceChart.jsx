@@ -21,8 +21,9 @@ import { moveLead } from '../lib/priceSentence';
 // 봉 단위 (11/16 사용자: '1개월' 기본이 불편, 보통 1분·5분·1시간·일로 봄) → 기간 대신 증권 앱처럼 봉 단위로 고름.
 // 기간은 끌기·휠로 넓히고 줄임. bars: 처음에 보여 줄 봉 수(없으면 받은 것 전부). 1시간봉은 서버에 없어 30분봉 두 개를 합침
 const RANGES = [
-  { key: '1m', label: '1분', unit: '1m', bars: 120 },
-  { key: '5m', label: '5분', unit: '5m' },
+  // 1분·5분: 처음부터 앞 며칠을 이어 받아 최근 120봉 (11/17 사용자: 아침엔 오늘 봉이 10여 개뿐이라 5분봉이 너무 확대돼 보였음)
+  { key: '1m', label: '1분', unit: '1m', bars: 120, minBars: 120 },
+  { key: '5m', label: '5분', unit: '5m', bars: 120, minBars: 120 },
   { key: '30m', label: '30분', unit: '30m', minBars: 40 },
   { key: '60m', label: '60분', unit: '60m', minBars: 30 },
   { key: 'day', label: '일', unit: 'day', bars: 65 },
@@ -493,7 +494,7 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           const { tried } = r;
           if (minBars && items.length > 0 && items.length < minBars) {
             // 하루 봉 수로 모자란 날 수를 셈 (오늘이 덜 끝났으면 하루치보다 적으므로 넉넉히 +1). 공휴일은 빈 날로 그냥 넘어감
-            const perDay = unit === '60m' ? 7 : 13;
+            const perDay = { '1m': 381, '5m': 78, '30m': 13, '60m': 7 }[unit] || 13;
             const need = Math.min(6, Math.ceil((minBars - items.length) / perDay) + 1);
             const days = [];
             for (let d = cursor, i = 0; i < need; i += 1) {

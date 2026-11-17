@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ExternalLink, FileText, MessageCircle, Newspaper } from 'lucide-react';
 import { groupStories } from '../lib/stories';
+import { titleOnlyReason } from '../lib/titleOnly';
 import { relativeTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
 import Tone, { Highlight, TONE_TIP, TitleText, ToneRing, toneOf, toneRowClass } from './Tone';
@@ -184,10 +185,11 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
             </span>
           )}
           {quiet === 'titleOnly' && (
-            // '요약 없음'은 기능이 안 되는 것처럼 보였음 (11/17 사용자) → 한 것(제목으로 종목 연결)과 안 한 이유(약관)를 밝힘.
-            // 연합뉴스·서울경제·연합인포맥스는 기사 끝에 'AI 학습 및 활용 금지' → 본문을 받지 않고 AI 에도 넣지 않음 (docs/decisions.md 11/05)
-            <span className="tone tone-quiet tone-titleonly" title="이 언론사는 기사에 'AI 학습 및 활용 금지'를 적어 둬서 본문을 받지 않고 AI 요약·판단을 하지 않아요. 종목은 제목으로 찾았어요.">
-              제목으로 종목 연결 · 약관상 AI 판단 안 함
+            // '요약 없음'은 기능이 안 되는 것처럼 보였고(11/17 사용자), 긴 '약관상 AI 판단 안 함'은 줄마다 반복돼 소음 + 본문 실패 기사엔 사실과 달랐음
+            // (4차 리뷰) → 한 것만 짧게 '제목만 연결', 이유(약관/본문 실패)는 설명과 화면 낭독기로. 목록 위에 한 번 안내 (NewsPage)
+            <span className="tone tone-quiet tone-titleonly" title={titleOnlyReason(a.press)}>
+              제목만 연결
+              <span className="sr-only"> — {titleOnlyReason(a.press)}</span>
             </span>
           )}
         </div>
