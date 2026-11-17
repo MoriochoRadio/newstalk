@@ -6457,3 +6457,11 @@ a { text-underline-offset: 3px; }
 @media (max-width: 768px) {
   .chart-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; line-height: 1.5; }
 }
+
+/* '제목만 연결' 안내: 휴대폰은 짧은 한 줄 (11/17) */
+.feed-note-short { display: none; }
+@media (max-width: 768px) {
+  .feed-note-long { display: none; }
+  .feed-note-short { display: inline; }
+  .feed-note { padding: 6px 10px; }
+}
