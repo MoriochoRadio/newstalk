@@ -35,6 +35,7 @@ import com.hkteam2.stocknews.common.TimeUtils;
  *
  * | 무엇 | 캐시 | KIS 호출 |
  * | 현재가 | 5초 | 1번 |
+ * | 현재가 여러 종목 (홈·관심 종목) | 종목마다 5초 (현재가와 같은 캐시) | 캐시에 없는 종목만 모아 1번 (30종목까지) |
  * | 분봉 1·5·10·30분 (그날 하루) | 오늘 장중 60초, 15:40 이후·지난 날 1시간 | 4번 동시에 (120분 구간씩), 주말 0번 → 서버가 n분씩 묶음 |
  * | 주·월·년봉 | 10분 | 1번 (최근 100개, 년봉은 상장 이후) |
  * | 일봉 1년 (차트 첫 화면 + 급등·급락 이력, 같은 캐시) | 10분 | 3번 (140일씩 나눠서) |
@@ -118,13 +119,70 @@ public class QuoteService {
         if (isLive(s)) {
             return fromSnapshot(s);
         }
-        Duration ttl = krxSession(LocalDateTime.now(clock)) ? PRICE_TTL : OFF_HOURS_QUOTE_TTL;
-        return cache.get("price:" + stockCode, ttl, () -> {
-            KisPrice p = kis.inquirePrice(stockCode);
-            return new QuoteResponse(p.stockCode(), p.price(), p.changeAmount(), p.changeRate(),
-                    direction(p.changeSign()), p.open(), p.high(), p.low(), p.accVolume(),
-                    TimeUtils.toKst(LocalDateTime.now(clock)), false, priceLimit(p.changeSign()));
-        });
+        return cache.get("price:" + stockCode, priceTtl(), () -> fromKis(kis.inquirePrice(stockCode)));
+    }
+
+    /**
+     * 현재가 여러 종목 (홈 목록·관심 종목). 순서는 codes 순서, 못 받은 종목은 빠짐
+     * 11/18: 예전엔 종목마다 KIS를 따로 불러 10종목에 줄 서기 간격(0.1초) × 10 + 응답 = 홈 첫 화면 1.6~2.1초.
+     * 이제 ① 실시간으로 받는 종목은 DB 현재가 ② 5초 안에 물어본 종목은 캐시 ③ 나머지만 모아 KIS 한 번(멀티종목 시세)
+     * 한 번에 묻기가 실패하면 그 종목들만 예전처럼 하나씩 (한 종목 문제로 목록 전체가 비지 않게)
+     */
+    public List<QuoteResponse> prices(List<String> codes) {
+        if (codes.isEmpty()) {
+            return List.of();
+        }
+        Map<String, QuoteResponse> found = new java.util.HashMap<>();
+        for (QuoteSnapshotRow s : mapper.findSnapshots(codes)) {
+            if (isLive(s)) {
+                found.put(s.stockCode(), fromSnapshot(s));
+            }
+        }
+        List<String> missing = new ArrayList<>();
+        for (String code : codes.stream().distinct().toList()) {
+            if (found.containsKey(code)) {
+                continue;
+            }
+            QuoteResponse cached = cache.peek("price:" + code);
+            if (cached != null) {
+                found.put(code, cached);
+            } else {
+                missing.add(code);
+            }
+        }
+        Duration ttl = priceTtl();
+        for (int from = 0; from < missing.size(); from += KisRestClient.MULTI_PRICE_MAX) {
+            List<String> chunk = missing.subList(from, Math.min(missing.size(), from + KisRestClient.MULTI_PRICE_MAX));
+            try {
+                for (KisPrice p : kis.inquireMultiPrice(chunk)) {
+                    QuoteResponse q = fromKis(p);
+                    cache.put("price:" + p.stockCode(), ttl, q);
+                    found.put(p.stockCode(), q);
+                }
+            } catch (KisApiException e) {
+                log.warn("여러 종목 현재가 한 번에 묻기 실패 ({}), 하나씩 다시: {}", e.getMessage(), chunk);
+                for (String code : chunk) {
+                    try {
+                        found.put(code, price(code));
+                    } catch (KisApiException one) {
+                        log.warn("시세 조회 실패 {}: {}", code, one.getMessage());
+                    }
+                }
+            }
+        }
+        return codes.stream().map(found::get).filter(java.util.Objects::nonNull).toList();
+    }
+
+    /** 장중 5초, 장 밖 60초 (장 밖 값은 거의 안 바뀜) */
+    private Duration priceTtl() {
+        return krxSession(LocalDateTime.now(clock)) ? PRICE_TTL : OFF_HOURS_QUOTE_TTL;
+    }
+
+    /** KIS 현재가 → API 응답 (live=false, 시각은 지금) */
+    private QuoteResponse fromKis(KisPrice p) {
+        return new QuoteResponse(p.stockCode(), p.price(), p.changeAmount(), p.changeRate(),
+                direction(p.changeSign()), p.open(), p.high(), p.low(), p.accVolume(),
+                TimeUtils.toKst(LocalDateTime.now(clock)), false, priceLimit(p.changeSign()));
     }
 
     /**

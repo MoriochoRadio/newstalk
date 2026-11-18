@@ -2,17 +2,10 @@ package com.hkteam2.stocknews.quote;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,7 +34,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequestMapping("/api/quotes")
 public class QuoteController {
 
-    private static final Logger log = LoggerFactory.getLogger(QuoteController.class);
     private static final int MAX_CODES = 10;
     private static final int MAX_STREAM_CODES = 5;
 
@@ -129,7 +121,8 @@ public class QuoteController {
         return service().price(checkStock(stockCode));
     }
 
-    @Operation(summary = "현재가 여러 종목", description = "codes=005930,000660 (최대 10개). 없는 종목·실패한 종목은 빠짐")
+    @Operation(summary = "현재가 여러 종목", description = "codes=005930,000660 (최대 10개). 없는 종목·실패한 종목은 빠짐."
+            + " 실시간 종목은 DB 현재가, 5초 안에 물어본 종목은 캐시, 나머지만 모아 KIS 한 번(멀티종목 시세)")
     @GetMapping
     public ListResponse<QuoteResponse> getQuotes(@RequestParam String codes) {
         QuoteService service = service();
@@ -139,37 +132,8 @@ public class QuoteController {
         if (known.isEmpty()) {
             return ListResponse.of(List.of());
         }
-        // 종목들을 동시에 물음 (11/13: 한 종목 답을 받고 다음 종목을 물어 KIS 답 약 0.5초 × 10종목 = 5초쯤 걸렸음)
-        // KIS로 나가는 간격은 줄 서기(KisRateLimiter)가 그대로 지켜서 한도는 같음. 답은 보낸 순서대로
-        // 일꾼은 보통 스레드: 줄 서기가 synchronized 안에서 잠들어 가상 스레드는 바닥 스레드를 붙잡음(Java 21)
-        List<QuoteResponse> out = new ArrayList<>();
-        try (ExecutorService pool = Executors.newFixedThreadPool(known.size())) {
-            List<Future<QuoteResponse>> futures = known.stream().map(code -> pool.submit(() -> priceOrNull(service, code))).toList();
-            for (Future<QuoteResponse> f : futures) {
-                QuoteResponse q = f.get();
-                if (q != null) {
-                    out.add(q);
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-            if (e.getCause() instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new IllegalStateException(e.getCause());
-        }
-        return ListResponse.of(out);
-    }
-
-    /** 한 종목이 실패해도 나머지는 보여 줌 (실패한 종목은 빠짐) */
-    private QuoteResponse priceOrNull(QuoteService service, String code) {
-        try {
-            return service.price(code);
-        } catch (KisApiException e) {
-            log.warn("시세 조회 실패 {}: {}", code, e.getMessage());
-            return null;
-        }
+        // 11/13: 종목마다 동시에 물음 → 11/18: 캐시에 없는 종목만 모아 KIS 한 번 (QuoteService.prices)
+        return ListResponse.of(service.prices(known));
     }
 
     @Operation(summary = "차트 (봉)",

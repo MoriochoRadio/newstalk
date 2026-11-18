@@ -29,6 +29,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * 주소·tr_id·입력 칸: KIS 공식 예제 domestic_stock_functions.py, 응답 칸 이름: 2026-11-03 실제 응답으로 확인
  * | 조회 | 주소 | tr_id | 한 번에 |
  * | 현재가 | /quotations/inquire-price | FHKST01010100 | 1 |
+ * | 현재가 여러 종목 | /quotations/intstock-multprice | FHKST11300006 | 30 (공식 예제 intstock_multprice.py) |
  * | 일별 분봉 | /quotations/inquire-time-dailychartprice | FHKST03010230 | 120분 (실전 전용, 지난 날도 됨, 최대 1년 보관) |
  * | 일·주·월·년봉 | /quotations/inquire-daily-itemchartprice | FHKST03010100 | 100개 |
  * | 최근 체결 | /quotations/inquire-ccnl | FHKST01010300 | 30건 |
@@ -68,6 +69,21 @@ public class KisRestClient {
                        @JsonProperty("acml_vol") String accVolume, @JsonProperty("stck_oprc") String open,
                        @JsonProperty("stck_hgpr") String high, @JsonProperty("stck_lwpr") String low,
                        @JsonProperty("hts_avls") String marketCap, @JsonProperty("bstp_kor_isnm") String sector) {
+    }
+
+    record MultiPriceResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
+                              @JsonProperty("msg1") String msg1, @JsonProperty("output") List<MultiPriceRow> rows) {
+    }
+
+    /**
+     * 관심종목(멀티종목) 시세 한 줄 (2026-11-18 실제 응답으로 확인). 부호·형식은 inquire-price 와 같음
+     * (삼성바이오로직스 하락: 두 API 모두 -26000, 부호 5, -1.84). 없는 종목은 칸이 모두 빈 줄로 옴
+     */
+    record MultiPriceRow(@JsonProperty("inter_shrn_iscd") String code, @JsonProperty("inter2_prpr") String price,
+                         @JsonProperty("inter2_prdy_vrss") String changeAmount,
+                         @JsonProperty("prdy_vrss_sign") String changeSign, @JsonProperty("prdy_ctrt") String changeRate,
+                         @JsonProperty("acml_vol") String accVolume, @JsonProperty("inter2_oprc") String open,
+                         @JsonProperty("inter2_hgpr") String high, @JsonProperty("inter2_lwpr") String low) {
     }
 
     record CapRankResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
@@ -126,6 +142,39 @@ public class KisRestClient {
         return new KisPrice(stockCode, toLong(o.price()), toLong(o.changeAmount()), o.changeSign(),
                 toDecimal(o.changeRate()), toLong(o.accVolume()), toLong(o.open()), toLong(o.high()), toLong(o.low()),
                 toLong(o.marketCap()), o.sector() == null ? null : o.sector().strip());
+    }
+
+    /** 한 번에 물을 수 있는 종목 수 (KIS 공식 예제 intstock_multprice.py: "최대 30종목") */
+    public static final int MULTI_PRICE_MAX = 30;
+
+    /**
+     * 여러 종목 현재가를 KIS 한 번으로 (관심종목(멀티종목) 시세조회 FHKST11300006, 최대 30종목)
+     * 시가총액·업종 칸은 없음(0, null). 없는 종목은 빠짐. 순서는 KIS가 준 순서(= 보낸 순서)
+     */
+    public List<KisPrice> inquireMultiPrice(List<String> stockCodes) {
+        if (stockCodes.isEmpty()) {
+            return List.of();
+        }
+        if (stockCodes.size() > MULTI_PRICE_MAX) {
+            throw new IllegalArgumentException("한 번에 최대 " + MULTI_PRICE_MAX + "종목");
+        }
+        Map<String, String> params = new LinkedHashMap<>();
+        for (int i = 0; i < stockCodes.size(); i++) {
+            params.put("FID_COND_MRKT_DIV_CODE_" + (i + 1), "J");
+            params.put("FID_INPUT_ISCD_" + (i + 1), stockCodes.get(i));
+        }
+        MultiPriceResponse res = get("/intstock-multprice", "FHKST11300006", params, MultiPriceResponse.class);
+        check(res == null ? null : res.rtCd(), res == null ? null : res.msgCd(), res == null ? null : res.msg1());
+        List<KisPrice> out = new ArrayList<>();
+        for (MultiPriceRow r : nullToEmpty(res.rows())) {
+            if (r.code() == null || r.code().isBlank()) {
+                continue;
+            }
+            out.add(new KisPrice(r.code().strip(), toLong(r.price()), toLong(r.changeAmount()), r.changeSign(),
+                    toDecimal(r.changeRate()), toLong(r.accVolume()), toLong(r.open()), toLong(r.high()),
+                    toLong(r.low()), 0, null));
+        }
+        return out;
     }
 
     /**

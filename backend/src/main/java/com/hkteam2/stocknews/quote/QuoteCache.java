@@ -46,6 +46,13 @@ class QuoteCache {
         }
     }
 
+    /** 아직 신선한 값이 있으면 그 값, 없으면 null (KIS에 묻지 않음). 여러 종목을 한 번에 물을 때 이미 있는 종목을 빼려고 */
+    @SuppressWarnings("unchecked")
+    <T> T peek(String key) {
+        Entry e = entries.get(key);
+        return fresh(e) ? (T) e.value() : null;
+    }
+
     /** 다른 응답에서 함께 얻은 값을 넣어 둠 (예: 거래소 현재가 응답의 업종 → 업종 캐시) */
     void put(String key, Duration ttl, Object value) {
         store(key, ttl, value);
