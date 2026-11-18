@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { countsOf } from './Tone';
 
 export default function HomeSummary({ articles, storyCount, disclosureCount = 0, topics = [], issues = [] }) {
-  // 좋은·나쁜 판단: AI가 읽은 기사만 (제목만 받은 기사·요약 전 공시는 빼고), 시세 기사는 판단 없음 — 목록 배지와 같은 규칙
+  // 좋은·나쁜 판단: AI가 읽은 기사만 (제목만 받은 기사·요약 전 공시는 빼고), 시세 기사는 중립 — 목록 배지와 같은 규칙
   const t = countsOf(
     (articles || [])
       .filter((a) => !a.titleOnly && !a.disclosurePending)
@@ -32,7 +32,7 @@ export default function HomeSummary({ articles, storyCount, disclosureCount = 0,
         <h3 className="hs-k">좋은·나쁜 소식</h3>
         {read ? (
           <>
-            <div className="hs-tone-bar" role="img" aria-label={`좋은 소식 ${t.pos}건, 판단 없음 ${t.neu}건, 나쁜 소식 ${t.neg}건`}>
+            <div className="hs-tone-bar" role="img" aria-label={`좋은 소식 ${t.pos}건, 중립 ${t.neu}건, 나쁜 소식 ${t.neg}건`}>
               {t.pos > 0 && <i className="pos" style={{ flexGrow: t.pos }} />}
               {t.neu > 0 && <i className="neu" style={{ flexGrow: t.neu }} />}
               {t.neg > 0 && <i className="neg" style={{ flexGrow: t.neg }} />}
@@ -42,7 +42,7 @@ export default function HomeSummary({ articles, storyCount, disclosureCount = 0,
                 좋은 <b>{t.pos}</b>건 <span>{pct(t.pos)}%</span>
               </li>
               <li className="neu">
-                판단 없음 <b>{t.neu}</b>건
+                중립 <b>{t.neu}</b>건
               </li>
               <li className="neg">
                 나쁜 <b>{t.neg}</b>건 <span>{pct(t.neg)}%</span>

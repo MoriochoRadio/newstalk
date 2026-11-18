@@ -137,7 +137,7 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                     {c.pos && c.neg ? '좋은·나쁜 함께' : c.pos ? '좋은 소식' : '나쁜 소식'}
                   </span>
                 ) : a.titleOnly && !(st.others || []).some((o) => !o.titleOnly && !o.disclosurePending) ? (
-                  // 약관상 AI 를 못 쓰는 언론사 묶음: '판단 없음'(AI 가 읽고 중립)과 구분 (11/17)
+                  // 약관상 AI 를 못 쓰는 언론사 묶음: '중립'(AI 가 읽고 중립)과 구분 (11/17)
                   <span className="st-tone st-tone-none" title={titleOnlyReason(a.press)}>
                     제목만 연결
                     <span className="sr-only"> — {titleOnlyReason(a.press)}</span>
@@ -145,7 +145,7 @@ function StoryTitles({ stories, quotes, start = 2 }) {
                 ) : (
                   <span className="st-tone st-tone-none">
                     <ToneRing neu={1} size={16} />
-                    판단 없음
+                    중립
                   </span>
                 )}
               </span>

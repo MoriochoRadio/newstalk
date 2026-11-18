@@ -98,7 +98,7 @@ function WatchTone({ t, count }) {
   if (!pos && !neg) return <span className="num">{count}건</span>;
   const lean = leanOf(pos, neu, neg);
   return (
-    <span className="wl-tone num" title={`${lean.text} · 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 판단 없음 ${neu}` : ''}`}>
+    <span className="wl-tone num" title={`${lean.text} · 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 중립 ${neu}` : ''}`}>
       {count}건
       {/* 글자 없는 링 → 글자 (11/16 3차 리뷰) → 글자 옆에 링 다시 (11/17 사용자) */}
       <ToneRing pos={pos} neu={neu} neg={neg} size={18} />

@@ -1,6 +1,6 @@
 // 홈 맨 위 '오늘 뉴스 한눈에' (11/13 피드백: "뉴스 중심이니까 뉴스에 대한 시각화를 메인에 크게 딱")
 // 뉴스 지도: 오늘의 소식(같은 소식끼리 묶음)을 네모 칸으로. 칸 크기 = 그 소식을 쓴 오늘 기사 수,
-//            색 = 그 소식이 주인공 종목에 좋은 소식(초록)·나쁜 소식(주황)·둘 다(반반)·판단 없음(회색). 시세 색(빨강·파랑)과 일부러 다르게
+//            색 = 그 소식이 주인공 종목에 좋은 소식(초록)·나쁜 소식(주황)·둘 다(반반)·중립(회색). 시세 색(빨강·파랑)과 일부러 다르게
 // 옆: 오늘 뉴스 수 · 좋은/나쁜 소식 큰 링 · 오늘 많이 나온 소식 3개
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -128,7 +128,7 @@ export function NewsPulse({ articles, topics = [], disclosureCount = 0 }) {
       .filter((a) => !a.titleOnly && !a.disclosurePending)
       .map((a) => (a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0])?.sentiment) // 주가 기사도 AI 판단대로 셈 (11/17, toneOf 와 같게)
   );
-  // '판단 없음' = AI가 읽고 좋다·나쁘다 하지 않은 기사 (종목 화면과 같은 뜻). AI가 읽지 않은 기사(제목만·요약 전 공시)는 세지 않고
+  // '중립' = AI가 읽고 좋다·나쁘다 하지 않은 기사 (종목 화면과 같은 뜻). AI가 읽지 않은 기사(제목만·요약 전 공시)는 세지 않고
   // 'AI가 읽은 n건'을 밝혀 세 수의 합과 맞춤 (11/16 PM 2차 리뷰: 홈은 안 읽은 기사까지 '판단 없음'에 넣어 같은 말이 다른 뜻이었음)
   const tone = judged;
   const read = judged.pos + judged.neu + judged.neg;
@@ -155,7 +155,7 @@ export function NewsPulse({ articles, topics = [], disclosureCount = 0 }) {
           </li>
           <li>
             <i className="np-dot neu" />
-            판단 없음 <b>{tone.neu}</b>
+            중립 <b>{tone.neu}</b>
           </li>
           <li>
             <i className="np-dot neg" />

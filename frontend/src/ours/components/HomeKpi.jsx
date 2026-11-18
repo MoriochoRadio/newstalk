@@ -1,7 +1,7 @@
 // 홈 '종목 지도' 시안 맨 위 오늘 숫자 (11/16 저녁 사용자 6차: "시계 디자인 말고 깔끔한 숫자로 크게, 가운데 빈 여백이 별로,
 //  분위기도 막대만 길고 글씨가 작음 → 큼직하고 멋지게")
 // - 왼쪽: 큰 숫자(오늘 들어온 기사·공시, 새 기사가 오면 부드럽게 올라감) + 뉴스·공시 비율 막대 → 빈자리 없이 채움
-// - 오른쪽: 분위기 세 숫자(좋은 소식·판단 없음·나쁜 소식 %)를 크게, 그 아래 얇은 막대 하나
+// - 오른쪽: 분위기 세 숫자(좋은 소식·중립·나쁜 소식 %)를 크게, 그 아래 얇은 막대 하나
 import { useEffect, useRef, useState } from 'react';
 import { countsOf } from './Tone';
 import { shortTime } from '../lib/format';
@@ -96,7 +96,7 @@ export default function HomeKpi({ articles, disclosureCount = 0, updatedAt }) {
               {pct(t.neu)}
               <small>%</small>
             </b>
-            <span>판단 없음 {t.neu}건</span>
+            <span>중립 {t.neu}건</span>
           </div>
           <div className="fig neg">
             <b>

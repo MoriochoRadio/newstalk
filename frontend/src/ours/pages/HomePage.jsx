@@ -231,7 +231,7 @@ export default function HomePage() {
             <span className="nm-legend" aria-hidden="true">
               <span><i className="nm-pos" />좋은 소식</span>
               <span><i className="nm-neg" />나쁜 소식</span>
-              <span><i className="nm-none" />판단 없음</span>
+              <span><i className="nm-none" />중립</span>
               <span className="hide-mobile">칸 하나 = 소식 하나 · 크기 = 그 소식 기사 수</span>
             </span>
           )}

@@ -158,10 +158,10 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
   const tone = own || storyTone;
   const toneCounts = storyTone ? storyCounts({ lead: a, others }) : own?.counts;
   // 링 없는 줄도 같은 자리에 표시 (11/17 사용자: 어떤 줄은 링이 있고 어떤 줄은 없어 왜 없는지 모름 → 회색 링 + 글자)
-  //  - AI 가 읽고 좋다·나쁘다 하지 않은 기사: 회색 링 + '판단 없음'
+  //  - AI 가 읽고 좋다·나쁘다 하지 않은 기사: 회색 링 + '중립'
   //  - 약관상 AI 요약을 못 하는 언론사(제목만 받은 기사): 회색 '요약 없음'
   //  주가 기사는 '주가 기사' 꼬리표가 따로 있고, 주인공 종목이 없는 기사(함께 언급만)는 판단 대상이 아니라 그대로 둠
-  // 대표가 제목만 받은 기사여도 같은 소식에 AI 가 읽은 기사가 있으면 '판단 없음'(회색 링) — '제목만 연결'은 같은 소식 전부가 제목만일 때
+  // 대표가 제목만 받은 기사여도 같은 소식에 AI 가 읽은 기사가 있으면 '중립'(회색 링) — '제목만 연결'은 같은 소식 전부가 제목만일 때
   const aiSibling = !focusCode && !toneCodes && others.some((o) => !o.titleOnly && !o.disclosurePending);
   const quiet = tone || sns ? null : a.titleOnly && aiSibling ? 'neutral' : quietOf(a, focusCode, toneCodes);
   const latestIso = [a, ...others].map((x) => x.publishedAtIso).filter(Boolean).sort().pop() || a.publishedAtIso;
@@ -191,7 +191,7 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
           {(quiet === 'neutral' || quiet === 'neutral-mention') && (
             <span className="tone tone-quiet" title={TONE_TIP}>
               <ToneRing neu={1} size={16} />
-              <span>{quiet === 'neutral-mention' ? '함께 언급 · 판단 없음' : '판단 없음'}</span>
+              <span>{quiet === 'neutral-mention' ? '함께 언급 · 중립' : '중립'}</span>
             </span>
           )}
           {quiet === 'titleOnly' && (

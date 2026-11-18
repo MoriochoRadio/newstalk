@@ -143,7 +143,7 @@ const TONE_TEXT = { pos: '좋은 소식', neg: '나쁜 소식', mixed: '좋은·
 /** 여러 기사를 모았을 때 한마디 (홈 카드·종목 화면 같은 기준). 11/13 사용자 눈으로: 좋은 1 · 중립 3 · 나쁜 0 인데
  *  '좋은 소식이 더 많아요'라고 나와 과장됨 → 중립이 좋은+나쁜보다 많으면 '대부분 중립' */
 export function leanOf(pos = 0, neu = 0, neg = 0) {
-  if (neu > pos + neg) return { kind: 'neutral', text: '대부분 판단 없음' };
+  if (neu > pos + neg) return { kind: 'neutral', text: '대부분 중립' };
   if (pos > neg) return { kind: 'pos', text: '좋은 소식이 더 많아요' };
   if (neg > pos) return { kind: 'neg', text: '나쁜 소식이 더 많아요' };
   return { kind: 'mixed', text: '좋은·나쁜 소식이 비슷해요' };
@@ -156,7 +156,7 @@ export function toneCountText(pos = 0, neu = 0, neg = 0) {
   if (!n) return '';
   if (pos === n) return `AI가 읽은 기사 ${n}건: 모두 좋은 소식`;
   if (neg === n) return `AI가 읽은 기사 ${n}건: 모두 나쁜 소식`;
-  return `AI가 읽은 기사 ${n}건: 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 판단 없음 ${neu}` : ''}`;
+  return `AI가 읽은 기사 ${n}건: 좋은 ${pos} · 나쁜 ${neg}${neu ? ` · 중립 ${neu}` : ''}`;
 }
 
 export default function Tone({ article, focusCode, tone, withName = true, counts }) {

@@ -6408,7 +6408,7 @@ a { text-underline-offset: 3px; }
 }
 /* 기사 3건 미만: 건수만 */
 .ratio-few { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
-/* 홈 1~5위: 판단 없음도 같은 자리 (3위만 오른쪽 칸이 밀렸음) */
+/* 홈 1~5위: 중립도 같은 자리 (3위만 오른쪽 칸이 밀렸음) */
 .st-tone-none { color: var(--text-3); font-weight: 500; }
 
 /* ===== 11/16 밤 3차 리뷰 남은 것 ===== */
@@ -6418,7 +6418,7 @@ a { text-underline-offset: 3px; }
 .cap-skeleton { height: 340px; }
 @media (max-width: 640px) { .cap-skeleton { height: 520px; } }
 
-/* 링 없는 줄의 회색 표시 (11/17): 판단 없음 = 회색 링 + 글자, 요약 없음 = 글자만 */
+/* 링 없는 줄의 회색 표시 (11/17): 중립 = 회색 링 + 글자, 요약 없음 = 글자만 */
 .feed-row-v2 .tone.tone-quiet { color: var(--text-2); background: var(--surface-2); font-weight: 600; }
 .feed-row-v2 .tone.tone-quiet > i { display: none; }
 .feed-row-v2 .tone.tone-titleonly { color: var(--text-3); background: none; padding-left: 0; font-weight: 500; }

@@ -231,7 +231,7 @@ function SentimentCard({ summary }) {
       {s && count > 0 && count < 3 && (
         <p className="ratio-legend ratio-few num">
           {(ratio.positiveCount ?? 0) > 0 && <span className="tb-pos">좋은 소식 {ratio.positiveCount}건</span>}
-          {(ratio.neutralCount ?? 0) > 0 && <span>판단 없음 {ratio.neutralCount}건</span>}
+          {(ratio.neutralCount ?? 0) > 0 && <span>중립 {ratio.neutralCount}건</span>}
           {(ratio.negativeCount ?? 0) > 0 && <span className="tb-neg">나쁜 소식 {ratio.negativeCount}건</span>}
           <span className="muted">
             AI가 읽은 {basis === 'event' ? '소식' : '기사'} {count}건 · 3건부터 비율을 보여 줘요
@@ -255,7 +255,7 @@ function SentimentCard({ summary }) {
               return <b className={lean.kind === 'pos' ? 'tb-pos' : lean.kind === 'neg' ? 'tb-neg' : ''}>{lean.text}</b>;
             })()}
           </div>
-          <div className="ratio-bar" role="img" aria-label={`좋은 소식 ${ratio.positive}%, 판단 없음 ${ratio.neutral}%, 나쁜 소식 ${ratio.negative}%`}>
+          <div className="ratio-bar" role="img" aria-label={`좋은 소식 ${ratio.positive}%, 중립 ${ratio.neutral}%, 나쁜 소식 ${ratio.negative}%`}>
             <span className="ratio-pos" style={{ width: `${ratio.positive}%` }} />
             <span className="ratio-neu" style={{ width: `${ratio.neutral}%` }} />
             <span className="ratio-neg" style={{ width: `${ratio.negative}%` }} />
@@ -267,7 +267,7 @@ function SentimentCard({ summary }) {
             </span>
             <span>
               <i className="ratio-neu" />
-              판단 없음 {ratio.neutral}%
+              중립 {ratio.neutral}%
             </span>
             <span>
               <i className="ratio-neg" />
