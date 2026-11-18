@@ -97,23 +97,24 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
             <div className="skeleton sk-line" style={{ width: '88%' }} />
           </>
         ) : text ? (
+          <>
           <p className="brief-summary">
             <Sparkles className="icon-sm brief-ai" aria-hidden="true" />
             <span className="sr-only">AI 요약: </span>
             {text}
-            {!compact && (
-              <button
-                type="button"
-                className="brief-regen"
-                onClick={regen.run}
-                disabled={regen.busy}
-                aria-label={`${name} AI 요약 새로 만들기`}
-                title={summary?.generatedAt ? `${shortTime(summary.generatedAt)}에 만든 요약 · 눌러서 새로 만들기` : 'AI 요약 새로 만들기'}
-              >
-                <RefreshCw className={`icon-sm ${regen.busy ? 'spin' : ''}`} aria-hidden="true" />
-              </button>
-            )}
           </p>
+          {/* 버튼을 요약 글 끝에 붙였더니 두 줄 자르기에 잘려 안 보였음 (11/18 사용자: '어디 있다는 거지?') → 요약 아래 따로 한 줄 */}
+          {!compact && (
+            <div className="brief-ai-row">
+              <span className="muted num">{summary?.generatedAt ? `AI 요약 · ${shortTime(summary.generatedAt)}에 만듦` : 'AI 요약'}</span>
+              <button type="button" className="brief-regen" onClick={regen.run} disabled={regen.busy}>
+                <RefreshCw className={`icon-sm ${regen.busy ? 'spin' : ''}`} aria-hidden="true" />
+                {regen.busy ? '만드는 중…' : '새로 만들기'}
+                <span className="sr-only"> ({name} AI 요약)</span>
+              </button>
+            </div>
+          )}
+          </>
         ) : digest?.headlines?.length ? (
           <>
             <ul className="brief-heads">

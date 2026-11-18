@@ -65,25 +65,52 @@ function TodayPanel({ code, name, quote }) {
         <IntradaySpark code={code} name={name || code} quote={quote} height={64} showLabel={false} />
       </div>
       {low > 0 && (
-        <div className="tp-range" role="img" aria-label={`오늘 저가 ${fmtPrice(low)}원, 고가 ${fmtPrice(high)}원, 지금 ${fmtPrice(price)}원`}>
-          <span className="tp-end num">
-            <span className="tp-cap">저가</span>
-            {fmtPrice(low)}
-          </span>
-          <span className="tp-bar">
-            {quote.open ? <i className="tp-open" style={{ left: `${at(quote.open)}%` }} title={`시가 ${fmtPrice(quote.open)}`} /> : null}
-            <i className={`tp-now ${cls}`} style={{ left: `${at(price)}%` }} />
-          </span>
-          <span className="tp-end tp-end-r num">
-            <span className="tp-cap">고가</span>
-            {fmtPrice(high)}
-          </span>
+        // 11/18 사용자: 막대 위 점·세로선이 뭔지 모르겠음 → 점에 '지금', 세로선에 '시가' 글자를 바로 붙이고 제목에 '오늘 움직인 범위'
+        <div className="tp-range-wrap">
+          <p className="tp-range-k">
+            오늘 움직인 범위 <span className="muted">(가장 낮았던 값 ~ 가장 높았던 값)</span>
+          </p>
+          <div className="tp-range" role="img" aria-label={`오늘 저가 ${fmtPrice(low)}원, 고가 ${fmtPrice(high)}원, 지금 ${fmtPrice(price)}원${quote.open ? `, 시가 ${fmtPrice(quote.open)}원` : ''}`}>
+            <span className="tp-end num">
+              <span className="tp-cap">저가</span>
+              {fmtPrice(low)}
+            </span>
+            <span className="tp-track">
+              <span className="tp-bar">
+                {quote.open ? <i className="tp-open" style={{ left: `${at(quote.open)}%` }} /> : null}
+                <i className={`tp-now ${cls}`} style={{ left: `${at(price)}%` }} />
+              </span>
+              <span className="tp-labels" aria-hidden="true">
+                {/* 둘이 가까우면(18% 안) 겹치지 않게 한 글자로 */}
+                {quote.open && Math.abs(at(quote.open) - at(price)) < 18 ? (
+                  <span className={`tp-lab ${cls}`} style={{ left: `${Math.min(88, Math.max(12, at(price)))}%` }}>
+                    지금·시가
+                  </span>
+                ) : (
+                  <>
+                    {quote.open ? (
+                      <span className="tp-lab tp-lab-open" style={{ left: `${Math.min(90, Math.max(10, at(quote.open)))}%` }}>
+                        시가
+                      </span>
+                    ) : null}
+                    <span className={`tp-lab ${cls}`} style={{ left: `${Math.min(90, Math.max(10, at(price)))}%` }}>
+                      지금
+                    </span>
+                  </>
+                )}
+              </span>
+            </span>
+            <span className="tp-end tp-end-r num">
+              <span className="tp-cap">고가</span>
+              {fmtPrice(high)}
+            </span>
+          </div>
         </div>
       )}
       <dl className="tp-facts num">
         {quote.open ? (
           <div>
-            <dt>시가</dt>
+            <dt>시가(장 시작 값)</dt>
             <dd>{fmtPrice(quote.open)}</dd>
           </div>
         ) : null}

@@ -225,6 +225,68 @@ function RecentForStock({ a }) {
   );
 }
 
+/**
+ * 공시 요약이 없는 이유 (11/18 사용자: '아직 요약하지 못했어요'가 영영 요약이 안 되는 공시에도 떴음)
+ * 지난 30일 요약 없는 공시 59건 중 51건이 [첨부정정](첨부 서류만 고쳐 본문이 없음 → 요약할 것이 없음). AI 수집기는 12시간 지나도 원문이 없으면 그만 물음
+ */
+const GIVE_UP_MS = 12 * 3600 * 1000;
+function pendingReason(a) {
+  if (a.title.includes('[첨부정정]')) {
+    return { title: '요약할 본문이 없는 공시', text: '첨부 서류만 고친 정정 공시라 본문이 바뀌지 않았어요. 무엇을 고쳤는지는 DART 원문에서 확인해 주세요.' };
+  }
+  const age = Date.now() - new Date(a.publishedAtIso).getTime();
+  if (age > GIVE_UP_MS) {
+    return { title: '요약 없음', text: 'DART에 요약할 원문(본문)이 올라오지 않아 요약하지 못했어요. 자세한 내용은 DART 원문에서 확인해 주세요.' };
+  }
+  return { title: '요약 준비 중', text: 'DART에 원문이 올라오면 자동으로 요약해요. 그동안은 DART 원문에서 확인해 주세요.' };
+}
+
+/** 정정 공시면 고치기 전 원래 공시를 찾아 그 요약을 보여 줌 (정정 공시만 보면 무슨 일인지 알 수 없음). 같은 종목·같은 보고서 이름 */
+function OriginalDisclosure({ a }) {
+  const isCorrection = /\[[^\]]*정정\]/.test(a.title);
+  const main = a.relatedStocks.find((x) => x.role === 'MAIN') || a.relatedStocks[0];
+  const base = a.title.replace(/\[[^\]]*정정\]\s*/, '').trim();
+  const report = base.slice(base.indexOf(' ') + 1).slice(0, 50);
+  const found = useApi(
+    (signal) => articleApi.list({ stockCode: main.code, q: report, size: 20 }, { signal }),
+    [a.id],
+    { enabled: Boolean(isCorrection && main && report) }
+  );
+  if (!isCorrection || !main || !found.data) return null;
+  const items = (found.data.items || []).map(toUiArticle).filter((x) => x.id !== a.id && x.isDisclosure);
+  // 원래 공시(정정 표시 없는 같은 이름) → 없으면 요약이 있는 앞선 정정 공시
+  const orig =
+    items.find((x) => x.title.trim() === base) ||
+    items.find((x) => x.hasSummary && x.title.replace(/\[[^\]]*정정\]\s*/, '').trim() === base && x.publishedAtIso < a.publishedAtIso);
+  if (!orig) return null;
+  const isOriginal = orig.title.trim() === base;
+  return (
+    <section className="card ad-orig" aria-labelledby="orig-title">
+      <div className="card-head">
+        <h2 className="card-title" id="orig-title">
+          {isOriginal ? '고치기 전 원래 공시' : '앞서 낸 같은 공시'}
+        </h2>
+        <span className="muted num" style={{ fontSize: 'var(--fs-xs)' }}>
+          {fullTime(orig.publishedAtIso)}
+        </span>
+      </div>
+      <Link to={`/news/${orig.id}`} className="ad-orig-title">
+        {orig.title}
+      </Link>
+      {orig.hasSummary ? (
+        <ul className="summary-list">
+          {orig.summary.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="sub">이 공시도 아직 요약이 없어요.</p>
+      )}
+      <p className="card-note">정정 공시는 원래 공시의 일부를 고친 것이에요. 무엇이 바뀌었는지는 DART 원문의 정정 사항에서 확인해 주세요.</p>
+    </section>
+  );
+}
+
 function NewsDetail({ id }) {
   const back = useBack('/news');
   const detail = useApi((signal) => articleApi.get(id, { signal }), [id]);
@@ -309,12 +371,21 @@ function NewsDetail({ id }) {
       <section className="card ad-sum" aria-labelledby="sum-title">
         <div className="card-head">
           <h2 className="card-title" id="sum-title">
-            {summaryIsTitle ? '내용' : 'AI 요약'}
+            {summaryIsTitle ? (a.isDisclosure ? pendingReason(a).title : '내용') : 'AI 요약'}
           </h2>
           {raw.summarizedAt && <span className="muted num" style={{ fontSize: 'var(--fs-xs)' }}>{shortTime(raw.summarizedAt)} 요약</span>}
         </div>
         {summaryIsTitle ? (
-          <p className="sub">공시 원문을 아직 요약하지 못했어요. 자세한 내용은 원문에서 확인해 주세요.</p>
+          <div className="ad-pending">
+            <p className="sub">{a.isDisclosure ? pendingReason(a).text : '원문을 아직 요약하지 못했어요. 자세한 내용은 원문에서 확인해 주세요.'}</p>
+            {a.url && (
+              <a className="btn btn-primary btn-sm" href={a.url} target="_blank" rel="noreferrer">
+                {a.isDisclosure ? 'DART 원문 보기' : '원문 보기'}
+                <ExternalLink className="icon-sm" aria-hidden="true" />
+                <span className="sr-only">(새 창)</span>
+              </a>
+            )}
+          </div>
         ) : a.hasSummary ? (
           <ul className="summary-list">
             {a.summary.map((line, i) => (
@@ -334,6 +405,8 @@ function NewsDetail({ id }) {
           </div>
         )}
       </section>
+
+      {a.isDisclosure && <OriginalDisclosure a={a} />}
 
       <section className="card ad-link" aria-labelledby="link-title">
         <div className="card-head">

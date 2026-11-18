@@ -228,15 +228,22 @@
 .regen-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .regen-empty .sub { flex-basis: 100%; margin: 0; }
 .regen-hint { font-size: var(--fs-xs); }
+.brief-ai-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: var(--fs-xs); }
 .brief-regen {
   display: inline-flex;
-  vertical-align: -3px;
-  margin-left: 6px;
-  padding: 2px;
-  border-radius: 6px;
-  color: var(--text-3);
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }
-.brief-regen:hover:not(:disabled) { color: var(--accent-text); background: var(--surface-2); }
+.brief-regen:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent); }
+.brief-regen:disabled { opacity: 0.7; }
 .brief-regen-text { margin-left: 6px; font-size: var(--fs-xs); }
 
 /* --- 종목 머리: 왼쪽 이름·가격 + 오른쪽 '오늘 흐름' (넓은 화면) --- */
@@ -263,7 +270,14 @@
 .tp-note { color: var(--text-3); font-size: var(--fs-xs); }
 .tp-spark .ispark { display: block; width: 100%; height: 64px; }
 .tp-spark .ispark-empty { border-radius: 6px; background: var(--surface-2); }
-.tp-range { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: var(--fs-xs); }
+.tp-range-k { margin: 2px 0 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-2); }
+.tp-range { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; font-size: var(--fs-xs); }
+.tp-track { position: relative; padding-top: 10px; min-height: 34px; }
+.tp-labels { position: relative; display: block; height: 16px; margin-top: 8px; }
+.tp-lab { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; font-weight: 700; white-space: nowrap; color: var(--text-2); }
+.tp-lab.up { color: var(--up); }
+.tp-lab.down { color: var(--down); }
+.tp-lab-open { color: var(--text-3); font-weight: 600; }
 .tp-end { display: grid; color: var(--text-2); font-weight: 600; line-height: 1.3; }
 .tp-end-r { text-align: right; }
 .tp-cap { color: var(--text-3); font-weight: 500; }
@@ -280,3 +294,9 @@
 
 /* --- 기사·공시 상세: 이 종목 최근 소식 (왼쪽 칸 아래 빈 곳) --- */
 .ad-recent .feed-dense { margin-top: 2px; }
+
+/* --- 요약 없는 공시: 이유 + DART 원문 버튼, 정정 공시의 원래 공시 --- */
+.ad-pending { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.ad-pending .sub { flex: 1 1 280px; margin: 0; }
+.ad-orig-title { display: block; margin: 2px 0 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+.ad-orig-title:hover { color: var(--accent-text); text-decoration: underline; }
