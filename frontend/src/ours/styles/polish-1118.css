@@ -283,3 +283,34 @@
 .ad-pending .sub { flex: 1 1 280px; margin: 0; }
 .ad-orig-title { display: block; margin: 2px 0 10px; font-weight: 700; color: var(--text); text-decoration: none; }
 .ad-orig-title:hover { color: var(--accent-text); text-decoration: underline; }
+
+/* ===== 11/18 로고·이름 확정 '뉴스톡' =====
+   아이콘: 흰 둥근 판 위 로고 그림 (예전 파란 칸 + 캔들 아이콘 대신). 글자: 뉴스 = 본문색(밝은 곳 남색), 톡 = 로고 파랑 */
+:root {
+  --brand-navy: #0f1b42;
+  --brand-blue: #4152f5;
+  --brand-blue-on-dark: #7d8bff; /* 남색·검정 바탕 위 '톡' (로고 파랑은 어두운 바탕에서 대비가 낮음) */
+}
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border-radius: 8px;
+  object-fit: contain;
+  flex: none;
+}
+.brand-word { font-weight: 800; letter-spacing: -0.02em; }
+.brand-word-accent { color: var(--brand-blue); }
+/* 왼쪽 메뉴는 남색·검정 바탕 → 밝은 파랑 */
+.sidenav .brand-word { color: var(--nav-text-strong, #fff); }
+.sidenav .brand-word-accent { color: var(--brand-blue-on-dark); }
+/* 휴대폰 위 줄: 밝은 화면은 로고 남색, 어두운 화면은 밝은 글자 */
+.mobile-brand .brand-word { color: var(--brand-navy); }
+:root[data-theme='dark'] .mobile-brand .brand-word { color: var(--text); }
+:root[data-theme='dark'] .mobile-brand .brand-word-accent { color: var(--brand-blue-on-dark); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .mobile-brand .brand-word { color: var(--text); }
+  :root:not([data-theme='light']) .mobile-brand .brand-word-accent { color: var(--brand-blue-on-dark); }
+}
+

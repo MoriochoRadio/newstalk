@@ -1,6 +1,8 @@
-# stock-news-matching
+<p align="center"><img src="frontend/public/brand/logo-full-small.png" alt="뉴스톡" width="420"></p>
 
-뉴스·SNS 글이 **어떤 종목에, 왜** 영향을 주는지 AI로 분석해 요약과 함께 보여주는 웹 서비스
+# 뉴스톡 (stock-news-matching)
+
+뉴스·공시가 **어떤 종목에, 왜** 영향을 주는지 AI로 분석해 요약과 함께 보여주는 웹 서비스 · 뉴스로 보는 종목
 
 한경닷컴 IT교육센터 금융 팀프로젝트 (2026)
 

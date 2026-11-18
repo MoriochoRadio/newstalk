@@ -17,7 +17,7 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
-                .info(new Info().title("stocknews API").description("뉴스×종목 매칭 백엔드 API").version("v1"))
+                .info(new Info().title("뉴스톡 API").description("뉴스톡 (뉴스·공시 × 종목 매칭) 백엔드 API").version("v1"))
                 .components(new Components().addSecuritySchemes(BEARER_AUTH, new SecurityScheme()
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
