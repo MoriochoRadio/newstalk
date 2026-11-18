@@ -174,7 +174,7 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               // 좁고 긴 칸: 한 줄에 안 들어가는 긴 이름(한화에어로스페이스 등)은 두세 줄로 접어서 (빈 칸으로 남던 것 — 11/16)
               const wrapSize = Math.round(Math.max(12, Math.min(15, ((w - 8) * 2.6) / len)));
               const wrapLinesFor = Math.ceil((len * wrapSize) / Math.max(1, w - 8));
-              const canWrap = w >= 40 && h >= wrapLinesFor * wrapSize * 1.2 + 8;
+              const canWrap = w >= 40 && h >= wrapLinesFor * wrapSize * 1.2 + 8 && (!pro || wrapLinesFor <= 2);
               // 한 줄 이름이 15px 밑이면(긴 이름) 접어서 크게 (11/16 밤 디자이너: 한화에어로스페이스 이름 11px·등락 9px)
               const showName = fitsOneLine && !(nameSize < 15 && canWrap && wrapSize > nameSize);
               const wrapName = !showName && canWrap;
@@ -195,7 +195,7 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
                 ? null
                 : roomV && fullW <= w - 8 ? (n > 0 ? `기사 ${n}건` : '기사 없음') : roomV && shortW <= w - 8 ? (n > 0 ? `${n}건` : '없음') : null;
               // 세로 자리가 없으면 오른쪽 위 작은 알약 'n건' (이름과 안 겹칠 때만)
-              const cornerNews = !newsText && n > 0 && w >= shortW + 8 && h >= 22 && (!showName || w - len * nameSize >= shortW * 2 + 8);
+              const cornerNews = !pro && !newsText && n > 0 && w >= shortW + 8 && h >= 22 && (!showName || w - len * nameSize >= shortW * 2 + 8);
               // 기사가 많을수록 진하게: 없음 회색 · 1~2건 보통 · 3~5건 보라 · 6건 이상 진한 보라
               const newsLevel = n === 0 ? 0 : n >= 6 ? 3 : n >= 3 ? 2 : 1;
               const heat = capHeatStyle(it.changeRate);
