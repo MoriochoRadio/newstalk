@@ -167,10 +167,37 @@
           <if test="sourceType != null">
               AND a.source_type = #{sourceType}
           </if>
+          <if test="market != null">
+              AND i.market = #{market}
+          </if>
+          <if test="theme != null">
+              AND EXISTS (SELECT 1 FROM stock_theme t WHERE t.stock_code = s.stock_code AND t.theme = #{theme})
+          </if>
         GROUP BY s.stock_code, i.stock_name
         HAVING article_count &gt; 0
         ORDER BY article_count DESC, avg_relevance DESC, i.stock_name
         LIMIT #{limit}
+    </select>
+
+    <!--
+        테마 목록 (2026-11-18 분류별 보기): 테마마다 묶인 종목 수 + from 이후 그 종목들이 나온 뉴스 기사 수
+        기사 수는 같은 기사가 테마 안 두 종목에 나와도 한 번 (COUNT DISTINCT). 공시는 이슈 순위와 같이 뺌
+        종목이 기사에 하나도 안 나온 테마도 0건으로 나옴 (LEFT JOIN)
+    -->
+    <select id="findThemes" resultType="com.hkteam2.stocknews.stock.StockThemeResponse">
+        SELECT t.theme,
+               COUNT(DISTINCT t.stock_code) AS stock_count,
+               COUNT(DISTINCT x.article_id) AS article_count
+        FROM stock_theme t
+        LEFT JOIN (SELECT s.stock_code, s.article_id
+                   FROM article_stock s
+                   JOIN article a ON a.article_id = s.article_id
+                   WHERE a.status = 'DONE'
+                     AND a.source_type = 'NEWS'
+                     AND a.channel &lt;&gt; 'DART'
+                     AND a.published_at >= #{from}) x ON x.stock_code = t.stock_code
+        GROUP BY t.theme
+        ORDER BY article_count DESC, t.theme
     </select>
 
     <resultMap id="stockDailySummaryRow" type="com.hkteam2.stocknews.stock.StockDailySummaryRow">

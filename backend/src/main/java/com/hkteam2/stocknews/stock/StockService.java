@@ -57,6 +57,11 @@ public class StockService {
      * 출처가 없으면 뉴스만 셈: AI가 SNS를 "뉴스 많은 종목"만 골라 모으므로 섞으면 같은 종목을 두 번 세게 됨
      */
     public ListResponse<StockIssueResponse> getIssues(String source, int limit) {
+        return getIssues(source, null, null, limit);
+    }
+
+    /** market·theme: 분류별 보기 (2026-11-18). 순위는 거른 뒤 1부터 다시 매김 */
+    public ListResponse<StockIssueResponse> getIssues(String source, String market, String theme, int limit) {
         String sourceType = source == null ? "NEWS" : toSourceType(source);
         if (limit < 1 || limit > MAX_ISSUE_LIMIT) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
@@ -64,12 +69,19 @@ public class StockService {
         // DB의 CURDATE()는 DB 시간대 설정에 따라 달라질 수 있어서 앱에서 한국 시간으로 계산해 넘김
         LocalDateTime todayStart = LocalDate.now(TimeUtils.KST).atStartOfDay();
 
-        List<StockIssueRow> rows = stockMapper.findIssues(todayStart, sourceType, limit);
+        List<StockIssueRow> rows = stockMapper.findIssues(todayStart, sourceType, StockCategory.market(market),
+                StockCategory.theme(theme), limit);
         // 순위는 1부터 차례로 (글 수가 같아도 SQL 정렬 순서대로 1, 2, 3)
         List<StockIssueResponse> items = IntStream.range(0, rows.size())
                 .mapToObj(i -> StockIssueResponse.of(i + 1, rows.get(i)))
                 .toList();
         return ListResponse.of(items);
+    }
+
+    /** 테마 목록 + 기간 안 기사 수 (분류별 보기 고르기용). period: today(기본)·7d·30d */
+    public ListResponse<StockThemeResponse> getThemes(String period) {
+        MentionPeriod p = MentionPeriod.from(period == null ? "today" : period);
+        return ListResponse.of(stockMapper.findThemes(p.start(LocalDateTime.now(TimeUtils.KST))));
     }
 
     /**
