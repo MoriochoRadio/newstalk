@@ -1,9 +1,6 @@
 // 최근 20거래일 종가 추세선. 화면에 보일 때만 부르고(IntersectionObserver), 부르는 동안은 회색 자리, 실패하면 안 그림
 // 색: 20거래일 전보다 올랐으면 빨강, 내렸으면 파랑
-// wide(화제 종목 카드): 넓고 낮은 칸에 선을 늘리면 납작하게 뭉개져 주식 하는 사람에겐 정보가 없음 (11/18 사용자)
-//   → 같은 칸에 20일 미니 캔들(양봉 빨강·음봉 파랑) + 지금 값 점선. 칸 크기는 그대로
-//   (거래량 띠도 넣어 봤지만 40px 칸에서 7px 띠는 읽히지 않고 캔들만 납작해져 뺌)
-import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { wantSpark } from '../lib/spark';
 
 const W = 72;
@@ -47,14 +44,12 @@ export default function Sparkline({ code, name, disabled = false, wide = false }
   }, [failed, retry]);
   useEffect(() => {
     if (!visible || disabled) return undefined;
-    return wantSpark(code, (e) => setEntry({ status: e.status, data: e.data, ohlc: e.ohlc }));
+    return wantSpark(code, (e) => setEntry({ status: e.status, data: e.data }));
   }, [code, visible, disabled, retry]);
 
   if (disabled || entry?.status === 'failed') return <span className="spark" aria-hidden="true" ref={boxRef} />;
   // 기다리는 동안은 반짝이는 회색 대신 빈 칸 (11/16 디자이너 리뷰: 표 절반이 반짝여 고장 난 화면처럼 보였음)
   if (!entry?.data) return <span className="spark spark-wait" ref={boxRef} aria-hidden="true" />;
-
-  if (wide && entry.ohlc) return <CandleSpark ref={boxRef} rows={entry.ohlc} name={name} />;
 
   const vals = entry.data;
   const min = Math.min(...vals);
@@ -79,70 +74,3 @@ export default function Sparkline({ code, name, disabled = false, wide = false }
     </span>
   );
 }
-
-const CH = 40; // 칸 높이 (CSS .brief-spark .spark-wide svg 와 같음)
-
-/** 화제 종목 카드: 20일 미니 캔들. 폭은 칸에 맞춰 재고(늘려 그리지 않음 → 선이 뭉개지지 않음) */
-const CandleSpark = forwardRef(function CandleSpark({ rows, name }, ref) {
-  const wrap = useRef(null);
-  const [w, setW] = useState(0);
-  useLayoutEffect(() => {
-    const el = wrap.current;
-    if (!el) return undefined;
-    const measure = () => setW(Math.round(el.getBoundingClientRect().width));
-    measure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const setRefs = (el) => {
-    wrap.current = el;
-    if (typeof ref === 'function') ref(el);
-    else if (ref) ref.current = el;
-  };
-
-  const hi = Math.max(...rows.map((r) => r.h));
-  const lo = Math.min(...rows.map((r) => r.l));
-  const span = hi - lo || 1;
-  const top = 2;
-  const priceH = CH - 4;
-  const y = (p) => top + ((hi - p) / span) * priceH;
-  const slot = w / rows.length;
-  const body = Math.max(3, Math.min(7, Math.round(slot * 0.4))); // 너무 넓으면 낮은 칸에서 몸통이 대시(-)처럼 보임
-  const first = rows[0].c;
-  const last = rows[rows.length - 1].c;
-  const rate = first ? ((last - first) / first) * 100 : 0;
-  const dir = rate > 0 ? 'up' : rate < 0 ? 'down' : 'flat';
-  const label = `${name} 최근 ${rows.length}거래일 일봉, 처음보다 ${rate > 0 ? '+' : ''}${rate.toFixed(1)}%, 기간 최고 ${hi.toLocaleString('ko-KR')}원 최저 ${lo.toLocaleString('ko-KR')}원`;
-
-  return (
-    <>
-    <span className={`spark spark-wide spark-candle spark-${dir}`} ref={setRefs} title={label}>
-      {w > 0 && (
-        <svg width={w} height={CH} viewBox={`0 0 ${w} ${CH}`} role="img" aria-label={label}>
-          {/* 지금 값 높이 (옅은 점선) */}
-          <line x1="0" x2={w} y1={Math.round(y(last)) + 0.5} y2={Math.round(y(last)) + 0.5} className="candle-now" />
-          {rows.map((r, i) => {
-            const cx = Math.round(slot * i + slot / 2) + 0.5;
-            const kind = r.c > r.o ? 'up' : r.c < r.o ? 'down' : 'flat';
-            const yo = y(r.o);
-            const yc = y(r.c);
-            const bt = Math.min(yo, yc);
-            return (
-              <g key={i} className={`candle candle-${kind}${i === rows.length - 1 ? ' candle-last' : ''}`}>
-                <line x1={cx} x2={cx} y1={y(r.h)} y2={y(r.l)} className="candle-wick" />
-                <rect x={cx - body / 2} y={bt} width={body} height={Math.max(1, Math.abs(yc - yo))} className="candle-body" />
-              </g>
-            );
-          })}
-        </svg>
-      )}
-    </span>
-    {/* 기간 등락 (예전 '20일' 글자 자리). 시세 색 */}
-    <span className="spark-range num">
-      20일 <b className={rate > 0 ? 'up' : rate < 0 ? 'down' : ''}>{`${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`}</b>
-    </span>
-    </>
-  );
-});

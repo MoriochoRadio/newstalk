@@ -6465,19 +6465,3 @@ a { text-underline-offset: 3px; }
   .feed-note-short { display: inline; }
   .feed-note { padding: 6px 10px; }
 }
-
-/* 화제 종목 카드 미니 캔들 (11/18 사용자: 넓고 낮은 칸에 늘린 선은 주식 하는 사람에게 정보가 없음). 칸 크기는 그대로 40px */
-.brief-spark .spark-candle svg { width: 100%; height: 40px; display: block; overflow: visible; }
-.candle-wick { stroke-width: 1; shape-rendering: crispEdges; }
-.candle-body { shape-rendering: crispEdges; }
-.candle-up .candle-wick { stroke: var(--up-chart); }
-.candle-up .candle-body { fill: var(--up-chart); }
-.candle-down .candle-wick { stroke: var(--down-chart); }
-.candle-down .candle-body { fill: var(--down-chart); }
-.candle-flat .candle-wick { stroke: var(--text-3); }
-.candle-flat .candle-body { fill: var(--text-3); }
-.candle-now { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.6; shape-rendering: crispEdges; }
-.spark-range { flex-shrink: 0; color: var(--text-3); white-space: nowrap; }
-.spark-range b { font-weight: 600; color: var(--text-2); }
-.spark-range b.up { color: var(--up); }
-.spark-range b.down { color: var(--down); }
