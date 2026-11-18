@@ -47,7 +47,8 @@
 
 /* 관심 종목: 표와 소식을 나란히 (넓은 화면) */
 @media (min-width: 1100px) {
-  :root[data-pro] .wl-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 8px; align-items: start; }
+  /* 표 쪽을 더 넓게 (5:7 이면 표가 약 490px 라 'SK하이|닉스'처럼 이름이 글자 단위로 꺾였음 — 11/18 산출물 캡처) */
+  :root[data-pro] .wl-body { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 8px; align-items: start; }
   :root[data-pro] .wl-body > .card,
   :root[data-pro] .wl-body > .wl-news { margin-top: 8px !important; }
 }
@@ -99,3 +100,9 @@
   .pro-switch { height: 34px; padding: 0 8px; border: 0; background: transparent; }
   .ps-label { font-size: 12px; }
 }
+
+/* 관심 종목 표: 한눈에에서는 칸 안 글자를 꺾지 않음 (이름·코드·시장·좋은/나쁜 소식 한 줄), 넘치면 표만 옆으로 밀어 보기 */
+:root[data-pro] .wl-body .table th,
+:root[data-pro] .wl-body .table td { white-space: nowrap; }
+:root[data-pro] .wl-body .table-wrap { overflow-x: auto; }
+
