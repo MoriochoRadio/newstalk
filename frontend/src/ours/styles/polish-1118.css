@@ -314,3 +314,18 @@
   :root:not([data-theme='light']) .mobile-brand .brand-word-accent { color: var(--brand-blue-on-dark); }
 }
 
+/* ===== 11/18 전체 점검 (화면 10개 × 기본·한눈에 × 1920·1440·1280·768·390 폭)에서 찾은 것 ===== */
+/* 1) 태블릿·휴대폰: 업종·테마 칩 줄이 옆으로 밀리는데 칩이 줄어들어 숫자 '27'이 두 줄로 꺾였음 → 칩은 줄지 않게 */
+.cat-chip, .cat-more { flex: none; white-space: nowrap; }
+/* 2) 휴대폰 종목 화면: 머리 안 '오늘 주가 기사' 한 줄(말줄임)이 줄지 않고 머리 폭을 452px 로 늘려 화면이 옆으로 밀렸음
+      → 머리 안쪽을 화면 폭에 고정해 긴 제목이 '…'로 줄게 */
+.stock-head-main { width: 100%; max-width: 100%; }
+.stock-head-main > *,
+.stock-price { min-width: 0; max-width: 100%; }
+/* 3) 휴대폰 관심 종목: '좋은 소식 n건 · 나쁜 소식 n건' 글자가 칸을 차지해 종목 이름이 'SK하이|닉스'처럼 꺾이고 표가 화면보다 넓었음
+      → 좁은 화면은 건수와 링만 (글자는 마우스를 올리면·화면 낭독기는 제목 설명으로) */
+@media (max-width: 640px) {
+  .wl-tone b { display: none; }
+  .wl-body .table td:first-child a { white-space: nowrap; }
+}
+
