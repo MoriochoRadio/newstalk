@@ -1,0 +1,101 @@
+/* ===== '한눈에'(전문가) 모드 — <html data-pro> (lib/proMode.js, 머리줄 스위치) =====
+   11/18 사용자: "누르면 모든 화면 왔다갔다 해도 다 동글하지 않고 전문성 있는 화면"
+   토큰만 바꿔 모든 화면에 한 번에: 모서리 2~3px, 글자 한두 단계 작게, 그림자 대신 얇은 선, 칸 안 여백 줄이기
+   [data-pro][data-pro] = 우선순위를 조금 높여 tokens.css 의 시안·어두운 화면 값보다 앞서게 */
+
+:root[data-pro][data-pro] {
+  --radius-sm: 2px;
+  --radius: 3px;
+  --radius-lg: 3px;
+  --radius-pill: 3px;
+  --shadow-card: none;
+  --shadow-hover: none;
+  --card-border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+  --fs-2xl: 21px;
+  --fs-3xl: 24px;
+}
+
+/* 칸: 그림자 없이 얇은 선, 여백 줄이기 */
+:root[data-pro] .card { padding: 12px 14px; box-shadow: none; border: var(--card-border); }
+:root[data-pro] .card + .card { margin-top: 8px; }
+:root[data-pro] .card-head { margin-bottom: 8px; }
+:root[data-pro] .card-title { font-size: 14px; font-weight: 700; }
+:root[data-pro] .page-head { padding-bottom: 8px; }
+:root[data-pro] .page-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+:root[data-pro] .page-sub { font-size: 12px; }
+:root[data-pro] .section-title { font-size: 15px; }
+:root[data-pro] .content { gap: 8px; }
+
+/* 표: 줄 높이 줄이기, 숫자 고정폭 */
+:root[data-pro] .table td,
+:root[data-pro] .table th { padding-top: 6px; padding-bottom: 6px; }
+:root[data-pro] .table { font-variant-numeric: tabular-nums; }
+
+/* 지도 칸·차트 칸도 각지게 */
+:root[data-pro] .cm-tile,
+:root[data-pro] .mm-tile,
+:root[data-pro] .skeleton { border-radius: 2px; }
+
+/* 종목 화면 머리: 큰 가격 글자 한 단계 작게 */
+:root[data-pro] .stock-name { font-size: 22px; }
+:root[data-pro] .price-big { font-size: 26px; }
+
+/* 관심 종목: 표와 소식을 나란히 (넓은 화면) */
+@media (min-width: 1100px) {
+  :root[data-pro] .wl-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 8px; align-items: start; }
+  :root[data-pro] .wl-body > .card,
+  :root[data-pro] .wl-body > .wl-news { margin-top: 8px !important; }
+}
+
+/* --- 머리줄 '한눈에' 스위치 --- */
+.pro-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pro-switch:hover { color: var(--text); border-color: var(--line-strong); }
+.ps-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition: background 0.15s ease;
+}
+.ps-track i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.pro-switch.on { color: var(--text); border-color: var(--accent); }
+.pro-switch.on .ps-track { background: var(--accent); box-shadow: none; }
+.pro-switch.on .ps-track i { transform: translateX(12px); background: #fff; }
+:root[data-pro] .ps-track,
+:root[data-pro] .ps-track i { border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .ps-track, .ps-track i { transition: none; }
+}
+@media (max-width: 768px) {
+  .pro-switch { height: 34px; padding: 0 8px; border: 0; background: transparent; }
+  .ps-label { font-size: 12px; }
+}

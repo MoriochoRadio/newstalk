@@ -15,6 +15,7 @@ import HotStocks from '../components/HotStocks';
 import Sparkline from '../components/Sparkline';
 import { Empty, ErrorBox, LimitBadge, SkeletonRows } from '../components/ui';
 import CategoryBar, { MARKETS } from '../components/CategoryBar';
+import { useProMode } from '../lib/proMode';
 
 const LIMIT = 30;
 // 11/18: 크게 = 화제 종목 카드 + 순위 15줄, 작게 = 카드 없이 순위 30줄을 촘촘히 (뉴스·공시의 크게·작게와 같은 단추)
@@ -114,7 +115,8 @@ export default function StocksPage() {
       /* 기억 못 해도 지금 화면은 바뀜 */
     }
   };
-  const dense = view === 'dense';
+  const [pro] = useProMode();
+  const dense = pro || view === 'dense'; // 한눈에(전체 스위치)면 늘 작게
   const rows = showAll || dense ? items : items.slice(0, 15);
 
   return (
@@ -123,6 +125,7 @@ export default function StocksPage() {
         <div>
           <h1 className="page-title">종목</h1>
         </div>
+        {!pro && (
         <div className="segmented sm view-toggle" role="group" aria-label="보기 방식">
           {VIEWS.map(({ key, label, icon: Icon }) => (
             <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>
@@ -131,6 +134,7 @@ export default function StocksPage() {
             </button>
           ))}
         </div>
+        )}
       </div>
       <div className="card cat-card">
         <CategoryBar value={{ market, theme }} onChange={setCategory} />

@@ -172,6 +172,7 @@ export default function WatchlistPage() {
           if (!watchCodes.has(s.stockCode)) toggleWatch(s.stockCode, s.stockName);
         }}
       />
+      <div className="wl-body">
       <section className="card" style={{ marginTop: 16 }} aria-labelledby="wl-title">
         <h2 className="sr-only" id="wl-title">
           담은 종목
@@ -254,10 +255,11 @@ export default function WatchlistPage() {
         )}
       </section>
       {items.length > 0 && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }} className="wl-news">
           <WatchNews count={items.length} />
         </div>
       )}
+      </div>
     </>
   );
 }

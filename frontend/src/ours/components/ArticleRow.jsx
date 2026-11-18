@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ExternalLink, FileText, MessageCircle, Newspaper } from 'lucide-react';
 import { groupStories } from '../lib/stories';
+import { useProMode } from '../lib/proMode';
 import { titleOnlyReason } from '../lib/titleOnly';
 import { relativeTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
@@ -306,7 +307,9 @@ function DenseRow({ article: a, others = [], focusCode }) {
 }
 
 /** 글 목록을 소식 단위로 (같은 소식은 첫 보도 한 줄 + 펼치기). dense = 작게 보기 */
-export function StoryFeed({ articles, focusCode, toneCodes, compact = false, dense = false, className = 'feed', style }) {
+export function StoryFeed({ articles, focusCode, toneCodes, compact = false, dense: dense0 = false, className = 'feed', style }) {
+  const [pro] = useProMode();
+  const dense = dense0 || pro; // 한눈에(전체 스위치)면 모든 기사 목록을 한 줄씩
   const stories = groupStories(articles);
   if (dense) {
     return (

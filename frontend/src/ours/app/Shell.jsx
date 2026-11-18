@@ -11,6 +11,7 @@ import AuthModal from '../components/AuthModal';
 import { useFocusTrap } from '../lib/focusTrap';
 import { SkeletonRows } from '../components/ui';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { useProMode } from '../lib/proMode';
 
 const NAV = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -163,6 +164,26 @@ function useNavCollapsed() {
       return !c;
     });
   return [collapsed, toggleNav];
+}
+
+/** '한눈에' 전체 스위치 (11/18): 켜면 모든 화면이 촘촘한 전문가형 (lib/proMode). 끄면 간편한 기본 화면 */
+function ProSwitch() {
+  const [pro, setPro] = useProMode();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={pro}
+      className={`pro-switch ${pro ? 'on' : ''}`}
+      onClick={() => setPro(!pro)}
+      title={pro ? '한눈에 끄기: 간편한 기본 화면으로' : '한눈에 켜기: 모든 화면을 촘촘한 전문가형으로'}
+    >
+      <span className="ps-track" aria-hidden="true">
+        <i />
+      </span>
+      <span className="ps-label">한눈에</span>
+    </button>
+  );
 }
 
 /** 서버 연결 띠: 끊기면 한 번만 크게, 다시 연결되면 '새로 불러오기' (카드마다 반복되던 긴 오류 대신) */
@@ -411,6 +432,7 @@ export default function Shell() {
           </Link>
           <SearchBox className="desktop-search" />
           <div className="topbar-right">
+            <ProSwitch />
             <LivePill className="desktop-only" />
             <button type="button" className="icon-btn mobile-only" aria-label="검색" onClick={() => setMobileSearch(true)}>
               <Search className="icon" aria-hidden="true" />

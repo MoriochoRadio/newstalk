@@ -13,6 +13,7 @@ import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { iGa } from '../lib/josa';
 import CategoryBar from '../components/CategoryBar';
+import { useProMode } from '../lib/proMode';
 
 const PAGE_SIZE = 20;
 const DENSE_SIZE = 50; // 작게 보기는 한 쪽에 50개 (11/18 사용자: 한눈에 여러 개)
@@ -132,7 +133,8 @@ export default function NewsPage() {
   const market = ['KOSPI', 'KOSDAQ'].includes(params.get('market')) ? params.get('market') : '';
   const theme = (params.get('theme') || '').slice(0, 50);
   const [view, setView] = useState(readView);
-  const dense = view === 'dense';
+  const [pro] = useProMode();
+  const dense = pro || view === 'dense'; // 한눈에(전체 스위치)면 늘 작게
   const size = dense ? DENSE_SIZE : PAGE_SIZE;
   const changeView = (v) => {
     setView(v);
@@ -232,6 +234,7 @@ export default function NewsPage() {
                 총 {total.toLocaleString('ko-KR')}건
               </span>
             )}
+            {!pro && (
             <div className="segmented sm view-toggle" role="group" aria-label="보기 방식">
               {VIEWS.map(({ key, label, icon: Icon }) => (
                 <button key={key} type="button" aria-pressed={view === key} onClick={() => changeView(key)} title={key === 'dense' ? '한 줄씩 작게, 한 쪽에 50개' : '요약까지 크게'}>
@@ -240,6 +243,7 @@ export default function NewsPage() {
                 </button>
               ))}
             </div>
+            )}
             {/* 공시는 관련도 점수가 없음(회사가 낸 자기 서류, docs/api.md) → 공시 탭에선 정렬을 감춤 (11/13 사용자 눈으로) */}
             {tab !== 'disclosure' && (
               <Segmented label="정렬" size="sm" options={SORTS} value={sort} onChange={(k) => update({ sort: k === 'latest' ? '' : k })} />
