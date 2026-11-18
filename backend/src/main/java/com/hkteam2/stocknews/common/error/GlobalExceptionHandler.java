@@ -67,6 +67,21 @@ public class GlobalExceptionHandler {
         return toResponse(ErrorCode.NOT_FOUND);
     }
 
+    /** 주소의 % 인코딩이 깨짐 (예: q=a%ZZ). 11/17 QA: 예전엔 500 */
+    @ExceptionHandler(org.apache.tomcat.util.http.InvalidParameterException.class)
+    public ResponseEntity<ErrorResponse> handleBadEncoding(Exception e) {
+        return toResponse(ErrorCode.INVALID_REQUEST);
+    }
+
+    /**
+     * 실시간 방송(SSE)이 정해진 시간을 다 씀: 이미 방송 중이라 오류 JSON 을 쓸 수 없음 → 아무것도 안 씀 (브라우저가 다시 붙음).
+     * 11/17 QA: 예전엔 여기서 JSON 을 쓰려다 "No converter … text/event-stream" 경고가 남음
+     */
+    @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestTimeoutException.class)
+    public ResponseEntity<ErrorResponse> handleAsyncTimeout(Exception e) {
+        return null;
+    }
+
     /** 예상하지 못한 오류. 원인은 로그에만 남기고 사용자에게는 일반 메시지 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {

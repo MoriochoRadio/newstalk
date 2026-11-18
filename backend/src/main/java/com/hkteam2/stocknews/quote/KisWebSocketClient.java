@@ -16,6 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,7 +44,7 @@ import jakarta.annotation.PreDestroy;
  *
  * 반쯤 죽은 연결 감시 (2026-11-10): 끊김 신호(onClose·onError) 없이 KIS가 조용히 보내기를 멈추는 경우가 있음
  *   (11/10 13:06 끊김 1006 → 다시 접속·구독 성공 → 13:07:48 이후 2시간 넘게 메시지 0, 상태는 "연결됨").
- *   장중(평일 09:00~15:30)에 구독 종목이 있는데 STALE_AFTER 동안 아무 메시지(체결·PINGPONG)도 없으면 끊고 다시 접속.
+ *   장중(평일 09:00~15:30, 수능일 등은 MarketHours)에 구독 종목이 있는데 STALE_AFTER 동안 아무 메시지(체결·PINGPONG)도 없으면 끊고 다시 접속.
  *   장중 고정 생중계 종목(기본 삼성전자)은 초마다 체결이 와서 정상 연결이면 60초 무소식이 거의 없음.
  *   근거: 하트비트 시간 초과로 죽은 연결을 찾는 방식 (RFC 6455 §5.5.2 Ping/Pong 은 연결이 살아 있는지 확인하는 용도)
  *
@@ -60,8 +61,6 @@ public class KisWebSocketClient {
     private static final Pattern TR_KEY = Pattern.compile("\"tr_key\"\\s*:\\s*\"([^\"]*)\"");
     private static final int MAX_RAW = 5000;
     static final Duration STALE_AFTER = Duration.ofSeconds(60);
-    private static final java.time.LocalTime MARKET_OPEN = java.time.LocalTime.of(9, 0);
-    private static final java.time.LocalTime MARKET_CLOSE = java.time.LocalTime.of(15, 30);
 
     private final KisProperties props;
     private final KisTokenManager tokens;
@@ -81,7 +80,8 @@ public class KisWebSocketClient {
     private final AtomicLong messages = new AtomicLong();
     private final AtomicLong quarantined = new AtomicLong();
     private final AtomicLong reconnects = new AtomicLong();
-    private int failures;
+    /** 연달아 실패한 횟수 (기다림 1·2·4…60초). 접속만으로는 0으로 돌리지 않고, 구독 성공·체결을 받아야 0 (11/17) */
+    private final AtomicInteger failures = new AtomicInteger();
     private volatile SubscriptionListener listener;
 
     /** 구독 자리 관리자(SubscriptionManager)가 접속·등록 결과를 받는 창구 */
@@ -91,6 +91,11 @@ public class KisWebSocketClient {
 
         /** 등록·해제 응답. ok=false면 message에 이유 (예: MAX SUBSCRIBE OVER) */
         void onResult(String code, boolean ok, String message);
+
+        /** 생중계할 종목이 있는가 (구독이 모두 실패해 등록 목록이 비어도 감시는 해야 해서) */
+        default boolean wantsCodes() {
+            return false;
+        }
     }
 
     public void setListener(SubscriptionListener listener) {
@@ -116,7 +121,10 @@ public class KisWebSocketClient {
     private void checkStale() {
         try {
             LocalDateTime now = LocalDateTime.now(TimeUtils.KST);
-            if (running && stale(now, connectedAt, lastMessageAt, !subscribed.isEmpty())) {
+            SubscriptionListener l = listener;
+            // 11/17: 다시 접속 뒤 구독이 모두 실패하면 등록 목록이 비어 감시가 꺼졌음 → 생중계할 종목이 있으면 봄
+            boolean subscribing = !subscribed.isEmpty() || (l != null && l.wantsCodes());
+            if (running && stale(now, connectedAt, lastMessageAt, subscribing)) {
                 log.warn("KIS 웹소켓 {}초 넘게 메시지 없음 (반쯤 죽은 연결) → 끊고 다시 접속", STALE_AFTER.toSeconds());
                 WebSocket ws = socket;
                 if (ws != null) {
@@ -137,10 +145,7 @@ public class KisWebSocketClient {
         if (connectedAt == null || !subscribing) {
             return false;
         }
-        java.time.DayOfWeek day = now.getDayOfWeek();
-        java.time.LocalTime time = now.toLocalTime();
-        if (day == java.time.DayOfWeek.SATURDAY || day == java.time.DayOfWeek.SUNDAY
-                || time.isBefore(MARKET_OPEN) || time.isAfter(MARKET_CLOSE)) {
+        if (!MarketHours.inSession(now)) {   // 장 시간은 날마다 다를 수 있음 (수능일 10:00~16:30)
             return false;
         }
         LocalDateTime since = lastMessageAt == null || lastMessageAt.isBefore(connectedAt) ? connectedAt : lastMessageAt;
@@ -172,7 +177,6 @@ public class KisWebSocketClient {
                     .buildAsync(URI.create(props.webSocketUrl()), new Listener())
                     .get(15, TimeUnit.SECONDS);
             connectedAt = LocalDateTime.now(TimeUtils.KST);
-            failures = 0;
             subscribed.clear();
             log.info("KIS 웹소켓 연결됨 ({})", props.mode());
             SubscriptionListener l = listener;
@@ -207,11 +211,37 @@ public class KisWebSocketClient {
         if (!running || !reconnectPending.compareAndSet(false, true)) {
             return;   // 이미 다시 접속하기로 함 (onClose·onError가 같이 와도 한 번만)
         }
-        failures++;
-        long delay = Math.min(60, 1L << Math.min(failures - 1, 6));
+        long delay = backoffSeconds(failures.incrementAndGet());
         reconnects.incrementAndGet();
         log.info("KIS 웹소켓 {}초 뒤 다시 접속", delay);
         scheduler.schedule(this::connect, delay, TimeUnit.SECONDS);
+    }
+
+    /** n번째 연속 실패의 기다림: 1·2·4·8·16·32·60·60…초 */
+    static long backoffSeconds(int failures) {
+        return Math.min(60, 1L << Math.min(Math.max(failures, 1) - 1, 6));
+    }
+
+    /**
+     * 연결을 버리고 다시 접속 (11/17). 끊김 신호(onClose·onError) 없이 연결이 못 쓰게 된 경우:
+     * 보내기 실패("closed output"), KIS가 "ALREADY IN USE appkey"로 새 연결을 거절한 경우
+     */
+    private void dropAndReconnect(String why) {
+        log.warn("KIS 웹소켓 연결을 버리고 다시 접속: {}", why);
+        WebSocket ws = socket;
+        if (ws != null) {
+            ws.abort();
+        }
+        scheduleReconnect();
+    }
+
+    /**
+     * KIS가 "이 앱키는 이미 다른 연결이 쓰는 중"이라고 거절했는가.
+     * 11/17 11:27 끊김(1006) 1초 뒤 다시 접속 → 이 응답 → KIS가 보내는 쪽을 닫음 → 3시간 넘게 체결 0인데 상태는 "연결됨".
+     * 끊긴 예전 연결을 KIS가 아직 정리하지 못한 것이라 조금 기다렸다 다시 붙으면 됨
+     */
+    static boolean appKeyInUse(String msg1) {
+        return msg1 != null && msg1.contains("ALREADY IN USE");
     }
 
     /** 구독 등록("1")·해제("2") 메시지. 헤더에 웹소켓 접속키 */
@@ -229,6 +259,9 @@ public class KisWebSocketClient {
                 ws.sendText(text, true).join();
             } catch (RuntimeException e) {
                 log.warn("KIS 웹소켓 보내기 실패: {}", e.getMessage());
+                if (ws == socket) {   // 그 사이 새 연결로 바뀌었으면 새 연결은 건드리지 않음
+                    dropAndReconnect("보내기 실패");
+                }
             }
         }
     }
@@ -241,6 +274,7 @@ public class KisWebSocketClient {
         if (TickParser.isData(msg)) {
             TickParser.Result r = TickParser.parse(msg, now);
             if (r.error() == null) {
+                failures.set(0);   // 체결이 들어오면 정상 연결
                 buffer.add(r.ticks());
             } else {
                 quarantine(msg, r.error(), now);
@@ -265,10 +299,15 @@ public class KisWebSocketClient {
                 subscribed.remove(key);
             } else {
                 subscribed.add(key);
+                failures.set(0);   // 구독 성공 = 정상 연결
             }
             log.info("KIS 실시간 {}: {}", key, m);
         } else {
             log.warn("KIS 실시간 응답 {}: rt_cd={} {}", key, rt, m);
+            if (appKeyInUse(m) && ws == socket) {
+                dropAndReconnect("앱키가 이미 다른 연결에서 쓰이는 중 (끊긴 예전 연결이 KIS에 남음)");
+                return;
+            }
         }
         SubscriptionListener l = listener;
         if (l != null) {

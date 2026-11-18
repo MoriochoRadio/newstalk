@@ -83,4 +83,38 @@ class KisRestClientRetryTest {
         assertThat(KisRestClient.isSlowResponse(new ResourceAccessException("x", new HttpConnectTimeoutException("connect timed out")))).isFalse();
         assertThat(KisRestClient.isSlowResponse(new ResourceAccessException("x", new ConnectException("refused")))).isFalse();
     }
+
+    /** 2026-11-18 실제 응답 모양 (칸 일부). 없는 종목(999999)은 빈 줄로 옴 */
+    @Test
+    void 여러_종목_현재가를_한_번에_받고_없는_종목은_뺀다() {
+        String url = BASE + "/uapi/domestic-stock/v1/quotations/intstock-multprice"
+                + "?FID_COND_MRKT_DIV_CODE_1=J&FID_INPUT_ISCD_1=207940&FID_COND_MRKT_DIV_CODE_2=J&FID_INPUT_ISCD_2=999999";
+        String body = """
+                {"rt_cd":"0","msg_cd":"MCA00000","msg1":"정상처리 되었습니다.","output":[
+                 {"inter_shrn_iscd":"207940","inter_kor_isnm":"삼성바이오로직스","inter2_prpr":"1388000",
+                  "inter2_prdy_vrss":"-26000","prdy_vrss_sign":"5","prdy_ctrt":"-1.84","acml_vol":"52000",
+                  "inter2_oprc":"1410000","inter2_hgpr":"1415000","inter2_lwpr":"1385000"},
+                 {"inter_shrn_iscd":"","inter_kor_isnm":"","inter2_prpr":"","inter2_prdy_vrss":"","prdy_vrss_sign":"",
+                  "prdy_ctrt":"","acml_vol":"","inter2_oprc":"","inter2_hgpr":"","inter2_lwpr":""}]}
+                """;
+        server.expect(once(), requestTo(url)).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        var out = client.inquireMultiPrice(java.util.List.of("207940", "999999"));
+
+        assertThat(out).hasSize(1);
+        KisPrice p = out.get(0);
+        assertThat(p.stockCode()).isEqualTo("207940");
+        assertThat(p.price()).isEqualTo(1388000);
+        assertThat(p.changeAmount()).isEqualTo(-26000);
+        assertThat(p.changeSign()).isEqualTo("5");
+        assertThat(p.changeRate()).isEqualByComparingTo("-1.84");
+        assertThat(p.high()).isEqualTo(1415000);
+        server.verify();
+    }
+
+    @Test
+    void 여러_종목은_30개까지만() {
+        var codes = java.util.stream.IntStream.range(0, 31).mapToObj(i -> String.format("%06d", i)).toList();
+        assertThatThrownBy(() -> client.inquireMultiPrice(codes)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

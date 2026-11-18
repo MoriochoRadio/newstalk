@@ -156,6 +156,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
   - `stocks[].sameNewsCount`: 이 종목에서 **같은 소식으로 묶인 기사 수** (V13 `group_article_id`, 화면에 나오는 `DONE` 글만 셈). 묶이지 않았으면 `null`
   - `stocks[].firstReportPress`: 그 묶음에서 **발행이 가장 빠른 기사**의 언론사 (같은 시각이면 글 번호가 작은 쪽). 묶이지 않았으면 `null`
   - `stocks[].firstReport`: 이 기사가 그 첫 보도인가 (`true`/`false`). 화면은 `sameNewsCount` 2 이상일 때 "같은 소식 n건 · 첫 보도 ○○" 또는 "첫 보도 · 같은 소식 n건"
+  - `stocks[].groupPositive`·`groupNegative`·`groupNeutral` (11/17): 그 같은 소식 묶음(`DONE` 글)의 AI 판단(감성) 수. 제목만 받은 기사(감성 `null`)도 같은 소식의 다른 기사가 받은 판단으로 화면이 링을 그림. 묶이지 않았으면 `null`
 - `sourceType`이 `SNS`면 "참고용 · 확인되지 않은 정보" 표시 (요구사항 N-05)
   - **SNS 글은 네이버 검색 결과 그대로 보여 주기:** `summary`는 네이버 검색 미리보기(AI 요약 아님). 카드에 관련도·직접/간접·감성을 붙이지 않고, 제목은 `url`(원문)로 바로 연결 (네이버 검색 API 약관 특약 2.1 "검색 결과에 다른 내용을 끼워 넣지 않음"). SNS 감성은 종목 화면의 감성 비율(`source=SNS`)과 `snsSummary`로 따로 보여 줌. 예: 데모 화면
   - SNS 글은 모은 지 **7일이 지나면 지워집니다** (약관 7.3 "별도 DB로 쌓아 두지 않음"). 그래서 30일 언급량 그래프의 SNS는 최근 7일만 있음. 종목 하루 요약의 `snsSummary`는 남음
@@ -212,7 +213,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 
 | | 방식 | 주소 | 설명 |
 |---|---|---|---|
-| 🔓 | GET | `/api/stocks/{stockCode}/posts?page=1&size=20` | 글 목록 (최신순, 본문 없음, 댓글 수·공감 수 포함) |
+| 🔓 | GET | `/api/stocks/{stockCode}/posts?page=1&size=20` | 글 목록 (최신순, 본문 없음, 댓글 수·공감 수 포함). 로그인 토큰을 보내면 `likedByMe`(내가 공감했는지), 없으면 `false` |
 | 🔓 | GET | `/api/posts/{postId}` | 글 상세 (본문 포함) |
 | 🔒 | POST | `/api/stocks/{stockCode}/posts` | 글쓰기 `{ title, content }` · 제목 200자, 본문 5000자 |
 | 🔒 | DELETE | `/api/posts/{postId}` | 글 삭제 (본인만, 댓글·공감도 함께 삭제) |
@@ -249,7 +250,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | | 방식 | 주소 | 설명 |
 |---|---|---|---|
 | 🔓 | GET | `/api/quotes/{stockCode}` | 현재가. 생중계 종목은 DB 실시간 값(`live: true`), 아니면 KIS 조회(5초 캐시) |
-| 🔓 | GET | `/api/quotes?codes=005930,000660` | 여러 종목 현재가 (최대 10개, 없는·실패한 종목은 빠짐) |
+| 🔓 | GET | `/api/quotes?codes=005930,000660` | 여러 종목 현재가 (최대 10개, 없는·실패한 종목은 빠짐). 생중계 종목은 DB 값, 5초 안에 물어본 종목은 캐시, 나머지만 모아 KIS 한 번 |
 | 🔓 | GET | `/api/quotes/{stockCode}/chart?unit=5m&date=2026-10-30` | **봉(캔들) 차트**. `unit` `1m`·`5m`·`10m`·`30m`: `date` 하루(없으면 오늘)의 09:00~15:30 분봉, 최대 1년 전까지. `day`: 최근 1년, `week`·`month`: 최근 100개, `year`: 상장 이후. `to`(일·주·월봉만): 그 날짜(포함)까지 거꾸로 100개 이내 (왼쪽으로 끌 때 이어 받기). 옛 값 `minute`=`1m`. `items`는 오래된 것부터 |
 | 🔓 | GET | `/api/quotes/{stockCode}/ticks` | 최근 체결 30건 (최신이 앞) |
 | 🔓 | GET (SSE) | `/api/quotes/stream?codes=005930` | **실시간 방송** (최대 5종목). 이벤트 `quote`(현재가, 연결 직후 한 번 + 바뀔 때마다), `tick`(새 체결, 생중계 종목만) |
@@ -258,16 +259,18 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | 🔓 | GET (SSE) | `/api/quotes/{stockCode}/replay?date=2026-11-03&from=09:00&speed=10` | **다시 보기**. 이벤트 `start` → `replay`(체결마다) → `end`. 배속 1·5·10·30·60 |
 | 🔓 | GET | `/api/quotes/check?date=` | 수집 점검: 종목별 저장 체결량 ÷ 실제 거래량(누적 거래량 차이) = `coverageRate`, 지연 ms |
 | 🔓 | GET | `/api/quotes/{stockCode}/big-moves?period=1y&threshold=5` | **과거 급등·급락 이력 (F-17)**. 하루 등락률이 ±`threshold`% 이상인 날(최신부터) + 그날 이 종목에 연결된 글. `period` `3m`·`6m`·`1y`(기본), `threshold` 3~30(기본 5) |
+| 🔓 | GET | `/api/quotes/market-map` | **종목 지도(시가총액 지도)**. 코스피·코스닥 시가총액 상위 각 30개(우선주 제외): `stockCode`, `stockName`, `market`, `sector`(거래소 업종, 못 받으면 "기타"), `marketCap`(억 원), `price`, `changeRate`, `priceLimit`. 순위 60초 캐시, 업종은 종목마다 하루 캐시. **장 밖(평일 09:00 전·15:31 이후, 주말)에는 `price`·`changeRate`·`priceLimit`을 거래소(KRX) 현재가로 바꿈** (순위 API 는 장 뒤 넥스트레이드 체결가를 줘서 차트·급등락 이력과 달랐음, 30분 캐시). 현재가 `GET /api/quotes/{code}`도 장 밖에는 실시간 값(시간외 단일가) 대신 거래소 현재가 |
 
 현재가 한 건:
 
 ```json
 { "stockCode": "005930", "price": 219500, "changeAmount": -9500, "changeRate": -4.15, "direction": "DOWN",
   "open": 220500, "high": 223000, "low": 217000, "accVolume": 7611275,
-  "fetchedAt": "2026-11-03T13:04:55+09:00", "live": true }
+  "fetchedAt": "2026-11-03T13:04:55+09:00", "live": true, "priceLimit": null }
 ```
 
 - `direction`: `UP`(상승·상한) / `DOWN`(하락·하한) / `FLAT`. 화면 색은 상승 빨강, 하락 파랑 (국내 증권 앱 관례)
+- `priceLimit`: 상한가면 `"UPPER"`, 하한가면 `"LOWER"`, 아니면 `null` (KIS 전일 대비 부호 1·4 그대로. 등락률로 어림하지 않음)
 - `live`: `true`면 웹소켓 실시간 값(`fetchedAt` = 마지막 체결 시각), `false`면 몇 초마다 조회한 값
 - 방송(SSE)은 브라우저 `EventSource`로 듣기: `new EventSource('/api/quotes/stream?codes=005930')` → `addEventListener('quote', e => JSON.parse(e.data))`. 끊기면 브라우저가 알아서 다시 연결. 화면을 떠나면 `close()`
 - 생중계 자리: 보는 사람이 있는 종목에 KIS 구독을 돌려씀 (공식 41건, 신규 키는 처음 3일 동안 3건). 자리가 없으면 그 종목은 5초마다 조회값으로 방송
@@ -282,10 +285,10 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
   { "date": "2026-10-29", "close": 61200, "changeAmount": 4300, "changeRate": 7.56, "direction": "UP", "volume": 31200000,
     "articleCount": 4,
     "articles": [ { "articleId": 579, "title": "...", "sourceType": "NEWS", "press": "...",
-                    "publishedAt": "2026-10-29T10:00:00+09:00", "relevance": 92 } ] }
+                    "publishedAt": "2026-10-29T10:00:00+09:00", "relevance": 92, "priceMoveTitle": false } ] }
   ```
 
-  응답 전체는 `{ stockCode, period, threshold, from, to, items: [위 모양] }`. 등락률은 KIS 일봉(수정주가) 종가로 `(그날 종가 − 전날 종가) ÷ 전날 종가`. 글은 **그날 0시~24시 작성**, `DONE`만, 관련도 높은 순 3개(`relevance`는 %, 없으면 `null`이고 뒤로)와 전체 수 `articleCount`. AI가 기사를 모으기 전 날짜는 글이 없는 게 정상. 일봉은 KIS 3번 조회 + 10분 캐시
+  응답 전체는 `{ stockCode, period, threshold, from, to, items: [위 모양] }`. 등락률은 KIS 일봉(수정주가) 종가로 `(그날 종가 − 전날 종가) ÷ 전날 종가`. 글은 **그날 0시~24시 작성**, `DONE`만, **그날 가장 많이 다뤄진 소식부터 3개**(같은 소식 묶음의 그날 기사 수가 많은 순, 같으면 관련도 순. 같은 소식은 하나만)와 전체 수 `articleCount`(`relevance`는 %, 없으면 `null`). 주가 움직임 기사(`priceMoveTitle` true, 글 목록과 같은 뜻)도 순서를 바꾸지 않음 — 화면이 '주가 기사' 표시를 붙여 원인이 아니라 그날 움직임을 다룬 기사임을 밝힘 (11/16 결정). AI가 기사를 모으기 전 날짜는 글이 없는 게 정상. 일봉은 KIS 3번 조회 + 10분 캐시
 - 오류: `503 QUOTE_DISABLED`(시세 꺼짐), `429 QUOTE_BUSY`(KIS 초당 호출 초과), `429 REPLAY_BUSY`(다시 보기 동시 5개 초과), `502 QUOTE_UPSTREAM_ERROR`·`QUOTE_UNREACHABLE`(KIS 오류·연결 실패)
 - 개발 중 확인: `http://localhost:8080/demo.html` 종목 화면의 "시세" 칸
 

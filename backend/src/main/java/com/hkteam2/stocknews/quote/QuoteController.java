@@ -2,17 +2,10 @@ package com.hkteam2.stocknews.quote;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,7 +34,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequestMapping("/api/quotes")
 public class QuoteController {
 
-    private static final Logger log = LoggerFactory.getLogger(QuoteController.class);
     private static final int MAX_CODES = 10;
     private static final int MAX_STREAM_CODES = 5;
 
@@ -117,13 +109,20 @@ public class QuoteController {
         return service().status();
     }
 
+    @Operation(summary = "종목 지도(시가총액 지도)", description = "코스피·코스닥 시가총액 상위 각 30개(우선주 제외)와 업종·등락률. 순위 60초 캐시, 업종 하루 캐시. marketCap 은 억 원")
+    @GetMapping("/market-map")
+    public MarketMapResponse getMarketMap() {
+        return service().marketMap();
+    }
+
     @Operation(summary = "현재가 한 종목", description = "실시간으로 받는 종목이면 live=true(DB 현재가), 아니면 KIS 조회 5초 캐시. direction UP/DOWN/FLAT, 하락이면 changeAmount·changeRate 음수")
     @GetMapping("/{stockCode}")
     public QuoteResponse getQuote(@PathVariable String stockCode) {
         return service().price(checkStock(stockCode));
     }
 
-    @Operation(summary = "현재가 여러 종목", description = "codes=005930,000660 (최대 10개). 없는 종목·실패한 종목은 빠짐")
+    @Operation(summary = "현재가 여러 종목", description = "codes=005930,000660 (최대 10개). 없는 종목·실패한 종목은 빠짐."
+            + " 실시간 종목은 DB 현재가, 5초 안에 물어본 종목은 캐시, 나머지만 모아 KIS 한 번(멀티종목 시세)")
     @GetMapping
     public ListResponse<QuoteResponse> getQuotes(@RequestParam String codes) {
         QuoteService service = service();
@@ -133,37 +132,8 @@ public class QuoteController {
         if (known.isEmpty()) {
             return ListResponse.of(List.of());
         }
-        // 종목들을 동시에 물음 (11/13: 한 종목 답을 받고 다음 종목을 물어 KIS 답 약 0.5초 × 10종목 = 5초쯤 걸렸음)
-        // KIS로 나가는 간격은 줄 서기(KisRateLimiter)가 그대로 지켜서 한도는 같음. 답은 보낸 순서대로
-        // 일꾼은 보통 스레드: 줄 서기가 synchronized 안에서 잠들어 가상 스레드는 바닥 스레드를 붙잡음(Java 21)
-        List<QuoteResponse> out = new ArrayList<>();
-        try (ExecutorService pool = Executors.newFixedThreadPool(known.size())) {
-            List<Future<QuoteResponse>> futures = known.stream().map(code -> pool.submit(() -> priceOrNull(service, code))).toList();
-            for (Future<QuoteResponse> f : futures) {
-                QuoteResponse q = f.get();
-                if (q != null) {
-                    out.add(q);
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-            if (e.getCause() instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new IllegalStateException(e.getCause());
-        }
-        return ListResponse.of(out);
-    }
-
-    /** 한 종목이 실패해도 나머지는 보여 줌 (실패한 종목은 빠짐) */
-    private QuoteResponse priceOrNull(QuoteService service, String code) {
-        try {
-            return service.price(code);
-        } catch (KisApiException e) {
-            log.warn("시세 조회 실패 {}: {}", code, e.getMessage());
-            return null;
-        }
+        // 11/13: 종목마다 동시에 물음 → 11/18: 캐시에 없는 종목만 모아 KIS 한 번 (QuoteService.prices)
+        return ListResponse.of(service.prices(known));
     }
 
     @Operation(summary = "차트 (봉)",
@@ -199,7 +169,7 @@ public class QuoteController {
     }
 
     @Operation(summary = "과거 급등·급락 이력 (F-17)",
-            description = "일봉으로 하루 등락률이 ±threshold% 이상인 날(최신부터)과 그날 이 종목에 연결된 글(관련도 높은 순 3개, 전체 수)."
+            description = "일봉으로 하루 등락률이 ±threshold% 이상인 날(최신부터)과 그날 이 종목에 연결된 글(그날 가장 많이 다뤄진 소식부터 3개, 같은 소식은 하나만, 전체 수)."
                     + " period 3m·6m·1y(기본), threshold 3~30(기본 5). 일봉은 KIS에서 받아 10분 캐시. 글은 작성일 기준, DONE만")
     @GetMapping("/{stockCode}/big-moves")
     public BigMoveResponse getBigMoves(@PathVariable String stockCode,

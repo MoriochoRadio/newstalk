@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
  * 판단(호재·악재)을 더하지 않고, 이미 있는 제목·출처에서 읽을 수 있는 사실만 꺼냄.
  * 근거와 측정은 docs/decisions.md 2026-11-10 "정보만 제공 표시"
  */
-final class ArticleLabels {
+public final class ArticleLabels {
 
     private ArticleLabels() {
     }
@@ -20,7 +20,9 @@ final class ArticleLabels {
      * (11/10 화면 확인). 주가 기사는 "5% 급등"처럼 급등·상승 낱말이 같이 나와 그대로 잡힘
      */
     private static final Pattern PRICE_MOVE = Pattern.compile(
-            "특징주|급등|급락|상한가|하한가|강세|약세|상승|하락|뛰|올랐|내렸|떨어|치솟|곤두박질|반등|폭락|폭등|신고가|52주");
+            // 11/16 밤 화면 리뷰: "삼전닉스 2차 매물폭탄 쏟아지나"가 시세 기사로 안 걸려 -5.34% 옆 대표 제목(원인처럼)으로 나옴.
+            // 지난 30일 제목에서 이 낱말들은 주가 기사에만 나옴 ('매물' 하나는 회사 매각 기사도 있어 '매물폭탄'만)
+            "특징주|급등|급락|상한가|하한가|강세|약세|상승|하락|뛰|올랐|내렸|떨어|치솟|곤두박질|반등|폭락|폭등|신고가|52주|매물폭탄|매물 폭탄|매도 폭탄|매도세|매수세|투매|패닉");
 
     /** 공시 유형: 제목(회사명 + 보고서명) 낱말 → 화면 이름. 위에서부터 먼저 맞는 것. AI dart.py 의 고르는 낱말과 같은 범위 */
     private static final List<String[]> DISCLOSURE_TYPES = List.of(
@@ -62,7 +64,7 @@ final class ArticleLabels {
     private static final Pattern[] COMPILED = DISCLOSURE_TYPES.stream()
             .map(p -> Pattern.compile(p[0])).toArray(Pattern[]::new);
 
-    static boolean priceMoveTitle(String title) {
+    public static boolean priceMoveTitle(String title) {
         return title != null && PRICE_MOVE.matcher(title).find();
     }
 

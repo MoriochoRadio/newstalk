@@ -119,4 +119,22 @@ class BoardApiTest extends ApiTestSupport {
         mvc.perform(post("/api/posts/{id}/like", postId))
                 .andExpect(status().isUnauthorized());
     }
+
+    /** 11/17 QA: 목록에 "내가 공감했는지"가 없어 다시 들어오면 빈 하트 → 누르면 공감이 취소됐음 */
+    @Test
+    void 목록은_내가_공감했는지를_알려_준다() throws Exception {
+        String author = tokenOf("zzboard09");
+        String fan = tokenOf("zzboard10");
+        long postId = newPost(author, "공감 표시 확인");
+        mvc.perform(post("/api/posts/{id}/like", postId).header("Authorization", bearer(fan)));
+
+        mvc.perform(get("/api/stocks/{code}/posts", KIA).header("Authorization", bearer(fan)))
+                .andExpect(jsonPath("$.items[0].postId").value(postId))
+                .andExpect(jsonPath("$.items[0].likedByMe").value(true));
+        mvc.perform(get("/api/stocks/{code}/posts", KIA).header("Authorization", bearer(author)))
+                .andExpect(jsonPath("$.items[0].likedByMe").value(false));
+        mvc.perform(get("/api/stocks/{code}/posts", KIA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].likedByMe").value(false));
+    }
 }

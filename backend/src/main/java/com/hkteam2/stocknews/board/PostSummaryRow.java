@@ -9,6 +9,7 @@ public record PostSummaryRow(
         String authorLoginId,
         LocalDateTime createdAt,
         Long commentCount,
-        Long likeCount
+        Long likeCount,
+        Boolean likedByMe
 ) {
 }

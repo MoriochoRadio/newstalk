@@ -29,6 +29,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * 주소·tr_id·입력 칸: KIS 공식 예제 domestic_stock_functions.py, 응답 칸 이름: 2026-11-03 실제 응답으로 확인
  * | 조회 | 주소 | tr_id | 한 번에 |
  * | 현재가 | /quotations/inquire-price | FHKST01010100 | 1 |
+ * | 현재가 여러 종목 | /quotations/intstock-multprice | FHKST11300006 | 30 (공식 예제 intstock_multprice.py) |
  * | 일별 분봉 | /quotations/inquire-time-dailychartprice | FHKST03010230 | 120분 (실전 전용, 지난 날도 됨, 최대 1년 보관) |
  * | 일·주·월·년봉 | /quotations/inquire-daily-itemchartprice | FHKST03010100 | 100개 |
  * | 최근 체결 | /quotations/inquire-ccnl | FHKST01010300 | 30건 |
@@ -40,6 +41,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class KisRestClient {
 
     private static final String BASE_PATH = "/uapi/domestic-stock/v1/quotations";
+    private static final String RANKING_PATH = "/uapi/domestic-stock/v1/ranking";
     private static final String RATE_LIMIT = "EGW00201";
     private static final int MAX_ATTEMPTS = 3;
     /** 연결 실패는 1번만 다시 (일시 끊김 대비). 응답이 느린 경우는 다시 안 함 → get() 설명 */
@@ -65,7 +67,33 @@ public class KisRestClient {
     record PriceOutput(@JsonProperty("stck_prpr") String price, @JsonProperty("prdy_vrss") String changeAmount,
                        @JsonProperty("prdy_vrss_sign") String changeSign, @JsonProperty("prdy_ctrt") String changeRate,
                        @JsonProperty("acml_vol") String accVolume, @JsonProperty("stck_oprc") String open,
-                       @JsonProperty("stck_hgpr") String high, @JsonProperty("stck_lwpr") String low) {
+                       @JsonProperty("stck_hgpr") String high, @JsonProperty("stck_lwpr") String low,
+                       @JsonProperty("hts_avls") String marketCap, @JsonProperty("bstp_kor_isnm") String sector) {
+    }
+
+    record MultiPriceResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
+                              @JsonProperty("msg1") String msg1, @JsonProperty("output") List<MultiPriceRow> rows) {
+    }
+
+    /**
+     * 관심종목(멀티종목) 시세 한 줄 (2026-11-18 실제 응답으로 확인). 부호·형식은 inquire-price 와 같음
+     * (삼성바이오로직스 하락: 두 API 모두 -26000, 부호 5, -1.84). 없는 종목은 칸이 모두 빈 줄로 옴
+     */
+    record MultiPriceRow(@JsonProperty("inter_shrn_iscd") String code, @JsonProperty("inter2_prpr") String price,
+                         @JsonProperty("inter2_prdy_vrss") String changeAmount,
+                         @JsonProperty("prdy_vrss_sign") String changeSign, @JsonProperty("prdy_ctrt") String changeRate,
+                         @JsonProperty("acml_vol") String accVolume, @JsonProperty("inter2_oprc") String open,
+                         @JsonProperty("inter2_hgpr") String high, @JsonProperty("inter2_lwpr") String low) {
+    }
+
+    record CapRankResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
+                           @JsonProperty("msg1") String msg1, @JsonProperty("output") List<CapRankRow> rows) {
+    }
+
+    /** 시가총액 상위 한 줄 (2026-11-16 실제 응답으로 칸 확인: 코스피·코스닥 각 30개) */
+    record CapRankRow(@JsonProperty("mksc_shrn_iscd") String code, @JsonProperty("hts_kor_isnm") String name,
+                      @JsonProperty("stck_prpr") String price, @JsonProperty("prdy_vrss_sign") String changeSign,
+                      @JsonProperty("prdy_ctrt") String changeRate, @JsonProperty("stck_avls") String marketCap) {
     }
 
     record MinuteResponse(@JsonProperty("rt_cd") String rtCd, @JsonProperty("msg_cd") String msgCd,
@@ -112,7 +140,61 @@ public class KisRestClient {
         check(res == null ? null : res.rtCd(), res == null ? null : res.msgCd(), res == null ? null : res.msg1());
         PriceOutput o = res.output();
         return new KisPrice(stockCode, toLong(o.price()), toLong(o.changeAmount()), o.changeSign(),
-                toDecimal(o.changeRate()), toLong(o.accVolume()), toLong(o.open()), toLong(o.high()), toLong(o.low()));
+                toDecimal(o.changeRate()), toLong(o.accVolume()), toLong(o.open()), toLong(o.high()), toLong(o.low()),
+                toLong(o.marketCap()), o.sector() == null ? null : o.sector().strip());
+    }
+
+    /** 한 번에 물을 수 있는 종목 수 (KIS 공식 예제 intstock_multprice.py: "최대 30종목") */
+    public static final int MULTI_PRICE_MAX = 30;
+
+    /**
+     * 여러 종목 현재가를 KIS 한 번으로 (관심종목(멀티종목) 시세조회 FHKST11300006, 최대 30종목)
+     * 시가총액·업종 칸은 없음(0, null). 없는 종목은 빠짐. 순서는 KIS가 준 순서(= 보낸 순서)
+     */
+    public List<KisPrice> inquireMultiPrice(List<String> stockCodes) {
+        if (stockCodes.isEmpty()) {
+            return List.of();
+        }
+        if (stockCodes.size() > MULTI_PRICE_MAX) {
+            throw new IllegalArgumentException("한 번에 최대 " + MULTI_PRICE_MAX + "종목");
+        }
+        Map<String, String> params = new LinkedHashMap<>();
+        for (int i = 0; i < stockCodes.size(); i++) {
+            params.put("FID_COND_MRKT_DIV_CODE_" + (i + 1), "J");
+            params.put("FID_INPUT_ISCD_" + (i + 1), stockCodes.get(i));
+        }
+        MultiPriceResponse res = get("/intstock-multprice", "FHKST11300006", params, MultiPriceResponse.class);
+        check(res == null ? null : res.rtCd(), res == null ? null : res.msgCd(), res == null ? null : res.msg1());
+        List<KisPrice> out = new ArrayList<>();
+        for (MultiPriceRow r : nullToEmpty(res.rows())) {
+            if (r.code() == null || r.code().isBlank()) {
+                continue;
+            }
+            out.add(new KisPrice(r.code().strip(), toLong(r.price()), toLong(r.changeAmount()), r.changeSign(),
+                    toDecimal(r.changeRate()), toLong(r.accVolume()), toLong(r.open()), toLong(r.high()),
+                    toLong(r.low()), 0, null));
+        }
+        return out;
+    }
+
+    /**
+     * 시가총액 상위 (국내주식 시가총액 상위 FHPST01740000). market: 0001 코스피 / 1001 코스닥. 한 번에 30개
+     * 시장 지도(종목 지도) 재료 — 2026-11-16 실제 응답으로 확인
+     */
+    public List<CapRankRow> rankMarketCap(String market) {
+        Map<String, String> params = new java.util.LinkedHashMap<>();
+        params.put("fid_cond_mrkt_div_code", "J");
+        params.put("fid_cond_scr_div_code", "20174");
+        params.put("fid_div_cls_code", "0");
+        params.put("fid_input_iscd", market);
+        params.put("fid_trgt_cls_code", "0");
+        params.put("fid_trgt_exls_cls_code", "0");
+        params.put("fid_input_price_1", "");
+        params.put("fid_input_price_2", "");
+        params.put("fid_vol_cnt", "");
+        CapRankResponse res = getRanking("/market-cap", "FHPST01740000", params, CapRankResponse.class);
+        check(res == null ? null : res.rtCd(), res == null ? null : res.msgCd(), res == null ? null : res.msg1());
+        return res.rows() == null ? List.of() : res.rows();
     }
 
     /**
@@ -188,8 +270,17 @@ public class KisRestClient {
      * - 응답이 느림(연결은 됐는데 읽기 시간 초과): 다시 안 함. 모든 호출이 한 줄로 서므로 느린 KIS를 또 기다리면
      *   뒤에 선 다른 종목 요청까지 밀림 (전에는 최악 약 32초 → 지금 약 16초 이하)
      */
+    /** 순위 API (/uapi/domestic-stock/v1/ranking/...) — 경로만 다르고 줄 서기·다시 시도는 get 과 같음 */
+    private <T> T getRanking(String path, String trId, Map<String, String> params, Class<T> type) {
+        return send(props.baseUrl() + RANKING_PATH + path, trId, params, type);
+    }
+
     private <T> T get(String path, String trId, Map<String, String> params, Class<T> type) {
-        UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(props.baseUrl() + BASE_PATH + path);
+        return send(props.baseUrl() + BASE_PATH + path, trId, params, type);
+    }
+
+    private <T> T send(String url, String trId, Map<String, String> params, Class<T> type) {
+        UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(url);
         params.forEach(uri::queryParam);
         int networkRetries = 0;
         for (int attempt = 1; ; attempt++) {

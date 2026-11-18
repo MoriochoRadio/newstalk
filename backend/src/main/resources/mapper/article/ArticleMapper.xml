@@ -31,6 +31,9 @@
             <arg column="same_news_count" javaType="Integer"/>
             <arg column="first_article_id" javaType="Long"/>
             <arg column="first_press" javaType="String"/>
+            <arg column="group_positive" javaType="Integer"/>
+            <arg column="group_negative" javaType="Integer"/>
+            <arg column="group_neutral" javaType="Integer"/>
         </constructor>
     </resultMap>
 
@@ -156,7 +159,21 @@
                    (SELECT ga.press FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
                     WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE'
                     ORDER BY ga.published_at, ga.article_id LIMIT 1)
-               END AS first_press
+               END AS first_press,
+               <!-- 같은 소식 묶음의 AI 판단 수 (11/17): 제목만 받은 기사(판단 없음)라도 같은 소식의 다른 기사가 받은 판단으로 화면이 링을 그림.
+                    화면이 받은 한 쪽(20건) 안에 같은 소식 기사가 없어도 되게 서버가 셈. 묶이지 않았으면 NULL -->
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
+                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
+                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE' AND g.sentiment = 'POSITIVE')
+               END AS group_positive,
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
+                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
+                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE' AND g.sentiment = 'NEGATIVE')
+               END AS group_negative,
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
+                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
+                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE' AND g.sentiment = 'NEUTRAL')
+               END AS group_neutral
         FROM article_stock s
         JOIN stock_info i ON i.stock_code = s.stock_code
         WHERE s.article_id IN

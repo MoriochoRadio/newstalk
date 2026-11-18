@@ -45,4 +45,30 @@ class KisWebSocketStaleTest {
         assertThat(KisWebSocketClient.stale(tue(11, 0, 0), tue(10, 0, 0), null, false)).isFalse(); // 구독 없음
         assertThat(KisWebSocketClient.stale(tue(11, 0, 0), null, null, true)).isFalse();          // 끊긴 상태 (다시 접속은 따로)
     }
+
+    @Test
+    void 수능일은_10시부터_16시30분까지_본다() {
+        LocalDateTime connected = LocalDateTime.of(2026, 11, 19, 8, 0);
+        assertThat(KisWebSocketClient.stale(LocalDateTime.of(2026, 11, 19, 9, 30), connected, null, true)).isFalse();   // 아직 장 전
+        assertThat(KisWebSocketClient.stale(LocalDateTime.of(2026, 11, 19, 16, 0), connected, null, true)).isTrue();    // 보통 날이면 장 마감 뒤
+        assertThat(KisWebSocketClient.stale(LocalDateTime.of(2026, 11, 19, 16, 31), connected, null, true)).isFalse();
+    }
+
+    /** 11/17 11:27: 끊김 1초 뒤 다시 접속 → KIS가 "ALREADY IN USE appkey"로 거절 → 3시간 넘게 체결 0인데 "연결됨" */
+    @Test
+    void 앱키가_이미_쓰이는_중이라는_응답은_다시_접속할_신호() {
+        assertThat(KisWebSocketClient.appKeyInUse("ALREADY IN USE appkey")).isTrue();
+        assertThat(KisWebSocketClient.appKeyInUse("SUBSCRIBE SUCCESS")).isFalse();
+        assertThat(KisWebSocketClient.appKeyInUse("ALREADY IN SUBSCRIBE")).isFalse();   // 이건 이미 등록됨 = 성공
+        assertThat(KisWebSocketClient.appKeyInUse(null)).isFalse();
+    }
+
+    @Test
+    void 연달아_실패하면_기다림이_늘어난다() {
+        assertThat(KisWebSocketClient.backoffSeconds(1)).isEqualTo(1);
+        assertThat(KisWebSocketClient.backoffSeconds(2)).isEqualTo(2);
+        assertThat(KisWebSocketClient.backoffSeconds(4)).isEqualTo(8);
+        assertThat(KisWebSocketClient.backoffSeconds(7)).isEqualTo(60);
+        assertThat(KisWebSocketClient.backoffSeconds(100)).isEqualTo(60);
+    }
 }

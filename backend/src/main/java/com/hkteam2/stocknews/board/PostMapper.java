@@ -15,7 +15,8 @@ public interface PostMapper {
     /** 최신순 한 페이지 */
     List<PostSummaryRow> findPageByStock(@Param("stockCode") String stockCode,
                                          @Param("limit") int limit,
-                                         @Param("offset") int offset);
+                                         @Param("offset") int offset,
+                                         @Param("userId") Long userId);
 
     Optional<PostDetailRow> findDetail(@Param("postId") Long postId);
 

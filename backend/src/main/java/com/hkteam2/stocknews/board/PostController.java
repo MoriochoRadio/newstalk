@@ -36,13 +36,15 @@ public class PostController {
         this.postService = postService;
     }
 
-    @Operation(summary = "종목 게시판 글 목록", description = "최신순. page는 1부터, size는 1~100 (기본 20)")
+    @Operation(summary = "종목 게시판 글 목록",
+            description = "최신순. page는 1부터, size는 1~100 (기본 20). 로그인 토큰을 보내면 likedByMe(내가 공감했는지), 없으면 false")
     @GetMapping("/stocks/{stockCode}/posts")
     public ListResponse<PostSummaryResponse> getPosts(
+            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "종목코드 6자리", example = "005930") @PathVariable String stockCode,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "" + PageQuery.DEFAULT_SIZE) int size) {
-        return postService.getPosts(stockCode, new PageQuery(page, size));
+        return postService.getPosts(stockCode, new PageQuery(page, size), jwt == null ? null : CurrentUser.id(jwt));
     }
 
     @Operation(summary = "게시글 상세")
