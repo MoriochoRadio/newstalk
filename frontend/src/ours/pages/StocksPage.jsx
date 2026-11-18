@@ -3,7 +3,7 @@
 // 11/18: 분류별 보기(시장·업종·테마) — 이슈 순위 API 가 market·theme 로 걸러 줌 (백엔드 feature/be-account-category). 값은 주소에
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronRight, LogIn, Star } from 'lucide-react';
+import { ChevronRight, LayoutList, LogIn, Rows3, Star } from 'lucide-react';
 import { stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
@@ -17,6 +17,12 @@ import { Empty, ErrorBox, LimitBadge, SkeletonRows } from '../components/ui';
 import CategoryBar, { MARKETS } from '../components/CategoryBar';
 
 const LIMIT = 30;
+// 11/18 실험(test/fe-dashboard-compact): 크게 = 화제 종목 카드 + 순위 15줄, 작게 = 카드 없이 순위 30줄을 촘촘히 (뉴스·공시의 크게·작게와 같은 단추)
+const VIEW_KEY = 'snm_stocks_view';
+const VIEWS = [
+  { key: 'card', label: '크게', icon: LayoutList },
+  { key: 'dense', label: '작게', icon: Rows3 },
+];
 
 function WatchMini() {
   const { user, checking, openAuth, watchlist } = useSession();
@@ -91,7 +97,23 @@ export default function StocksPage() {
   const maxCount = Math.max(1, ...items.map((i) => i.articleCount));
   // 처음엔 15줄 + '더 보기' (11/16 리뷰 11번: 30줄이라 화면이 3,400px 넘게 길었음)
   const [showAll, setShowAll] = useState(false);
-  const rows = showAll ? items : items.slice(0, 15);
+  const [view, setViewState] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'dense' ? 'dense' : 'card';
+    } catch {
+      return 'card';
+    }
+  });
+  const setView = (v) => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* 기억 못 해도 지금 화면은 바뀜 */
+    }
+  };
+  const dense = view === 'dense';
+  const rows = showAll || dense ? items : items.slice(0, 15);
 
   return (
     <>
@@ -99,19 +121,29 @@ export default function StocksPage() {
         <div>
           <h1 className="page-title">종목</h1>
         </div>
+        <div className="segmented sm view-toggle" role="group" aria-label="보기 방식">
+          {VIEWS.map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>
+              <Icon className="icon-sm" aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="card cat-card">
         <CategoryBar value={{ market, theme }} onChange={setCategory} />
       </div>
       {/* 화면 안 종목 검색창은 뺌: 바로 위 머리줄 검색과 같은 일이라 어느 쪽에 써야 할지 망설이게 함 (11/16 디자이너 리뷰) */}
       {/* 홈에서 옮겨 온 화제 종목 카드 (11/13 피드백: 홈은 한 화면 대시보드, 자세한 건 눌러서 다른 화면) */}
+      {!dense && (
       <section className="hot-section" aria-labelledby="hot-title">
         <h2 className="section-title" id="hot-title">
           오늘 화제 종목{filtering && <span className="section-tag">{catLabel}</span>}
         </h2>
         <HotStocks issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={disabled} />
       </section>
-      <div className="grid-2 sl-grid" style={{ marginTop: 16 }}>
+      )}
+      <div className={`grid-2 sl-grid ${dense ? 'sl-dense' : ''}`} style={{ marginTop: dense ? 0 : 16 }}>
         <section className="card sl-rank" aria-labelledby="rank-title">
           <div className="card-head">
             <h2 className="card-title" id="rank-title">

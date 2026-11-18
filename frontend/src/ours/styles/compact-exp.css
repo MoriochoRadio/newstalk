@@ -1,0 +1,81 @@
+/* ===== 11/18 실험 (test/fe-dashboard-compact): 홈 '한눈에'(컨트롤 센터) · 종목 '작게' =====
+   main 에는 아직 없음. 색·크기는 tokens.css 이름만 */
+
+/* 머리의 보기 단추 */
+.home-view { margin-left: auto; }
+.page-head .view-toggle { margin-left: auto; }
+
+/* --- 홈 한눈에 --- */
+.cc { display: grid; gap: 12px; }
+.cc-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1100px) {
+  .cc-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .cc-map { grid-column: span 5; }
+  .cc-rank { grid-column: span 4; }
+  .cc-movers { grid-column: span 3; }
+  .cc-news { grid-column: span 6; }
+  .cc-topics { grid-column: span 3; }
+  .cc-disc { grid-column: span 3; }
+}
+/* 칸은 얇게: 카드 안쪽 여백·제목 크기를 줄여 한 화면에 더 (토스증권 첫 화면처럼 밀도 높게) */
+.cc-card { padding: 12px 14px; margin: 0 !important; min-width: 0; }
+.cc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.cc-title { margin: 0; font-size: var(--fs-md); font-weight: 700; }
+.cc-more { display: inline-flex; align-items: center; gap: 2px; color: var(--text-3); font-size: var(--fs-xs); font-weight: 600; text-decoration: none; }
+.cc-more:hover { color: var(--accent-text); }
+.cc-note { margin: 8px 0 0; color: var(--text-3); font-size: 11px; }
+.cc-movers > .card { height: 100%; margin: 0; padding: 12px 14px; }
+
+/* 화제 종목 순위: 한 줄 = 순위 · 이름 · 기사 막대 · 건수 · 현재가 · 등락 */
+.cc-rank-list { list-style: none; margin: 0; padding: 0; }
+.cc-rank-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 48px 36px auto 58px;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+}
+.cc-rank-row:hover { background: var(--surface-hover); }
+.cc-rank-n { color: var(--text-3); font-weight: 700; text-align: center; }
+.cc-rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cc-rank-bar { height: 4px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.cc-rank-bar i { display: block; height: 100%; background: var(--bar-news, var(--accent)); }
+.cc-rank-cnt { color: var(--text-3); font-size: var(--fs-xs); text-align: right; }
+.cc-rank-price { text-align: right; font-size: var(--fs-xs); color: var(--text-2); }
+.cc-rank-rate { text-align: right; font-weight: 700; font-size: var(--fs-xs); }
+.cc-rank-rate.up { color: var(--up); }
+.cc-rank-rate.down { color: var(--down); }
+
+/* 주요 소식·공시: 작게 보기 줄을 칸 높이에 맞춰 잘라 보임 (넓은 화면에서 줄 수가 달라 칸이 들쭉날쭉하지 않게) */
+.cc-feed { max-height: 400px; overflow: auto; scrollbar-width: thin; }
+.cc-feed .dense-row { min-height: 34px; padding: 4px 2px; }
+/* 좁은 '오늘 공시' 칸: 공시 제목 앞에 이미 회사 이름이 있어 종목 칩·출처('전자공시')를 빼고 제목에 자리를 줌 */
+.cc-disc .dense-stock,
+.cc-disc .dense-src,
+.cc-disc .dense-kind { display: none; }
+
+/* 많이 다룬 주제 */
+.cc-topic-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cc-topic-list li { display: grid; grid-template-columns: 76px minmax(0, 1fr) 24px; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.cc-topic-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cc-topic-bar { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.cc-topic-bar i { display: block; height: 100%; background: var(--accent); opacity: 0.75; }
+.cc-topic-n { text-align: right; color: var(--text-2); font-size: var(--fs-xs); }
+
+/* --- 종목 작게: 순위표 줄 높이를 줄이고 30줄 모두 --- */
+.sl-dense .table td,
+.sl-dense .table th { padding-top: 5px; padding-bottom: 5px; }
+.sl-dense .table td .muted { display: none; } /* 코드·최근 시각 둘째 줄을 숨겨 한 줄로 */
+.sl-dense .table { font-size: var(--fs-sm); }
