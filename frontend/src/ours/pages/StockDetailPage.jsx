@@ -8,7 +8,8 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { dirClass, fmtAmount, fmtPrice, fmtRate, marketKo, shortTime } from '../lib/format';
+import { dirClass, fmtAmount, fmtPrice, fmtRate, fmtVolume, marketKo, shortTime } from '../lib/format';
+import IntradaySpark from '../components/IntradaySpark';
 import { errorText } from '../lib/errors';
 import { StoryFeed } from '../components/ArticleRow';
 // 차트(차트 라이브러리 약 50KB)는 따로 받음 — 화면 묶음을 다 받을 때까지 API 요청이 시작되지 않아 느린 휴대폰에서 첫 글이 3.9초 (11/16 측정)
@@ -42,6 +43,61 @@ function useTick(value) {
   return tick;
 }
 
+/**
+ * 머리 오른쪽 '오늘 흐름' (11/18 사용자: 종목 화면 머리가 왼쪽에 가격만 있고 오른쪽이 비어 있음)
+ * 증권 앱 머리의 기본 두 가지만: 오늘 5분 흐름(어제 종가 점선 위 빨강·아래 파랑)과 오늘 범위(저가~고가 막대 위 지금 값·시가)
+ * 아래 주가 차트가 자세한 차트라, 여기는 한눈에 보는 요약 (넓은 화면에서만, 휴대폰은 숨김)
+ */
+function TodayPanel({ code, name, quote }) {
+  const price = quote.price;
+  const high = Math.max(quote.high || 0, price);
+  const low = quote.low ? Math.min(quote.low, price) : 0;
+  const span = high - low;
+  const at = (v) => (span > 0 ? Math.min(100, Math.max(0, ((v - low) / span) * 100)) : 50);
+  const cls = dirClass(quote.changeRate);
+  return (
+    <aside className="today-panel" aria-label={`${name || code} 오늘 시세 흐름`}>
+      <div className="tp-head">
+        <span className="tp-k">오늘 흐름</span>
+        <span className="tp-note">5분 단위 · 점선 = 어제 종가</span>
+      </div>
+      <div className="tp-spark">
+        <IntradaySpark code={code} name={name || code} quote={quote} height={64} showLabel={false} />
+      </div>
+      {low > 0 && (
+        <div className="tp-range" role="img" aria-label={`오늘 저가 ${fmtPrice(low)}원, 고가 ${fmtPrice(high)}원, 지금 ${fmtPrice(price)}원`}>
+          <span className="tp-end num">
+            <span className="tp-cap">저가</span>
+            {fmtPrice(low)}
+          </span>
+          <span className="tp-bar">
+            {quote.open ? <i className="tp-open" style={{ left: `${at(quote.open)}%` }} title={`시가 ${fmtPrice(quote.open)}`} /> : null}
+            <i className={`tp-now ${cls}`} style={{ left: `${at(price)}%` }} />
+          </span>
+          <span className="tp-end tp-end-r num">
+            <span className="tp-cap">고가</span>
+            {fmtPrice(high)}
+          </span>
+        </div>
+      )}
+      <dl className="tp-facts num">
+        {quote.open ? (
+          <div>
+            <dt>시가</dt>
+            <dd>{fmtPrice(quote.open)}</dd>
+          </div>
+        ) : null}
+        {quote.accVolume ? (
+          <div>
+            <dt>거래량</dt>
+            <dd>{fmtVolume(quote.accVolume)}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </aside>
+  );
+}
+
 function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePause, priceNews }) {
   const { watchCodes, toggleWatch } = useSession();
   const tick = useTick(quote?.price);
@@ -49,6 +105,7 @@ function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePa
   const cls = dirClass(quote?.changeRate);
   return (
     <div className="stock-head">
+      <div className="stock-head-main">
       <div>
         {/* 별 버튼은 제목 밖 (제목 안에 두면 낭독기가 제목을 "삼성전자 관심 종목에 담기"로 읽음 — 11/12 점검) */}
         <div className="stock-name-row">
@@ -108,6 +165,8 @@ function StockHeader({ code, info, quote, quoteState, paused = false, onTogglePa
           <p className="muted">{quoteState.disabled ? '시세 준비 중' : '시세를 받지 못했어요'}</p>
         )}
       </div>
+      </div>
+      {quote && !quoteState.disabled && <TodayPanel code={code} name={info?.stockName} quote={quote} />}
     </div>
   );
 }
@@ -170,10 +229,13 @@ function SummaryCard({ code, summary }) {
           <Sparkles className="icon" aria-hidden="true" />
           오늘 AI 요약
         </h2>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={regenerate} disabled={busy}>
-          <RefreshCw className="icon-sm" aria-hidden="true" />
-          {busy ? '만드는 중… (최대 30초)' : '다시 만들기'}
-        </button>
+        {/* 11/18 사용자: '전엔 있던 AI 다시 불러오기 버튼'을 못 찾음 → 흐린 글자 버튼을 테두리 버튼 + 분명한 이름으로 */}
+        {s?.newsSummary && (
+          <button type="button" className="btn btn-secondary btn-sm regen-btn" onClick={regenerate} disabled={busy} title="오늘 기사로 AI 요약을 새로 만들어요 (로그인, 같은 종목은 10분에 한 번)">
+            <RefreshCw className={`icon-sm ${busy ? 'spin' : ''}`} aria-hidden="true" />
+            {busy ? '만드는 중… (최대 30초)' : 'AI 요약 새로 만들기'}
+          </button>
+        )}
       </div>
       {summary.loading && !s && <SkeletonRows rows={2} />}
       {summary.error && !s && <ErrorBox error={summary.error} onRetry={summary.reload} />}
@@ -189,7 +251,15 @@ function SummaryCard({ code, summary }) {
           {s.generatedAt && <p className="card-note num">{shortTime(s.generatedAt)}에 만든 요약 · AI가 쓴 글이라 틀릴 수 있어요</p>}
         </>
       ) : (
-        <p className="sub">오늘 요약이 아직 없어요. 오늘 기사가 모이면 1시간마다 만들어요.</p>
+        // 요약이 없을 때가 다시 만들기가 가장 필요한 때 → 빈 자리에 큰 버튼
+        <div className="regen-empty">
+          <p className="sub">오늘 요약이 아직 없어요. 오늘 기사가 모이면 1시간마다 만들어요. 기다리지 않고 지금 만들 수도 있어요.</p>
+          <button type="button" className="btn btn-primary btn-sm" onClick={regenerate} disabled={busy}>
+            <Sparkles className={`icon-sm ${busy ? 'spin' : ''}`} aria-hidden="true" />
+            {busy ? '만드는 중… (최대 30초)' : '지금 AI 요약 만들기'}
+          </button>
+          {!user && <span className="muted regen-hint">로그인하면 쓸 수 있어요</span>}
+        </div>
       ))}
       {error && (
         <p className="form-error" role="alert" style={{ marginTop: 10 }}>

@@ -2,7 +2,7 @@
 // 부품 출처: V7 ArticleDetail (연결 이유·근거 원문·사실 종류 배지, "기사 때문에 움직였다는 뜻 아님" 안내, 같은 소식)
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Quote } from 'lucide-react';
+import { ArrowLeft, ChevronRight, ExternalLink, Quote } from 'lucide-react';
 import { articleApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
@@ -10,7 +10,7 @@ import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
 import { fmtPrice, fmtRate, dirClass, fullTime, shortTime } from '../lib/format';
 import { explainDisclosure } from '../lib/disclosureGlossary';
-import { ArticleTags, SAME_NEWS_TIP, sourceText } from '../components/ArticleRow';
+import { ArticleTags, SAME_NEWS_TIP, StoryFeed, sourceText } from '../components/ArticleRow';
 import { TONE_TIP, ToneRing, countsOf } from '../components/Tone';
 import { Empty, ErrorBox, SkeletonRows } from '../components/ui';
 
@@ -195,6 +195,36 @@ export default function NewsDetailPage() {
   return <NewsDetail key={id} id={id} />;
 }
 
+/**
+ * 이 종목의 최근 소식 (11/18 사용자: 같은 소식·SNS 가 없는 글, 특히 공시는 카드 두 장뿐이라 아래가 비어 허전함)
+ * 빈칸을 꾸밈으로 채우지 않고 '이 회사에 요즘 무슨 일이' 를 작게 보기 줄로 5개 — 공시를 보다가 같은 회사 앞뒤 소식으로 이어 감
+ */
+function RecentForStock({ a }) {
+  const main = a.relatedStocks.find((s) => s.role === 'MAIN') || a.relatedStocks[0];
+  const recent = useApi(
+    (signal) => (main ? articleApi.list({ stockCode: main.code, sort: 'latest', size: 12 }, { signal }) : Promise.resolve(null)),
+    [main?.code, a.id],
+    { enabled: Boolean(main) }
+  );
+  if (!main) return null;
+  const items = (recent.data?.items || []).map(toUiArticle).filter((x) => x.id !== a.id).slice(0, 6);
+  if (recent.data && items.length === 0) return null;
+  return (
+    <section className="card ad-recent" aria-labelledby="recent-title">
+      <div className="card-head">
+        <h2 className="card-title" id="recent-title">
+          {main.name} 최근 소식
+        </h2>
+        <Link to={`/stocks/${main.code}`} className="link">
+          종목 화면 <ChevronRight className="icon-sm" aria-hidden="true" />
+        </Link>
+      </div>
+      {recent.loading && !recent.data && <SkeletonRows rows={3} compact />}
+      {items.length > 0 && <StoryFeed articles={items} dense focusCode={main.code} />}
+    </section>
+  );
+}
+
 function NewsDetail({ id }) {
   const back = useBack('/news');
   const detail = useApi((signal) => articleApi.get(id, { signal }), [id]);
@@ -368,6 +398,8 @@ function NewsDetail({ id }) {
           </ul>
         </section>
       )}
+
+      <RecentForStock a={a} />
     </article>
   );
 }

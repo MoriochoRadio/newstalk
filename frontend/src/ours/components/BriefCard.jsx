@@ -1,8 +1,12 @@
 // 종목 브리핑 카드: "오늘 이 종목에 무슨 일" 을 기사를 열지 않고 알게
 // 종목명·현재가·등락률·추세선 → AI 종합 요약 2~3줄(없으면 주인공 기사 제목, 그렇다고 밝힘) → 소식 종류 태그 → 기사·언론사 수·평소 대비 보도량·첫 기사 시각
 // 말은 조심스럽게: 호재·악재·예측·"때문에" 를 쓰지 않음. 등락률은 어제 종가 대비 값일 뿐
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
+import { stockApi } from '../../api';
+import { useSession } from '../app/session';
+import { errorText } from '../lib/errors';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import { BUZZ_TIP } from '../lib/buzz';
 import IntradaySpark from './IntradaySpark';
@@ -27,7 +31,31 @@ function BriefTone({ sentiment: t }) {
   );
 }
 
-export default function BriefCard({ rank, code, name, quote, quoteLoading, priceOff, summary, digest, buzz, firstAt, articleCount, compact = false }) {
+/** AI 요약 새로 만들기 (11/18 사용자: 원할 때 AI 로 다시 불러오는 버튼). 로그인 필요, 같은 종목은 서버가 10분에 한 번만 새로 만듦 */
+function useRegenerate(code, name) {
+  const { user, requireLogin, handleAuthError, toast } = useSession();
+  const [busy, setBusy] = useState(false);
+  const [fresh, setFresh] = useState(null);
+  // 로그인 뒤 이어서 할 때는 로그인 전 화면의 user(null)를 다시 보지 않게 검사 없는 doRun 을 넘김
+  const run = () => (user ? doRun() : requireLogin(`${name} AI 요약 새로 만들기는 로그인하면 쓸 수 있어요.`, doRun));
+  async function doRun() {
+    setBusy(true);
+    try {
+      const res = await stockApi.regenerate(code);
+      if (res?.summary) setFresh(res.summary);
+      toast(res?.regenerated ? `${name} 요약을 오늘 기사로 새로 만들었어요.` : `${name}: 방금(10분 안) 만들었거나 오늘 기사가 없어 저장된 요약을 보여 드려요.`);
+    } catch (err) {
+      if (!handleAuthError(err)) toast(errorText(err, '요약을 새로 만들지 못했어요. 잠시 후 다시 시도해 주세요.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { busy, fresh, run };
+}
+
+export default function BriefCard({ rank, code, name, quote, quoteLoading, priceOff, summary: summary0, digest, buzz, firstAt, articleCount, compact = false }) {
+  const regen = useRegenerate(code, name);
+  const summary = regen.fresh ? { ...summary0, ...regen.fresh, sentiment: summary0?.sentiment } : summary0;
   const cls = dirClass(quote?.changeRate);
   const text = dropPriceSentences(summary?.newsSummary || '');
   // '실적 3 · 외국인·기관 2' 꼬리표가 무슨 숫자인지 몰랐음 (11/16 사용자) → 큰 카드는 '오늘 나온 소식' 막대 그림, 작은 카드는 '실적 소식 3개'
@@ -73,6 +101,18 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
             <Sparkles className="icon-sm brief-ai" aria-hidden="true" />
             <span className="sr-only">AI 요약: </span>
             {text}
+            {!compact && (
+              <button
+                type="button"
+                className="brief-regen"
+                onClick={regen.run}
+                disabled={regen.busy}
+                aria-label={`${name} AI 요약 새로 만들기`}
+                title={summary?.generatedAt ? `${shortTime(summary.generatedAt)}에 만든 요약 · 눌러서 새로 만들기` : 'AI 요약 새로 만들기'}
+              >
+                <RefreshCw className={`icon-sm ${regen.busy ? 'spin' : ''}`} aria-hidden="true" />
+              </button>
+            )}
           </p>
         ) : digest?.headlines?.length ? (
           <>
@@ -83,11 +123,25 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
                 </li>
               ))}
             </ul>
-            <p className="brief-note">AI 요약이 아직 없어 주요 기사 제목을 보여 드려요.</p>
+            <p className="brief-note">
+              AI 요약이 아직 없어 주요 기사 제목을 보여 드려요.
+              {!compact && (
+                <button type="button" className="link-btn brief-regen-text" onClick={regen.run} disabled={regen.busy}>
+                  {regen.busy ? '만드는 중…' : '지금 AI 요약 만들기'}
+                </button>
+              )}
+            </p>
           </>
         ) : (
           // 기사 수가 있는데 '기사가 없어요'라 하면 모순 (11/13: 요약·기사 목록을 못 받았을 때 '기사 7건' 옆에 이렇게 나옴)
-          <p className="brief-note">{articleCount ? '아직 AI 요약이 없어요.' : '오늘 요약할 기사가 아직 없어요.'}</p>
+          <p className="brief-note">
+            {articleCount ? '아직 AI 요약이 없어요.' : '오늘 요약할 기사가 아직 없어요.'}
+            {articleCount > 0 && !compact && (
+              <button type="button" className="link-btn brief-regen-text" onClick={regen.run} disabled={regen.busy}>
+                {regen.busy ? '만드는 중…' : '지금 만들기'}
+              </button>
+            )}
+          </p>
         )}
       </div>
 

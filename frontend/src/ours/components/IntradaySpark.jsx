@@ -4,10 +4,12 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { wantIntraday } from '../lib/intraday';
 
-const H = 40;
+const DEFAULT_H = 40;
 const SESSION_MS = 390 * 60_000; // 평소 09:00~15:30, 수능일 10:00~16:30 → 첫 봉 시각부터 6시간 30분
 
-export default function IntradaySpark({ code, name, quote, disabled = false }) {
+/** height: 그림 높이(px). 화제 종목 카드 40, 종목 화면 머리 오른쪽 '오늘 흐름' 은 더 크게 (11/18) */
+export default function IntradaySpark({ code, name, quote, disabled = false, height = DEFAULT_H, showLabel = true }) {
+  const H = height;
   const box = useRef(null);
   const [w, setW] = useState(0);
   const [entry, setEntry] = useState(null);
@@ -40,7 +42,7 @@ export default function IntradaySpark({ code, name, quote, disabled = false }) {
     return (
       <>
         <span className="ispark ispark-empty" ref={box} aria-hidden="true" />
-        <span className="ispark-label" />
+        {showLabel && <span className="ispark-label" />}
       </>
     );
   }
@@ -94,7 +96,7 @@ export default function IntradaySpark({ code, name, quote, disabled = false }) {
           </svg>
         )}
       </span>
-      <span className="ispark-label">{when}</span>
+      {showLabel && <span className="ispark-label">{when}</span>}
     </>
   );
 }
