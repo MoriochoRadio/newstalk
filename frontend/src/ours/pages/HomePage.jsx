@@ -84,7 +84,10 @@ const VIEWS = [
 ];
 const VIEW_KEY = 'snm_home_view';
 function useHomeView() {
+  // 주소 ?view=cc|basic 이 있으면 그것 (링크로 공유·캡처), 없으면 기억한 값
   const [view, setView] = useState(() => {
+    const q = new URLSearchParams(window.location.search).get('view');
+    if (q === 'cc' || q === 'basic') return q;
     try {
       return localStorage.getItem(VIEW_KEY) === 'cc' ? 'cc' : 'basic';
     } catch {

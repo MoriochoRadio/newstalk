@@ -98,6 +98,8 @@ export default function StocksPage() {
   // 처음엔 15줄 + '더 보기' (11/16 리뷰 11번: 30줄이라 화면이 3,400px 넘게 길었음)
   const [showAll, setShowAll] = useState(false);
   const [view, setViewState] = useState(() => {
+    const q = new URLSearchParams(window.location.search).get('view'); // 주소 ?view=dense|card (링크로 공유·캡처)
+    if (q === 'dense' || q === 'card') return q;
     try {
       return localStorage.getItem(VIEW_KEY) === 'dense' ? 'dense' : 'card';
     } catch {
