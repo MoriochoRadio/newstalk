@@ -91,4 +91,6 @@ async function request(method, path, { params, body, signal } = {}, retried = fa
 
 export const apiGet = (path, params, options = {}) => request('GET', path, { ...options, params });
 export const apiPost = (path, body, options = {}) => request('POST', path, { ...options, body });
+export const apiPut = (path, body, options = {}) => request('PUT', path, { ...options, body });
+/** 본문이 필요하면 options.body (탈퇴처럼 비밀번호를 한 번 더 받을 때) */
 export const apiDelete = (path, options = {}) => request('DELETE', path, options);

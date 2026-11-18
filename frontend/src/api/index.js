@@ -2,7 +2,7 @@
 // 응답은 백엔드 모양 그대로 돌려줌. 화면 모양으로 바꾸는 일은 adapters.js
 // 모든 함수의 마지막 인자 options 에 { signal } 을 넣으면 요청을 취소할 수 있음 (검색어가 바뀔 때 등)
 
-import { apiDelete, apiGet, apiPost, apiUrl, tokenStore } from './client';
+import { apiDelete, apiGet, apiPost, apiPut, apiUrl, tokenStore } from './client';
 
 // 주소 조각은 인코딩 (11/17 QA: /stocks/..%2Fauth%2Fme 같은 주소가 /api/stocks/../auth/me 를 불렀음)
 const enc = (v) => encodeURIComponent(String(v));
@@ -15,8 +15,11 @@ export const stockApi = {
   search: (q, { page = 1, size = 20 } = {}, options) => apiGet('/api/stocks', { q, page, size }, options),
   /** 종목 하나 → { stockCode, stockName, market, sector } */
   get: (stockCode, options) => apiGet(`/api/stocks/${enc(stockCode)}`, undefined, options),
-  /** 오늘의 이슈 종목 → { items: [{ rank, stockCode, stockName, articleCount, avgRelevance, lastPublishedAt }] } */
-  issues: ({ source, limit = 10 } = {}, options) => apiGet('/api/stocks/issues', { source, limit }, options),
+  /** 오늘의 이슈 종목 → { items: [{ rank, stockCode, stockName, articleCount, avgRelevance, lastPublishedAt }] }. market(KOSPI|KOSDAQ)·theme 로 거름 */
+  issues: ({ source, limit = 10, market, theme } = {}, options) =>
+    apiGet('/api/stocks/issues', { source, limit, market: market || undefined, theme: theme || undefined }, options),
+  /** 테마 목록 (분류별 보기) → { items: [{ theme, stockCount, articleCount }] } 기사 많은 순. period: today|7d|30d */
+  themes: (period = 'today', options) => apiGet('/api/stocks/themes', { period }, options),
   /** 오늘의 종합 요약·감성 비율 (요약이 아직 없으면 newsSummary·snsSummary 가 null) */
   summary: (stockCode, { source } = {}, options) =>
     apiGet(`/api/stocks/${enc(stockCode)}/summary`, { source }, options),
@@ -29,7 +32,7 @@ export const stockApi = {
 
 /** 뉴스·SNS 글 */
 export const articleApi = {
-  /** 글 목록. 조건: stockCode, source(NEWS|SNS), sort(latest|relevance), minRelevance, q, period(today|7d|30d), page, size */
+  /** 글 목록. 조건: stockCode, source(NEWS|SNS), sort(latest|relevance), minRelevance, q, period(today|7d|30d), market(KOSPI|KOSDAQ), theme, page, size */
   list: (params = {}, options) => apiGet('/api/articles', params, options),
   /** 글 상세 (연결 이유·근거 문장·키워드·가까운 SNS 포함) */
   get: (articleId, options) => apiGet(`/api/articles/${enc(articleId)}`, undefined, options),
@@ -43,15 +46,29 @@ export const searchApi = {
 
 /** 회원 */
 export const authApi = {
-  signup: (loginId, password) => apiPost('/api/auth/signup', { loginId, password }),
+  /** 확인 질문(recoveryQuestion 코드·recoveryAnswer)은 선택 */
+  signup: (loginId, password, recovery) =>
+    apiPost('/api/auth/signup', { loginId, password, recoveryQuestion: recovery?.question || undefined, recoveryAnswer: recovery?.answer || undefined }),
   /** 로그인하면 토큰을 저장해 두므로 이후 요청에 자동으로 붙음 */
   login: async (loginId, password) => {
     const res = await apiPost('/api/auth/login', { loginId, password });
     if (res?.accessToken) tokenStore.set(res.accessToken);
     return res;
   },
+  /** → { userId, loginId, role, recoveryQuestion: {code,text}|null, createdAt } */
   me: (options) => apiGet('/api/auth/me', undefined, options),
   logout: () => tokenStore.clear(),
+  /** 내 계정 (로그인 필요). 비밀번호가 틀리면 400 WRONG_PASSWORD */
+  changePassword: (currentPassword, newPassword) => apiPut('/api/auth/me/password', { currentPassword, newPassword }),
+  setRecovery: (password, question, answer) => apiPut('/api/auth/me/recovery', { password, question, answer }),
+  deleteAccount: (password) => apiDelete('/api/auth/me', { body: { password } }),
+  /** 확인 질문 목록 → [{ code, text }] */
+  questions: (options) => apiGet('/api/auth/recovery/questions', undefined, options),
+  /** 비밀번호 찾기: ① 아이디의 질문 → { code, text } (없으면 404 RECOVERY_NOT_SET) ② 답 + 새 비밀번호 */
+  questionOf: (loginId) => apiPost('/api/auth/recovery/question', { loginId }),
+  resetPassword: (loginId, answer, newPassword) => apiPost('/api/auth/recovery/reset', { loginId, answer, newPassword }),
+  /** 아이디 찾기: 질문·답·비밀번호가 모두 맞으면 → { loginId } */
+  findLoginId: (question, answer, password) => apiPost('/api/auth/recovery/find-id', { question, answer, password }),
 };
 
 /** 관심 종목 (로그인 필요) */

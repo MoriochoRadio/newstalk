@@ -2,7 +2,7 @@
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
 import { Suspense, useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
-import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Star, Sun, User } from 'lucide-react';
+import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import { useNetStatus } from '../lib/netStatus';
@@ -100,6 +100,11 @@ function UserMenu() {
           <Link to="/watchlist" className="menu-item" onClick={() => setOpen(false)}>
             <Star className="icon-sm" aria-hidden="true" />
             관심 종목
+          </Link>
+          {/* 11/18: 비밀번호 바꾸기·확인 질문·탈퇴 */}
+          <Link to="/account" className="menu-item" onClick={() => setOpen(false)}>
+            <Settings className="icon-sm" aria-hidden="true" />
+            내 계정
           </Link>
           <button
             type="button"
@@ -432,6 +437,12 @@ export default function Shell() {
         </main>
 
         <footer className="footer">
+          {/* 11/18 사용자: 다른 사이트처럼 잘 안 보이지만 늘 있는 '이용 안내·유의사항' (자세한 면책·개인정보·토론 규칙) */}
+          <nav className="footer-links" aria-label="이용 안내">
+            <Link to="/notice">이용 안내·유의사항</Link>
+            <Link to="/notice#privacy">개인정보 처리</Link>
+            <Link to="/notice#board">토론 이용 규칙</Link>
+          </nav>
           {/* 11/17 QA: AI 기본법 제31조(생성형 AI 사용 사전 고지) 취지로 '생성형 AI' 임을 밝힘 */}
           요약·좋은/나쁜 소식·종목 연결은 생성형 AI(OpenAI)가 뉴스·공시를 읽고 만든 정보예요. 틀릴 수 있고 투자 권유가 아니며, 투자
           판단과 책임은 본인에게 있어요.

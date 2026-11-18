@@ -80,12 +80,26 @@ export function SessionProvider({ children }) {
   }, []);
 
   const signup = useCallback(
-    async (loginId, password) => {
-      await authApi.signup(loginId, password);
+    async (loginId, password, recovery) => {
+      await authApi.signup(loginId, password, recovery);
       return login(loginId, password);
     },
     [login]
   );
+
+  /** 내 정보 다시 받기 (확인 질문을 정한 뒤 등) */
+  const reloadMe = useCallback(async () => {
+    const me = await authApi.me();
+    setUser(me);
+    return me;
+  }, []);
+
+  /** 탈퇴한 뒤: 토큰·상태를 지움 (로그아웃 알림 대신 탈퇴 알림) */
+  const afterDelete = useCallback(() => {
+    authApi.logout();
+    setUser(null);
+    toast('탈퇴했어요. 관심 종목과 쓴 글·댓글도 함께 지웠어요.');
+  }, [toast]);
 
   const logout = useCallback(() => {
     authApi.logout();
@@ -195,6 +209,8 @@ export function SessionProvider({ children }) {
       login,
       signup,
       logout,
+      reloadMe,
+      afterDelete,
       authModal,
       openAuth,
       closeAuth,
@@ -208,7 +224,7 @@ export function SessionProvider({ children }) {
       toasts,
       dismissToast,
     }),
-    [user, checking, login, signup, logout, authModal, requireLogin, handleAuthError, watchlist, watchCodes, loadWatchlist, toggleWatch, toast, toasts, dismissToast]
+    [user, checking, login, signup, logout, reloadMe, afterDelete, authModal, requireLogin, handleAuthError, watchlist, watchCodes, loadWatchlist, toggleWatch, toast, toasts, dismissToast]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
