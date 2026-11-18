@@ -170,7 +170,7 @@ def test_disclosure_evidence_db():
 
     answer = SimpleNamespace(summary="요약", evidence="1. 계약금액(원) 52,300,000,000", sentiment="POSITIVE", reason="계약")
     try:
-        with mock.patch.object(dart, "fetch_document", side_effect=fetch),                 mock.patch.object(dart, "summarize_one", return_value=answer):
+        with mock.patch.object(dart, "fetch_document", side_effect=fetch),                 mock.patch.object(dart, "_give_up"),                 mock.patch.object(dart, "summarize_one", return_value=answer):  # _give_up: 진짜 공시를 그만 묻게 하지 않음
             assert dart.summarize_disclosures(engine, key="x") == 1
         with engine.connect() as conn:
             ev = conn.execute(text("SELECT evidence FROM article_stock WHERE article_id = :id"), {"id": aid}).scalar()
@@ -204,8 +204,14 @@ def test_disclosure_gives_up_when_document_never_comes():
     def fetch(key, no):
         raise dart.NotReady(no)
 
+    real_give_up = dart._give_up
+
+    def give_up(engine, article_id):  # 진짜 공시는 건드리지 않음 (11/18 처음 버전이 진짜 DB 의 공시 1건을 바꿈)
+        if article_id in ids.values():
+            real_give_up(engine, article_id)
+
     try:
-        with mock.patch.object(dart, "fetch_document", side_effect=fetch),                 mock.patch.object(dart, "summarize_one", side_effect=AssertionError("LLM 부르면 안 됨")):
+        with mock.patch.object(dart, "fetch_document", side_effect=fetch),                 mock.patch.object(dart, "_give_up", side_effect=give_up),                 mock.patch.object(dart, "summarize_one", side_effect=AssertionError("LLM 부르면 안 됨")):
             dart.summarize_disclosures(engine, key="x")
         with engine.connect() as conn:
             got = dict(conn.execute(text("SELECT article_id, retry_count FROM article WHERE article_id IN :ids")

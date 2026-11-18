@@ -313,6 +313,14 @@ def pick_evidence(evidence, body):
     return None
 
 
+def _give_up(engine, article_id):
+    """원문이 영영 안 오는 공시는 그만 물음. 제목·종목 연결은 이미 화면에 있음"""
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE article SET retry_count = :t, last_error = :err WHERE article_id = :id"),
+                     {"t": MAX_TRIES, "err": "DART 원문 없음 (12시간 지나도 014)", "id": article_id})
+    log.info("공시 원문이 12시간 지나도 없어 그만 물음 (article_id %d)", article_id)
+
+
 def summarize_disclosures(engine=None, limit=50, key=None):
     """어제 이후 공시 중 아직 요약 안 된 것. 실패해도 제목으로 이미 화면에 나가므로 재시도 횟수만 올림"""
     key = key or os.environ.get("DART_API_KEY")
@@ -343,10 +351,7 @@ def summarize_disclosures(engine=None, limit=50, key=None):
             done += 1
         except NotReady:  # 재시도 횟수에 안 넣음: 넣으면 15분 만에 포기해서 영영 요약이 안 됨 (어제 이후 범위에서 빠지면 끝)
             if to_db(datetime.now(KST)) - r.published_at > NOT_READY_GIVE_UP:
-                with engine.begin() as conn:  # 그만 물음. 제목·종목 연결은 이미 화면에 있음
-                    conn.execute(text("UPDATE article SET retry_count = :t, last_error = :err WHERE article_id = :id"),
-                                 {"t": MAX_TRIES, "err": "DART 원문 없음 (12시간 지나도 014)", "id": r.article_id})
-                log.info("공시 원문이 12시간 지나도 없어 그만 물음 (article_id %d)", r.article_id)
+                _give_up(engine, r.article_id)
             else:
                 log.info("공시 원문 아직 없음 (article_id %d)", r.article_id)
         except STOP_ERRORS:
