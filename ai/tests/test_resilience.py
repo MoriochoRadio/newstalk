@@ -101,6 +101,19 @@ def test_breaker_opens_after_three_failures_then_half_open():
     assert b.allow("site", now=t + BASE_OPEN * 3) and not b.issues(), "성공하면 원래대로 (closed)"
 
 
+def test_breaker_probe_without_result_retries_after_timeout():
+    """11/17 QA: 시험 허용 뒤 결과를 안 알리고 건너뛰는 경로가 있으면 그 사이트가 영영 '시험 중'이었음"""
+    from hk_llm.core.resilience import BASE_OPEN, PROBE_TIMEOUT
+
+    b, t = _breaker(), 1_000_000.0
+    for _ in range(3):
+        b.failure("site", "HTTP 403", now=t)
+    t += BASE_OPEN
+    assert b.allow("site", now=t), "시험 1번"
+    assert not b.allow("site", now=t + PROBE_TIMEOUT - 1), "결과를 기다리는 동안은 막음"
+    assert b.allow("site", now=t + PROBE_TIMEOUT), "결과가 안 오면 다시 시험"
+
+
 def test_breaker_success_resets_failure_count():
     b, t = _breaker(), 1_000_000.0
     b.failure("site", "Timeout", now=t)

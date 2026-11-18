@@ -141,3 +141,80 @@ def test_step8_etf_holding_needs_product_name():
             raise AssertionError("거부해야 함")
         except s8.RejectedAnswer:
             pass
+
+
+def _summary_rows(n):
+    from types import SimpleNamespace
+    return [SimpleNamespace(article_id=i, title=f"제목{i}", body="본문", retry_count=0) for i in range(n)]
+
+
+def _summary_engine(rows):
+    engine = mock.MagicMock()
+    engine.connect.return_value.__enter__.return_value.execute.return_value.all.return_value = rows
+    return engine
+
+
+def test_step5_summarizes_in_parallel():
+    """11/18: 요약을 4개씩 동시에. 8건 × 0.2초 → 4개씩이면 약 0.4초 (한 건씩이면 1.6초)"""
+    import threading
+    import time
+    from hk_llm.steps import step5_summary as s5
+    from hk_llm.steps import step6_match
+
+    running = peak = 0
+    lock = threading.Lock()
+
+    def slow(title, body, model):
+        nonlocal running, peak
+        with lock:
+            running += 1
+            peak = max(peak, running)
+        time.sleep(0.2)
+        with lock:
+            running -= 1
+        return object(), {}
+
+    saved = []
+    with mock.patch.object(step6_match, "load_dictionary", return_value=([], None, None)), \
+            mock.patch.object(step6_match, "could_link", side_effect=lambda t, b, n: t != "제목7"), \
+            mock.patch.object(s5, "summarize", side_effect=slow), \
+            mock.patch.object(s5, "_save", side_effect=lambda e, aid, s, m: saved.append(aid)), \
+            mock.patch.object(s5, "title_only_presses", return_value=["x"]):
+        started = time.monotonic()
+        done = s5.summarize_articles(_summary_engine(_summary_rows(9)))
+        took = time.monotonic() - started
+    assert done == 8 and sorted(saved) == [0, 1, 2, 3, 4, 5, 6, 8], "거른 글(7)만 빼고 모두 저장"
+    assert peak == s5.WORKERS == 4, peak
+    assert took < 1.0, f"동시에 처리하면 1초 안 ({took:.2f}초)"
+
+
+def test_step5_parallel_stops_on_budget_and_openai_errors():
+    """하루 상한이면 남은 글을 건너뛰고 조용히 끝냄, OpenAI 쪽 문제면 남은 글을 건너뛰고 예외를 다시 던짐 (예전과 같은 뜻)"""
+    import httpx
+    import openai
+    from hk_llm.steps import step5_summary as s5
+    from hk_llm.steps import step6_match
+
+    def run(error, n=20):
+        calls = []
+
+        def fake(title, body, model):
+            calls.append(title)
+            if len(calls) == 2:
+                raise error
+            return object(), {}
+
+        with mock.patch.object(step6_match, "load_dictionary", return_value=([], None, None)), \
+                mock.patch.object(step6_match, "could_link", return_value=True), \
+                mock.patch.object(s5, "summarize", side_effect=fake), \
+                mock.patch.object(s5, "_save"), \
+                mock.patch.object(s5, "title_only_presses", return_value=["x"]):
+            return s5.summarize_articles(_summary_engine(_summary_rows(n))), calls
+
+    done, calls = run(s5.BudgetExceeded("상한"))
+    assert len(calls) < 20 and done == len(calls) - 1, (done, len(calls))
+    try:
+        run(openai.APIConnectionError(request=httpx.Request("POST", "https://api.openai.com")))
+        raise AssertionError("OpenAI 쪽 문제는 실행을 멈추게 다시 던져야 함")
+    except openai.APIConnectionError:
+        pass

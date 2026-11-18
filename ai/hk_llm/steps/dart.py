@@ -52,6 +52,11 @@ SKIP = re.compile(r"종료보고서|결과보고서|안내공시|설명서|공�
 log = get_logger(__name__)
 
 
+# 원문이 이만큼 지나도 없으면(014) 그만 물음. [첨부정정] 공시는 본문 없이 첨부만 고쳐서 원문이 영영 안 생김
+# (11/18 확인: 다보링크·에이플러스에셋 [첨부정정]을 5분마다 계속 물음)
+NOT_READY_GIVE_UP = timedelta(hours=12)
+
+
 class NotReady(Exception):
     """목록에는 떴지만 원문 파일이 아직 없음 (DART status 014). 실패가 아니라 다음 실행에서 다시"""
 
@@ -308,6 +313,14 @@ def pick_evidence(evidence, body):
     return None
 
 
+def _give_up(engine, article_id):
+    """원문이 영영 안 오는 공시는 그만 물음. 제목·종목 연결은 이미 화면에 있음"""
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE article SET retry_count = :t, last_error = :err WHERE article_id = :id"),
+                     {"t": MAX_TRIES, "err": "DART 원문 없음 (12시간 지나도 014)", "id": article_id})
+    log.info("공시 원문이 12시간 지나도 없어 그만 물음 (article_id %d)", article_id)
+
+
 def summarize_disclosures(engine=None, limit=50, key=None):
     """어제 이후 공시 중 아직 요약 안 된 것. 실패해도 제목으로 이미 화면에 나가므로 재시도 횟수만 올림"""
     key = key or os.environ.get("DART_API_KEY")
@@ -318,7 +331,7 @@ def summarize_disclosures(engine=None, limit=50, key=None):
     engine = engine or get_engine()
     since = datetime.now(KST).date() - timedelta(days=1)
     with engine.connect() as conn:
-        rows = conn.execute(text("""SELECT article_id, url, title, retry_count FROM article
+        rows = conn.execute(text("""SELECT article_id, url, title, retry_count, published_at FROM article
                                     WHERE channel = 'DART' AND summarized_at IS NULL AND retry_count < :max AND published_at >= :since
                                     ORDER BY published_at DESC, article_id DESC LIMIT :n"""), {"max": MAX_TRIES, "since": since, "n": limit}).all()
     done = 0
@@ -337,7 +350,10 @@ def summarize_disclosures(engine=None, limit=50, key=None):
                               "id": r.article_id})
             done += 1
         except NotReady:  # 재시도 횟수에 안 넣음: 넣으면 15분 만에 포기해서 영영 요약이 안 됨 (어제 이후 범위에서 빠지면 끝)
-            log.info("공시 원문 아직 없음 (article_id %d)", r.article_id)
+            if to_db(datetime.now(KST)) - r.published_at > NOT_READY_GIVE_UP:
+                _give_up(engine, r.article_id)
+            else:
+                log.info("공시 원문 아직 없음 (article_id %d)", r.article_id)
         except STOP_ERRORS:
             log.exception("OpenAI 쪽 문제로 공시 요약 중단 (%d건 요약 후)", done)
             raise

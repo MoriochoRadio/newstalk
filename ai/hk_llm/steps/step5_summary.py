@@ -11,6 +11,7 @@ import json
 import os
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -32,6 +33,9 @@ MODEL = "gpt-5.4-nano-2026-03-17"  # 실측 1건 약 $0.0006~0.0011 → 하루 3
 MAX_CHARS = 3000  # ponytail: 본문 앞 3,000자만 (한글 약 2,000토큰). 기사 핵심은 앞쪽. 길이 문제 생기면 토큰 단위로
 BATCH = 200  # 1번 실행에 최대 200건 (약 $0.13)
 MAX_TRIES = 3
+# 요약 동시 호출 수 (11/18). 평가 스크립트(eval/regress.py)도 4. 비용은 같고(호출 수 그대로) 시간만 약 1/4.
+# 하루 상한은 호출 전에 확인하므로 동시에 걸린 몇 건(최대 WORKERS-1건, 약 $0.003)만큼 넘을 수 있음
+WORKERS = 4
 PRICE_IN, PRICE_OUT = 0.20 / 1_000_000, 1.25 / 1_000_000  # 달러/토큰. 200건 실측(입력 348,662·출력 49,042 = $0.1310)에 맞는 값, 캐시 할인 안 침
 USAGE_FILE = LOG_DIR / "llm_usage.json"  # DB 에 닿지 않을 때만 쓰는 예비 기록. 날짜별 토큰·추정 비용 (Git 제외). 재시작해도 오늘 쓴 금액을 기억
 # 11/13: 하루 비용은 DB 표 llm_usage_daily(V16) 에서 셈 → 수집기 컨테이너·내 PC 실행이 같은 상한을 나눠 씀
@@ -285,7 +289,8 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
                                       AND press NOT IN :skip
                                     ORDER BY published_at DESC, article_id DESC LIMIT :n""").bindparams(bindparam("skip", expanding=True)),
                             {"since": since, "n": limit, "skip": title_only_presses()}).all()  # AI 활용 금지 언론사는 LLM 에 안 보냄
-    done = failed = skipped = 0
+    skipped = 0
+    todo = []
     names = None
     for r in rows:
         if names is None:
@@ -297,15 +302,26 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
                              {"e": "LLM 전 거르기: 사전 종목 이름 없음 (요약 안 함)", "id": r.article_id})
             skipped += 1
             continue
+        todo.append(r)
+
+    # 11/18: 요약을 WORKERS 개씩 동시에 (밀린 341건 요약이 한 건씩 약 12분 → 화면에 15분 동안 새 글이 없었음)
+    # 글마다 LLM 호출 1번·DB 저장 1번이라 서로 겹칠 것이 없음. 비용 기록은 DB 가 한 번에 더함(_db_add)
+    # OpenAI 쪽 문제(STOP_ERRORS)나 하루 상한이면 stop 을 켜서 아직 시작 안 한 글은 건너뜀 (예전 break·raise 와 같은 뜻)
+    stop = threading.Event()
+
+    def one(r):
+        if stop.is_set():
+            return "stopped"
         try:
             s, _ = summarize(r.title, r.body, model)
             _save(engine, r.article_id, s, model)  # 저장 실패(값 이상 등)도 재시도 횟수에 넣음
+            return "done"
         except BudgetExceeded as e:  # 뉴스 수집·연결은 계속 돌아야 하니 실행 실패로 안 남김
-            log.warning("요약 중단 (%d건 요약 후): %s", done, e)
-            break
-        except STOP_ERRORS:
-            log.exception("OpenAI 쪽 문제로 요약 중단 (%d건 요약 후)", done)
-            raise
+            stop.set()
+            return e
+        except STOP_ERRORS as e:
+            stop.set()
+            return e
         except Exception as e:
             tries = r.retry_count + 1
             with engine.begin() as conn:
@@ -313,9 +329,22 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
                                      status = IF(:t >= :max, 'FAILED', status) WHERE article_id = :id"""),
                              {"t": tries, "max": MAX_TRIES, "err": str(e)[:1000], "id": r.article_id})
             log.warning("요약 실패 %d/%d (article_id %d): %s", tries, MAX_TRIES, r.article_id, e)
-            failed += 1
-            continue
-        done += 1
+            return "failed"
+
+    if todo:
+        with ThreadPoolExecutor(max_workers=min(WORKERS, len(todo))) as ex:
+            results = list(ex.map(one, todo))
+    else:
+        results = []
+    done, failed = results.count("done"), results.count("failed")
+    errors = [x for x in results if isinstance(x, BaseException)]
+    budget = next((e for e in errors if isinstance(e, BudgetExceeded)), None)
+    stop_error = next((e for e in errors if not isinstance(e, BudgetExceeded)), None)
+    if stop_error is not None:
+        log.error("OpenAI 쪽 문제로 요약 중단 (%d건 요약 후)", done, exc_info=stop_error)
+        raise stop_error
+    if budget is not None:
+        log.warning("요약 중단 (%d건 요약 후): %s", done, budget)
     log.info("요약: %d건 중 %d건 저장, 실패 %d건, LLM 전 거르기 %d건", len(rows), done, failed, skipped)
     return done
 

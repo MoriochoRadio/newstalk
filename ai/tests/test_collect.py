@@ -229,6 +229,8 @@ def test_health_rules():
     assert health.feed_issues(errs[:3], [feed]) == [], "기록이 모자라면 판단 안 함"
     got = health.volume_issues({"전자신문": 0, "한국경제": 50}, {"전자신문": 13, "한국경제": 54, "작은곳": 4})
     assert got == ["수집량 급감 전자신문: 최근 24시간 0건 (지난 7일 하루 평균 13건)"], "평균 절반 아래만, 평균이 작은 곳은 빼고"
+    got = health.volume_issues({}, {"전자신문": 13, "아주경제": 16}, active={"전자신문"})
+    assert got == ["수집량 급감 전자신문: 최근 24시간 0건 (지난 7일 하루 평균 13건)"], "일부러 뺀 언론사는 0건이 정상"
     assert broken("ì¤ì\x80ë\x8f" * 3) and not broken("삼성전자가 3분기 영업이익 10조원을 기록했다. Ã 한 글자"), "글자 깨짐 의심"
 
 

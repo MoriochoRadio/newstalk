@@ -19,6 +19,7 @@
 import re
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 
@@ -27,7 +28,9 @@ from sqlalchemy import bindparam, text
 
 from hk_llm.core.config import KST
 from hk_llm.core.db import get_engine, to_db
+from hk_llm.core.press_policy import FULL, TITLE_ONLY, policy, restrict
 from hk_llm.core.util import get_logger
+from hk_llm.steps.rights import page_reservation, site_reservation
 from hk_llm.steps.robots import allowed, crawl_delay
 from hk_llm.steps.step2_dedup import url_key
 from hk_llm.steps.step4_body import MAX_DELAY, MIN_LEN, PAYWALL, _get, extract
@@ -62,8 +65,25 @@ def has_stock_name(title, body, names):
     return any(n in head for n in names if len(n) >= MIN_NAME)
 
 
+@contextmanager
+def pipeline_lock(engine, wait=600):
+    """수집기(run.py)와 같은 잠금: 요약·매칭을 동시에 돌려 같은 FETCHED 기사를 두 번 요약하지 않게 (11/17 QA).
+    수집기가 돌고 있으면 최대 wait 초 기다림. 잡고 있는 동안 수집기는 그 차례를 건너뜀"""
+    with engine.connect() as conn:
+        if not conn.execute(text("SELECT GET_LOCK('hk_llm_run', :w)"), {"w": wait}).scalar():
+            raise RuntimeError("수집기가 오래 돌고 있어 요약을 못 함 (나중에 다시)")
+        try:
+            yield
+        finally:
+            conn.execute(text("SELECT RELEASE_LOCK('hk_llm_run')"))
+
+
 def backfill_day(engine, press, day, names, count_only=False):
     """(사이트맵 기사 수, 이름 있는 기사 수, 새로 저장 수)"""
+    # 11/17 QA: 지난 기사 받기도 실시간 수집과 같은 언론사 방침·AI 거부 표시를 따름 (예전엔 건너뜀)
+    if policy(press) != FULL:
+        log.warning("지난 기사 %s: 언론사 방침이 %s 라 본문을 받지 않음", press, policy(press))
+        return 0, 0, 0
     res = _get(SITEMAPS[press].format(day))
     rows = sitemap_urls(res.text)
     keys = {url_key(u): (u, m) for u, m in rows}
@@ -78,16 +98,22 @@ def backfill_day(engine, press, day, names, count_only=False):
     for key, (url, lastmod) in keys.items():
         if key in have or not allowed(url):
             continue
+        why = site_reservation(url)
+        if why:
+            restrict(press, TITLE_ONLY, why)
+            log.warning("지난 기사 %s: 사이트 AI 거부 표시 → 제목만으로 바꾸고 멈춤: %s", press, why)
+            break
         wait = last + min(crawl_delay(url), MAX_DELAY) - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         last = time.monotonic()
         try:
-            html = _get(url).content
+            res_page = _get(url)
+            html = res_page.content
         except Exception as e:  # 한 건 실패는 건너뜀
             log.warning("가져오기 실패 %s: %s", url, e)
             continue
-        if PAYWALL in html:
+        if PAYWALL in html or page_reservation(html, res_page.headers):  # 유료 기사, 기사 끝 AI 이용 금지 고지
             continue
         body = extract(html, url)
         if not body or len(body) < MIN_LEN:
@@ -190,9 +216,10 @@ def _refetch_day(engine, day, count_only, summarize_limit):
         rest = REFETCH_BATCH * PACE - (time.monotonic() - t0)
         if rest > 0:
             time.sleep(rest)
-    while summarize_articles(engine, summarize_limit, since=day):
-        pass
-    match_articles(engine)
+    with pipeline_lock(engine):
+        while summarize_articles(engine, summarize_limit, since=day):
+            pass
+        match_articles(engine)
     log.info("다시 받기 %s: 대상 %d건, 본문 %d건", day, n, got)
     return n, (-1 if stopped else got)
 
@@ -210,9 +237,10 @@ def backfill(start, end, engine=None, count_only=False, summarize_limit=200):
         day += timedelta(days=1)
     log.info("지난 기사 합계 %s~%s: 사이트맵 %d건, 이름 있음 %d건, 새로 저장 %d건", start, end, *total)
     if not count_only:
-        while summarize_articles(engine, summarize_limit, since=start):
-            pass
-        match_articles(engine)
+        with pipeline_lock(engine):
+            while summarize_articles(engine, summarize_limit, since=start):
+                pass
+            match_articles(engine)
     return total
 
 

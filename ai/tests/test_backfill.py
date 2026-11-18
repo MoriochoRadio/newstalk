@@ -60,6 +60,8 @@ def _patches(backfill, fetch_results, waits=()):
         mock.patch.object(backfill, "match_articles", return_value=None),
         mock.patch.object(backfill, "_breaker_wait", side_effect=lambda host: next(wait_values, 0)),
         mock.patch.object(backfill.time, "sleep", sleep),
+        # 진짜 수집기 잠금을 기다리지 않게 (수집기가 돌고 있으면 시험이 최대 10분 멈춤)
+        mock.patch.object(backfill, "pipeline_lock", lambda engine: __import__("contextlib").nullcontext()),
     ]
 
 
@@ -142,3 +144,11 @@ def test_breaker_wait_reasons():
         assert backfill._breaker_wait("h") <= backfill.MAX_WAIT_SECONDS, "아무리 길어도 20분까지"
     with mock.patch("hk_llm.core.resilience.breaker._load", return_value={}):
         assert backfill._breaker_wait("h") == 0
+
+
+def test_backfill_day_follows_press_policy():
+    """11/17 QA: 지난 기사 받기가 언론사 방침(제목만·제외)을 건너뛰고 본문을 받았음"""
+    from hk_llm.steps import backfill
+
+    with mock.patch.object(backfill, "policy", return_value="TITLE_ONLY"),             mock.patch.object(backfill, "_get", side_effect=AssertionError("방침이 FULL 이 아니면 사이트에 요청하지 않음")):
+        assert backfill.backfill_day(mock.MagicMock(), "한국경제", DAY, set()) == (0, 0, 0)
