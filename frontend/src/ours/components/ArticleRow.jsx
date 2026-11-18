@@ -252,9 +252,71 @@ export default function ArticleRow({ article: a, others = [], focusCode, toneCod
   );
 }
 
-/** 글 목록을 소식 단위로 (같은 소식은 첫 보도 한 줄 + 펼치기) */
-export function StoryFeed({ articles, focusCode, toneCodes, compact = false, className = 'feed', style }) {
+/**
+ * 작게 보기 한 줄 (11/18 사용자: 큰 카드는 좋은데 한눈에 여러 개 보고 싶을 때). 요약·태그를 빼고
+ * [판단 점] 제목 · 같은 소식 수 · 주인공 종목 · 출처 · 시각 을 한 줄에. 판단 점 색 = 큰 보기의 칸 색과 같은 뜻
+ */
+function DenseRow({ article: a, others = [], focusCode }) {
+  const sns = a.sourceType === 'SNS';
+  const own = toneOf(a, focusCode);
+  const tone = own || (others.length && !focusCode ? toneOfStory({ lead: a, others }) : null);
+  const stocks = a.relatedStocks || [];
+  const main = (focusCode && stocks.find((x) => x.code === focusCode)) || stocks.find((x) => x.role === 'MAIN') || stocks[0];
+  const latestIso = [a, ...others].map((x) => x.publishedAtIso).filter(Boolean).sort().pop() || a.publishedAtIso;
+  const toneText = tone ? (tone.kind === 'pos' ? '좋은 소식' : tone.kind === 'neg' ? '나쁜 소식' : '좋은·나쁜 내용 함께') : '';
+  const title = <TitleText text={a.title} />;
+  return (
+    <article className={`dense-row ${a.isDisclosure ? 'is-disclosure' : ''}`}>
+      <span className={`dense-dot ${tone ? `dd-${tone.kind}` : ''}`} title={tone ? `${tone.name ? `${tone.name}에 ` : ''}${toneText}. ${TONE_TIP}` : undefined} aria-hidden="true" />
+      {tone && <span className="sr-only">{toneText}: </span>}
+      {a.isDisclosure && (
+        <span className="dense-kind" title={explainDisclosure(a.disclosureType) || undefined}>
+          공시
+        </span>
+      )}
+      {sns ? (
+        <a className="dense-title" href={a.url} target="_blank" rel="noreferrer">
+          {title}
+          <span className="sr-only">(새 창에서 원문 열기)</span>
+        </a>
+      ) : (
+        <Link className="dense-title" to={`/news/${a.id}`}>
+          {title}
+        </Link>
+      )}
+      {others.length > 0 && (
+        <span className="dense-same num" title={SAME_NEWS_TIP}>
+          +{others.length}
+        </span>
+      )}
+      {main && (
+        <Link to={`/stocks/${main.code}`} className={`dense-stock ${main.role === 'MAIN' ? 'is-main' : ''}`}>
+          {main.name}
+          {stocks.length > 1 && <span className="muted num"> 외 {stocks.length - 1}</span>}
+        </Link>
+      )}
+      <span className="dense-meta">
+        <span className="dense-src">{sourceText(a)}</span>
+        <time className="num" dateTime={latestIso || undefined}>
+          {relativeTime(latestIso)}
+        </time>
+      </span>
+    </article>
+  );
+}
+
+/** 글 목록을 소식 단위로 (같은 소식은 첫 보도 한 줄 + 펼치기). dense = 작게 보기 */
+export function StoryFeed({ articles, focusCode, toneCodes, compact = false, dense = false, className = 'feed', style }) {
   const stories = groupStories(articles);
+  if (dense) {
+    return (
+      <div className={`${className} feed-dense`} style={style}>
+        {stories.map((st) => (
+          <DenseRow key={st.lead.id} article={st.lead} others={st.others} focusCode={focusCode} />
+        ))}
+      </div>
+    );
+  }
   return (
     <div className={className} style={style}>
       {stories.map((st) => (

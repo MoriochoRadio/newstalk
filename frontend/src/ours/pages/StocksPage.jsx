@@ -1,8 +1,8 @@
 // 종목 메인: 종목 찾기 → 오늘의 이슈 순위(서버 집계) → 이슈 종목 중 많이 오른·내린 → 관심 종목
 // v2: 종목마다 최근 20거래일 추세선(보일 때만, 한 번에 2개씩 부름)과 기사 수 막대
-// 시장 필터는 넣지 않음: 이슈 순위 API 에 시장 칸이 없어 V7 처럼 거르면 틀린 결과(KOSDAQ 0건)가 나옴
+// 11/18: 분류별 보기(시장·업종·테마) — 이슈 순위 API 가 market·theme 로 걸러 줌 (백엔드 feature/be-account-category). 값은 주소에
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronRight, LogIn, Star } from 'lucide-react';
 import { stockApi } from '../../api';
 import { useApi } from '../../hooks/useApi';
@@ -14,6 +14,7 @@ import Movers from '../components/Movers';
 import HotStocks from '../components/HotStocks';
 import Sparkline from '../components/Sparkline';
 import { Empty, ErrorBox, LimitBadge, SkeletonRows } from '../components/ui';
+import CategoryBar, { MARKETS } from '../components/CategoryBar';
 
 const LIMIT = 30;
 
@@ -74,7 +75,17 @@ export default function StocksPage() {
     if (e.ctrlKey || e.metaKey || e.button === 1) window.open(path, '_blank', 'noopener');
     else navigate(path);
   };
-  const issues = useApi((signal) => stockApi.issues({ limit: LIMIT }, { signal }), []);
+  const [params, setParams] = useSearchParams();
+  const market = ['KOSPI', 'KOSDAQ'].includes(params.get('market')) ? params.get('market') : '';
+  const theme = (params.get('theme') || '').slice(0, 50);
+  const filtering = Boolean(market || theme);
+  const setCategory = (next) => {
+    const p = new URLSearchParams(params);
+    Object.entries(next).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)));
+    setParams(p, { replace: true });
+  };
+  const issues = useApi((signal) => stockApi.issues({ limit: LIMIT, market, theme }, { signal }), [market, theme]);
+  const catLabel = [MARKETS.find((m) => m.key === market && m.key)?.label, theme].filter(Boolean).join(' · ');
   const items = issues.data?.items || [];
   const { quotes, loading: quoteLoading, disabled } = useQuotes(items.map((i) => i.stockCode));
   const maxCount = Math.max(1, ...items.map((i) => i.articleCount));
@@ -89,11 +100,14 @@ export default function StocksPage() {
           <h1 className="page-title">종목</h1>
         </div>
       </div>
+      <div className="card cat-card">
+        <CategoryBar value={{ market, theme }} onChange={setCategory} />
+      </div>
       {/* 화면 안 종목 검색창은 뺌: 바로 위 머리줄 검색과 같은 일이라 어느 쪽에 써야 할지 망설이게 함 (11/16 디자이너 리뷰) */}
       {/* 홈에서 옮겨 온 화제 종목 카드 (11/13 피드백: 홈은 한 화면 대시보드, 자세한 건 눌러서 다른 화면) */}
       <section className="hot-section" aria-labelledby="hot-title">
         <h2 className="section-title" id="hot-title">
-          오늘 화제 종목
+          오늘 화제 종목{filtering && <span className="section-tag">{catLabel}</span>}
         </h2>
         <HotStocks issues={issues} quotes={quotes} quoteLoading={quoteLoading} priceOff={disabled} />
       </section>
@@ -102,6 +116,7 @@ export default function StocksPage() {
           <div className="card-head">
             <h2 className="card-title" id="rank-title">
               오늘 화제 종목 순위
+              {filtering && <span className="section-tag">{catLabel}</span>}
             </h2>
             <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>
               오늘 0시부터 뉴스 기사 수
@@ -109,7 +124,18 @@ export default function StocksPage() {
           </div>
           {issues.loading && !issues.data && <SkeletonRows rows={8} compact />}
           {issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}
-          {issues.data && items.length === 0 && <Empty title="오늘 기사에 나온 종목이 아직 없어요" />}
+          {issues.data && items.length === 0 && (
+            <Empty
+              title={filtering ? `오늘 기사에 나온 ${catLabel} 종목이 아직 없어요` : '오늘 기사에 나온 종목이 아직 없어요'}
+              action={
+                filtering ? (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCategory({ market: '', theme: '' })}>
+                    분류 지우기
+                  </button>
+                ) : null
+              }
+            />
+          )}
           {items.length > 0 && (
             <div className="table-wrap">
               <table className="table">

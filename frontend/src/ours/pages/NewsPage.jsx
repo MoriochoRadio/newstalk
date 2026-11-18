@@ -4,7 +4,7 @@
 //   이 탭은 총 건수를 알 수 없어 숫자를 보여 주지 않음 (받아 온 범위로 총 건수를 지어내지 않음)
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { LayoutList, Rows3, Search, X } from 'lucide-react';
 import { articleApi } from '../../api';
 import { toUiArticle } from '../../api/adapters';
 import { useApi } from '../../hooks/useApi';
@@ -12,8 +12,23 @@ import { useTitle } from '../lib/hooks';
 import { StoryFeed } from '../components/ArticleRow';
 import { Empty, ErrorBox, Pager, Segmented, SkeletonRows } from '../components/ui';
 import { iGa } from '../lib/josa';
+import CategoryBar from '../components/CategoryBar';
 
 const PAGE_SIZE = 20;
+const DENSE_SIZE = 50; // 작게 보기는 한 쪽에 50개 (11/18 사용자: 한눈에 여러 개)
+// 보기 방식(크게·작게)은 이 브라우저에 기억 (주소에 두지 않음: 공유한 사람의 보기 방식까지 따라가면 이상함)
+const VIEW_KEY = 'snm_news_view';
+function readView() {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'dense' ? 'dense' : 'card';
+  } catch {
+    return 'card';
+  }
+}
+const VIEWS = [
+  { key: 'card', label: '크게', icon: LayoutList },
+  { key: 'dense', label: '작게', icon: Rows3 },
+];
 const TABS = [
   { key: 'all', label: '전체' },
   { key: 'news', label: '뉴스' },
@@ -32,9 +47,9 @@ const SORTS = [
 ];
 
 /** 뉴스·공시 탭: 서버에서 100건씩 받아 그 탭 글만 모음 (한 번 누를 때 최대 5번 요청) */
-function useFilteredFeed({ tab, q, period, sort }) {
+function useFilteredFeed({ tab, q, period, sort, market, theme, size }) {
   const [state, setState] = useState({ key: '', items: [], nextPage: 1, done: false, loading: false, error: null });
-  const key = `${tab}|${q}|${period}|${sort}`;
+  const key = `${tab}|${q}|${period}|${sort}|${market}|${theme}|${size}`;
   const abortRef = useRef(null);
 
   const load = (reset) => {
@@ -46,10 +61,10 @@ function useFilteredFeed({ tab, q, period, sort }) {
     (async () => {
       let { items, nextPage } = start;
       let done = false;
-      const wanted = items.length + PAGE_SIZE;
+      const wanted = items.length + size;
       for (let n = 0; n < 5 && items.length < wanted; n += 1) {
         const res = await articleApi.list(
-          { source: 'NEWS', q: q || undefined, period: period || undefined, sort, page: nextPage, size: 100 },
+          { source: 'NEWS', q: q || undefined, period: period || undefined, sort, market: market || undefined, theme: theme || undefined, page: nextPage, size: 100 },
           { signal: controller.signal }
         );
         const got = (res?.items || []).map(toUiArticle);
@@ -114,6 +129,20 @@ export default function NewsPage() {
   const defaultPeriod = q ? 'all' : 'today';
   const sort = params.get('sort') === 'relevance' && tab !== 'disclosure' ? 'relevance' : 'latest'; // 공시 탭은 늘 최신순
   const page = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1);
+  const market = ['KOSPI', 'KOSDAQ'].includes(params.get('market')) ? params.get('market') : '';
+  const theme = (params.get('theme') || '').slice(0, 50);
+  const [view, setView] = useState(readView);
+  const dense = view === 'dense';
+  const size = dense ? DENSE_SIZE : PAGE_SIZE;
+  const changeView = (v) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* 기억 못 해도 지금 화면은 바뀜 */
+    }
+    if (page > 1) update({ page: '' }); // 한 쪽 크기가 바뀌면 쪽 번호가 다른 글을 가리킴 → 첫 쪽으로
+  };
   const [draft, setDraft] = useState(q);
   const qRef = useRef(null);
   useEffect(() => setDraft(q), [q]);
@@ -126,11 +155,15 @@ export default function NewsPage() {
   };
 
   const all = useApi(
-    (signal) => articleApi.list({ q: q || undefined, period: period || undefined, sort, page, size: PAGE_SIZE }, { signal }),
-    [q, period, sort, page],
+    (signal) =>
+      articleApi.list(
+        { q: q || undefined, period: period || undefined, sort, market: market || undefined, theme: theme || undefined, page, size },
+        { signal }
+      ),
+    [q, period, sort, page, market, theme, size],
     { enabled: tab === 'all' }
   );
-  const filtered = useFilteredFeed({ tab, q, period, sort });
+  const filtered = useFilteredFeed({ tab, q, period, sort, market, theme, size });
 
   const isAll = tab === 'all';
   const items = isAll ? (all.data?.items || []).map(toUiArticle) : filtered.fresh ? filtered.items : [];
@@ -138,7 +171,8 @@ export default function NewsPage() {
   const error = isAll ? all.error : filtered.error;
   const total = all.data?.totalCount ?? 0;
 
-  const [newCount, clearNew] = useNewArrivals(isAll && page === 1 && sort === 'latest' && !q, items[0]?.publishedAtIso, period);
+  // 새 소식 알림은 분류를 고르지 않았을 때만 (알림이 세는 '전체 최신 글'과 지금 목록이 달라짐)
+  const [newCount, clearNew] = useNewArrivals(isAll && page === 1 && sort === 'latest' && !q && !market && !theme, items[0]?.publishedAtIso, period);
   const showNew = () => {
     clearNew();
     all.reload();
@@ -198,12 +232,27 @@ export default function NewsPage() {
                 총 {total.toLocaleString('ko-KR')}건
               </span>
             )}
+            <div className="segmented sm view-toggle" role="group" aria-label="보기 방식">
+              {VIEWS.map(({ key, label, icon: Icon }) => (
+                <button key={key} type="button" aria-pressed={view === key} onClick={() => changeView(key)} title={key === 'dense' ? '한 줄씩 작게, 한 쪽에 50개' : '요약까지 크게'}>
+                  <Icon className="icon-sm" aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
             {/* 공시는 관련도 점수가 없음(회사가 낸 자기 서류, docs/api.md) → 공시 탭에선 정렬을 감춤 (11/13 사용자 눈으로) */}
             {tab !== 'disclosure' && (
               <Segmented label="정렬" size="sm" options={SORTS} value={sort} onChange={(k) => update({ sort: k === 'latest' ? '' : k })} />
             )}
           </div>
         </div>
+
+        <CategoryBar
+          value={{ market, theme }}
+          period={periodKey === 'all' ? '30d' : periodKey}
+          countLabel={periodKey === 'today' ? '오늘 기사' : periodKey === '7d' ? '7일 기사' : '30일 기사'}
+          onChange={(next) => update(next)}
+        />
 
         {/* 새 소식 알림: 버튼이 나타날 때 낭독기에 한 번 알림 (aria-live), 누르면 목록을 새로 받음 */}
         <div aria-live="polite" className="new-arrivals-slot">
@@ -230,16 +279,16 @@ export default function NewsPage() {
             title={
               q
                 ? `‘${q}’${iGa(q)} 들어간 ${tab === 'disclosure' ? '공시가' : '글이'} 없어요`
-                : periodKey === 'today'
+                : periodKey === 'today' && !market && !theme
                   ? `오늘 나온 ${tab === 'disclosure' ? '공시가' : '글이'} 아직 없어요`
                   : '조건에 맞는 글이 없어요'
             }
-            desc={period ? '기간을 넓혀 보세요.' : undefined}
+            desc={market || theme ? '고른 분류를 지우거나 기간을 넓혀 보세요.' : period ? '기간을 넓혀 보세요.' : undefined}
             action={
               // 기본값이 '오늘'이라 기간을 비우면 다시 오늘이 됨 → '전체 기간'을 주소에 넣음 (3차 코드 리뷰: 눌러도 그대로였음)
-              q || period ? (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => update({ q: '', period: 'all' })}>
-                  {q ? '조건 지우기' : '전체 기간 보기'}
+              q || period || market || theme ? (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => update({ q: '', period: 'all', market: '', theme: '' })}>
+                  {q || market || theme ? '조건 지우기' : '전체 기간 보기'}
                 </button>
               ) : null
             }
@@ -257,12 +306,12 @@ export default function NewsPage() {
           </p>
         )}
         {items.length > 0 && (
-          <StoryFeed articles={items} style={{ opacity: isAll && all.loading ? 0.5 : 1 }} />
+          <StoryFeed articles={items} dense={dense} style={{ opacity: isAll && all.loading ? 0.5 : 1 }} />
         )}
 
         {isAll && all.data && (
           <>
-            <Pager page={page} size={PAGE_SIZE} total={total} onChange={goPage} />
+            <Pager page={page} size={size} total={total} onChange={goPage} />
           </>
         )}
         {!isAll && filtered.fresh && items.length > 0 && (
