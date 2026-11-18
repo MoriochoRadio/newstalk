@@ -24,7 +24,7 @@ from sqlalchemy import bindparam, text
 
 from hk_llm.core.config import KST
 from hk_llm.core.db import get_engine, to_db
-from hk_llm.core.press_policy import title_only_presses
+from hk_llm.core.press_policy import excluded_presses, title_only_presses
 from hk_llm.core.util import get_logger
 
 GAP_MIN = 15
@@ -55,10 +55,13 @@ def feed_issues(recent_errors, feeds):
     return [f"피드 {FEED_STREAK}번 연속 실패: {url}" for url in feeds if all(url in (e or "") for e in window)]
 
 
-def volume_issues(recent, daily_avg):
-    """recent: {언론사: 최근 24시간 수}, daily_avg: {언론사: 지난 7일 하루 평균}"""
+def volume_issues(recent, daily_avg, active=None):
+    """recent: {언론사: 최근 24시간 수}, daily_avg: {언론사: 지난 7일 하루 평균}, active: 지금 받는 언론사 (None 이면 전부)
+    일부러 뺀 언론사(EXCLUDED, 피드 목록에 없음)는 0건이 정상 → 빼지 않으면 뺀 뒤 7일 동안 매번 헛경보 (11/18 아주경제)"""
     out = []
     for press, avg in sorted(daily_avg.items()):
+        if active is not None and press not in active:
+            continue
         n = recent.get(press, 0)
         if avg >= DROP_MIN_AVG and n < avg * DROP_RATIO:
             out.append(f"수집량 급감 {press}: 최근 24시간 {n}건 (지난 7일 하루 평균 {avg:.0f}건)")
@@ -101,7 +104,7 @@ def check(engine=None, now=None):
                                     AND published_at >= :a AND published_at < :b"""),
                             {"a": now - timedelta(days=8), "b": now - timedelta(days=1)}).scalar() or 0
         if days:
-            issues += volume_issues(recent, {p: n / days for p, n in week.items()})
+            issues += volume_issues(recent, {p: n / days for p, n in week.items()}, set(FEEDS) - set(excluded_presses()))
 
         broken = conn.execute(text("""SELECT COUNT(*) FROM article WHERE status = 'FAILED' AND last_error LIKE :m
                                       AND collected_at >= :t"""), {"m": BROKEN_MARK + "%", "t": now - timedelta(days=1)}).scalar()

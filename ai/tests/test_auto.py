@@ -181,6 +181,43 @@ def test_disclosure_evidence_db():
             conn.execute(text("DELETE FROM article WHERE article_id = :id"), {"id": aid})
 
 
+def test_disclosure_gives_up_when_document_never_comes():
+    """원문이 12시간 지나도 014 면 그만 물음 ([첨부정정]), 갓 올라온 공시는 계속 기다림. DB 필요, LLM·DART 호출 없음"""
+    from sqlalchemy import bindparam, text
+
+    from hk_llm.core.config import KST
+    from hk_llm.core.db import get_engine, to_db
+    from hk_llm.steps import dart
+
+    engine = get_engine()
+    now = datetime.now(KST)
+    rows = {"19990104000002": now - timedelta(hours=13), "19990104000003": now - timedelta(minutes=10)}
+    ids = {}
+    with engine.begin() as conn:
+        for rcp, at in rows.items():
+            url = f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcp}"
+            conn.execute(text("DELETE FROM article WHERE url_key = :k"), {"k": url})
+            ids[rcp] = conn.execute(text("""INSERT INTO article (url_key, url, press, title, published_at, status, source_type, channel)
+                                            VALUES (:k, :k, '전자공시', '시험 [첨부정정]', :at, 'DONE', 'NEWS', 'DART')"""),
+                                    {"k": url, "at": to_db(at)}).lastrowid
+
+    def fetch(key, no):
+        raise dart.NotReady(no)
+
+    try:
+        with mock.patch.object(dart, "fetch_document", side_effect=fetch),                 mock.patch.object(dart, "summarize_one", side_effect=AssertionError("LLM 부르면 안 됨")):
+            dart.summarize_disclosures(engine, key="x")
+        with engine.connect() as conn:
+            got = dict(conn.execute(text("SELECT article_id, retry_count FROM article WHERE article_id IN :ids")
+                                    .bindparams(bindparam("ids", expanding=True)), {"ids": list(ids.values())}).all())
+        assert got[ids["19990104000002"]] == dart.MAX_TRIES, "12시간 지난 것은 그만"
+        assert got[ids["19990104000003"]] == 0, "갓 올라온 것은 계속 기다림"
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM article WHERE article_id IN :ids").bindparams(bindparam("ids", expanding=True)),
+                         {"ids": list(ids.values())})
+
+
 def test_sns_rules():
     from hk_llm.core.config import KST
     from hk_llm.steps import sns
