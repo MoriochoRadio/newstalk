@@ -26,6 +26,8 @@ function pump() {
       .then((res) => {
         const rows = (res?.items || []).slice(-DAYS);
         entry.data = rows.length >= 2 ? rows.map((r) => r.close) : null;
+        // 화제 종목 카드의 미니 캔들용 (11/18): 시가·고가·저가·종가·거래량. 작은 흐름선은 종가만 씀
+        entry.ohlc = entry.data ? rows.map((r) => ({ o: r.open, h: r.high, l: r.low, c: r.close, v: r.volume || 0 })) : null;
         entry.status = entry.data ? 'done' : 'failed';
       })
       .catch(() => {

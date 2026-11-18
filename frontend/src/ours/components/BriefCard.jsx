@@ -57,8 +57,8 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
       </Link>
       {!compact && (
         <div className="brief-spark">
+          {/* '20일 +n%' 글자는 미니 캔들이 같이 그림 (11/18) */}
           <Sparkline code={code} name={name} disabled={priceOff} wide />
-          {!priceOff && <span className="muted">20일</span>}
         </div>
       )}
 
