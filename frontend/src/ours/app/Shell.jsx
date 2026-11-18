@@ -139,6 +139,9 @@ const SHOW_DEV_LINKS = (() => {
 })();
 function useNavCollapsed() {
   const [collapsed, setCollapsed] = useState(() => {
+    // 주소 ?nav=collapsed|open 이 있으면 그것 (링크 공유·캡처용, 11/18)
+    const q = new URLSearchParams(window.location.search).get('nav');
+    if (q === 'collapsed' || q === 'open') return q === 'collapsed';
     try {
       const v = localStorage.getItem(NAV_KEY);
       if (v != null) return v === '1';

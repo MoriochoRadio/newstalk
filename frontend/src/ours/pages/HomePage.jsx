@@ -29,6 +29,7 @@ import { limitOf } from '../components/ui';
 import { pickWhy } from '../lib/todayFeed';
 import { marketTerms } from '../lib/marketTerms';
 import StoryBoard from '../components/StoryBoard';
+import HomeControl from '../components/HomeControl';
 import LivePill from '../components/LivePill';
 import { ToneRing, leanOf } from '../components/Tone';
 import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
@@ -74,6 +75,34 @@ function useHomeVariant() {
     setParams(p, { replace: true });
   };
   return [v, set, compare];
+}
+
+// 11/18: '기본 / 한눈에' — 한눈에 = 토스증권 첫 화면 같은 컨트롤 센터 (components/HomeControl.jsx). 고른 것은 기억
+const VIEWS = [
+  { key: 'basic', label: '기본' },
+  { key: 'cc', label: '한눈에' },
+];
+const VIEW_KEY = 'snm_home_view';
+function useHomeView() {
+  // 주소 ?view=cc|basic 이 있으면 그것 (링크로 공유·캡처), 없으면 기억한 값
+  const [view, setView] = useState(() => {
+    const q = new URLSearchParams(window.location.search).get('view');
+    if (q === 'cc' || q === 'basic') return q;
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'cc' ? 'cc' : 'basic';
+    } catch {
+      return 'basic';
+    }
+  });
+  const set = (v) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* 기억 못 해도 지금 화면은 바뀜 */
+    }
+  };
+  return [view, set];
 }
 
 /** 화면 낭독기용 한 줄 (눈에는 지도가 말함). 데이터로 만든 문장, LLM 아님. 사실만: 기사 때문이라고 말하지 않음 */
@@ -169,7 +198,8 @@ export default function HomePage() {
   const hasWatch = Boolean(user && watchlist.loaded && watchlist.items.length);
   const watchCodes = hasWatch ? watchlist.items.slice(0, WATCH_N).map((w) => w.stockCode) : [];
   const storyCodes = topStories.flatMap((st) => st.lead.relatedStocks.filter((s) => s.role === 'MAIN').map((s) => s.code));
-  const { quotes } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
+  const { quotes, loading: quoteLoading, disabled: priceOff } = useQuotes([...new Set([...issueItems.map((i) => i.stockCode), ...watchCodes, ...storyCodes])]);
+  const [view, setView] = useHomeView();
   const newsArticles = feed.data ? feed.data.items.filter((a) => !a.isDisclosure) : [];
   const newsCount = newsArticles.length;
   const [variant, setVariant, compareVariants] = useHomeVariant();
@@ -203,7 +233,7 @@ export default function HomePage() {
 
   return (
     <>
-      <div className="page-head home-head dash-head">
+      <div className={`page-head home-head dash-head ${view === 'cc' ? 'is-cc' : ''}`}>
         <div style={{ minWidth: 0 }}>
           <h1 className="page-title">
             오늘의 뉴스 브리핑 <span className="title-date num">{todayLabel()}</span>
@@ -211,6 +241,9 @@ export default function HomePage() {
           {topStories.length > 0 && <p className="sr-only">{headline(newsCount, storyCount, issueItems, quotes)}</p>}
         </div>
         <LivePill className="mobile-pill" />
+        <div className="home-view">
+          <Segmented label="홈 보기 방식" size="sm" options={VIEWS} value={view} onChange={setView} />
+        </div>
         {/* 시안 비교 (임시): 주소에 ?home= 을 붙였을 때만. 팀 회의에서 고른 뒤 뺌 */}
         {compareVariants && (
           <div className="home-variant">
@@ -220,6 +253,30 @@ export default function HomePage() {
         )}
       </div>
 
+      {view === 'cc' ? (
+        <>
+          {hasWatch && <WatchStrip quotes={quotes} />}
+          {feed.error && !feed.data ? (
+            <ErrorBox error={feed.error} onRetry={feed.reload} />
+          ) : !feed.data ? (
+            <div className="skeleton" style={{ height: 520, borderRadius: 'var(--radius)' }} />
+          ) : (
+            <HomeControl
+              items={feed.data.items}
+              newsArticles={newsArticles}
+              issueItems={issueItems}
+              quotes={quotes}
+              quoteLoading={quoteLoading}
+              priceOff={priceOff}
+              capMap={capMap}
+              capNews={capNews}
+              topics={topicMix(groupStories(newsArticles), 10)}
+              feedAt={feedAt}
+            />
+          )}
+        </>
+      ) : (
+      <>
       {/* 1) 한눈에 요약: 숫자·막대로 먼저 (11/16 저녁 사용자: "시각화로 먼저 떠먹여 주고, 그 밑에 자세히") */}
       <section className="card news-hero" aria-labelledby="hero-title">
         <div className="card-head">
@@ -417,6 +474,8 @@ export default function HomePage() {
           <ChevronRight className="icon-sm" aria-hidden="true" />
         </Link>
       </nav>
+      </>
+      )}
     </>
   );
 }

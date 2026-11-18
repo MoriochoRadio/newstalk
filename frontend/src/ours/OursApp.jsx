@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import './styles/tokens.css';
 import './styles/app.css';
 import './styles/polish-1118.css';
+import './styles/compact-exp.css';
 
 // 디자인 확정 (11/12 밤 사용자: "남색 사이드바 형으로 진행"): G = 중립 회색(e) + 둥근 카드(soft) + 남색 왼쪽 메뉴(ink)
 // 시안 비교 버튼(VariantSwitch)과 J·I 시안 코드는 지움 — 비교 기록은 _local/frontend-ours/README.md 15~18절, gallery-1112
