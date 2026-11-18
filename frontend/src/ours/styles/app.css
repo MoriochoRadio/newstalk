@@ -6465,3 +6465,15 @@ a { text-underline-offset: 3px; }
   .feed-note-short { display: inline; }
   .feed-note { padding: 6px 10px; }
 }
+
+/* 화제 종목 카드 '오늘' 미니 차트 (11/18): 칸 크기는 예전 흐름선과 같음 (높이 40, 남는 폭 전부) */
+.brief-spark .ispark { flex: 1; min-width: 0; height: 28px; display: block; } /* 예전 흐름선처럼 자리 28px + 그림 40px(아래로 겹침) → 카드 높이 그대로 */
+.ispark svg { display: block; overflow: visible; }
+.ispark-base { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.7; shape-rendering: crispEdges; }
+.ispark-line { fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.ispark-area { stroke: none; opacity: 0.14; }
+.ispark-up .ispark-line { stroke: var(--up-chart); }
+.ispark-up .ispark-area, .ispark-dot.ispark-up { fill: var(--up-chart); }
+.ispark-down .ispark-line { stroke: var(--down-chart); }
+.ispark-down .ispark-area, .ispark-dot.ispark-down { fill: var(--down-chart); }
+.ispark-label { flex-shrink: 0; color: var(--text-3); }

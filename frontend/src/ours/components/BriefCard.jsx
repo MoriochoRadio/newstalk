@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import { BUZZ_TIP } from '../lib/buzz';
-import Sparkline from './Sparkline';
+import IntradaySpark from './IntradaySpark';
 import { TONE_TIP, ToneRing, leanOf, toneCountText } from './Tone';
 import { dropPriceSentences } from '../lib/priceSentence';
 
@@ -57,8 +57,8 @@ export default function BriefCard({ rank, code, name, quote, quoteLoading, price
       </Link>
       {!compact && (
         <div className="brief-spark">
-          <Sparkline code={code} name={name} disabled={priceOff} wide />
-          {!priceOff && <span className="muted">20일</span>}
+          {/* 11/18: 20일 흐름선 → 오늘 5분 흐름 (어제 종가 점선 위 빨강·아래 파랑). 아래 표의 작은 흐름선은 20일 그대로 */}
+          <IntradaySpark code={code} name={name} quote={quote} disabled={priceOff} />
         </div>
       )}
 
