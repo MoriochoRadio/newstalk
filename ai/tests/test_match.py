@@ -60,6 +60,8 @@ def test_step6_match():
     assert on_topic("[주간 증시 전망] 삼성전자", "삼성전자", [main], names) == [], "유형 기사"
     assert on_topic("[부고] 삼성전자 전무 부친상", "삼성전자", [main], names) == [], "부고 말머리"
     assert on_topic("[특징주] 코스피 시황에 삼성전자 급등", "삼성전자", [main], names) == [main], "특징주는 예외"
+    assert on_topic("[이슈픽5] 앤트로픽 상장 D-3·경기 전세난 5년 만에 최고", "삼성전자", [main], names) == [], "여러 소식 모음 기사"
+    assert on_topic("李 \"코스닥 부실기업 퇴출\"·한전 어닝쇼크···오늘의 경제 5선", "삼성전자", [main], names) == [], "오늘의 경제 모음"
     many = "".join(f"회사{i}번 " for i in range(6))
     assert on_topic("저PBR 151곳 공표", many + "두산", [side], names) == [], "명단 기사"
     assert on_topic("삼성전자 투자", "삼성전자 " + many, [main], names) == [main], "제목에 주인공이 있으면 명단 아님"
