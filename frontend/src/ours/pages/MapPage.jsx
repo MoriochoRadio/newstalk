@@ -12,11 +12,39 @@ import MarketMap, { MapLegend } from '../components/MarketMap';
 import Movers from '../components/Movers';
 import { Empty, ErrorBox, Segmented, limitOf } from '../components/ui';
 import CapMap, { CapLegend } from '../components/CapMap';
+import MapPro from '../components/MapPro';
 import { Link } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 
 const LIMIT = 30;
 const CAP_LIMIT = 24; // 시가총액 지도 칸 수
+
+// 11/18: '기본 / 한눈에' — 한눈에 = FINVIZ 지도(업종별·빈틈없이·각진 칸, components/MapPro.jsx). 홈·종목과 같은 단추, 고른 것은 기억, 주소 ?view=cc
+const VIEW_KEY = 'snm_map_view';
+const VIEWS = [
+  { key: 'basic', label: '기본' },
+  { key: 'cc', label: '한눈에' },
+];
+function useMapView() {
+  const [view, setView] = useState(() => {
+    const q = new URLSearchParams(window.location.search).get('view');
+    if (q === 'cc' || q === 'basic') return q;
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'cc' ? 'cc' : 'basic';
+    } catch {
+      return 'basic';
+    }
+  });
+  const set = (v) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* 기억 못 해도 지금 화면은 바뀜 */
+    }
+  };
+  return [view, set];
+}
 
 /** 화면 높이에 맞춘 지도 높이 (위 머리줄·제목·범례를 빼고, 최소 420) */
 function useMapHeight() {
@@ -37,6 +65,7 @@ export default function MapPage() {
   const items = issues.data?.items || [];
   const { quotes, loading, disabled } = useQuotes(items.map((i) => i.stockCode));
   const height = useMapHeight();
+  const [view, setView] = useMapView();
   // 지도 두 가지 (11/16 저녁): 시가총액 지도(FINVIZ 방식, 코스피·코스닥 시총 상위) / 오늘 기사 많은 종목 지도. 서버가 시총 지도를 모르면 기사 지도만
   const [mode, setMode] = useState('cap');
   const capMap = useApi((signal) => quoteApi.marketMap({ signal }), []);
@@ -83,6 +112,30 @@ export default function MapPage() {
     why: whyOf(it.stockCode),
   }));
 
+  if (view === 'cc') {
+    return (
+      <>
+        <div className="page-head home-head is-cc">
+          <div style={{ minWidth: 0 }}>
+            <h1 className="page-title">
+              시장 지도 <span className="title-date num">{todayLabel()}</span>
+            </h1>
+          </div>
+          <div className="home-view">
+            <Segmented label="지도 보기 방식" size="sm" options={VIEWS} value={view} onChange={setView} />
+          </div>
+        </div>
+        {capMap.error && !capMap.data ? (
+          <ErrorBox error={capMap.error} onRetry={capMap.reload} text="시가총액 지도를 받지 못했어요. '기본'의 기사 많은 종목 지도는 볼 수 있어요." />
+        ) : !capReady ? (
+          <div className="skeleton" style={{ height: height + 120 }} />
+        ) : (
+          <MapPro items={capMap.data.items} news={capNews} fetchedAt={capMap.data.fetchedAt} height={Math.max(480, height + 40)} />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <div className="page-head">
@@ -96,6 +149,7 @@ export default function MapPage() {
               : '오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률'}
           </p>
         </div>
+        <div className="home-view" style={{ display: 'flex', gap: 8 }}>
         {capReady && (
           <Segmented
             label="지도 고르기"
@@ -108,6 +162,8 @@ export default function MapPage() {
             onChange={setMode}
           />
         )}
+          <Segmented label="지도 보기 방식" size="sm" options={VIEWS} value={view} onChange={setView} />
+        </div>
       </div>
       <section className="card map-page" aria-label={showCap ? `시가총액 상위 ${shownCap.length || CAP_LIMIT}종목 지도` : `오늘 기사가 많은 ${items.length || LIMIT}종목 지도`}>
         {showNews && issues.error && <ErrorBox error={issues.error} onRetry={issues.reload} />}

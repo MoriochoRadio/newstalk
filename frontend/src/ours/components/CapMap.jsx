@@ -180,9 +180,12 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               const wrapName = !showName && canWrap;
               const rateSize = showName ? Math.max(11, Math.round(nameSize * 0.72)) : Math.max(11, Math.round(wrapSize * 0.85));
               // 접은 이름 아래에도 등락률 (예전엔 빠져 하나금융지주 칸이 색만으로 등락을 전했음 — impeccable, WCAG 1.4.1)
-              const showRate = showName
+              const showRate0 = showName
                 ? h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44
                 : wrapName && h >= wrapLinesFor * wrapSize * 1.2 + rateSize * 1.25 + 8;
+              // 전문가 지도: 등락률이 한 줄에 들어갈 때만 ('+5.04 / %' 처럼 꺾였음 — 11/18). 숫자·기호 폭 약 0.62em
+              const rateW = (String(fmtRate(it.changeRate)).length + (it.priceLimit ? 4 : 0)) * rateSize * 0.62 + 6;
+              const showRate = showRate0 && (!pro || rateW <= w);
               // 기사 수 표시 (11/16 사용자: 어떤 칸은 '기사 n건'이 있고 어떤 칸은 없음, 큰 칸만 알약 모양이 없음 → 한 가지 알약으로 통일)
               // 자리가 되면 '기사 n건', 좁으면 'n건', 기사가 없으면 '기사 없음'. 자리 계산: 이름·등락 줄 높이를 뺀 나머지
               const digits = String(n).length;
