@@ -168,21 +168,29 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               const newsSize = roomy ? Math.max(14, Math.min(17, Math.round(Math.sqrt(w * h) / 16))) : 12; // 기사 줄 글자 (먼저 정함)
               // 이름·등락·기사 세 줄이 칸 높이에 들어가게 이름 크기를 맞춤: 이름 1.2 + 등락 0.9 + 기사 줄 + 여백
               const fitByH = (h - 10 - newsSize * 1.45) / 2.05;
-              const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : pro ? Math.min(17, Math.max(11, Math.sqrt(w * h) / 7)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8, fitByH)));
+              const minName = pro ? 9 : 10; // 전문가 지도: 좁은 칸도 이름이 나오게 9px까지 (11/18 사용자: 글씨가 커서 이름이 안 적힘)
+              const nameSize = Math.round(Math.max(minName, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : pro ? Math.min(17, Math.max(11, Math.sqrt(w * h) / 7)) : 18, (w - (roomy ? 24 : pro ? 6 : 8)) / len, h / 2.8, fitByH)));
               // 이름이 칸 너비에 다 들어갈 때만 (잘린 이름 '삼성엔지니…' 대신 빈 칸 + 마우스를 올리면 정보)
-              const fitsOneLine = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
+              const fitsOneLine = w >= (pro ? 20 : 30) && h >= nameSize * 1.2 + 4 && len * nameSize <= w - (pro ? 3 : 4);
               // 좁고 긴 칸: 한 줄에 안 들어가는 긴 이름(한화에어로스페이스 등)은 두세 줄로 접어서 (빈 칸으로 남던 것 — 11/16)
-              const wrapSize = Math.round(Math.max(12, Math.min(15, ((w - 8) * 2.6) / len)));
+              // 전문가 지도: 두 줄에 맞는 크기(폭)·칸 높이에 맞는 크기 중 작은 쪽 (에코프로비엠 40px 칸이 세 줄이 돼 이름이 빠졌음)
+              const wrapSize = pro
+                ? Math.floor(Math.max(9, Math.min(13, ((w - 8) * 1.95) / len, (h - 4) / 2.4))) // 아래 줄 수 셈과 같은 폭(w-8), 내림
+                : Math.round(Math.max(12, Math.min(15, ((w - 8) * 2.6) / len)));
               const wrapLinesFor = Math.ceil((len * wrapSize) / Math.max(1, w - 8));
-              const canWrap = w >= 40 && h >= wrapLinesFor * wrapSize * 1.2 + 8 && (!pro || wrapLinesFor <= 2);
+              const canWrap = w >= (pro ? 26 : 40) && h >= wrapLinesFor * wrapSize * 1.2 + (pro ? 4 : 8) && (!pro || wrapLinesFor <= 2);
               // 한 줄 이름이 15px 밑이면(긴 이름) 접어서 크게 (11/16 밤 디자이너: 한화에어로스페이스 이름 11px·등락 9px)
               const showName = fitsOneLine && !(nameSize < 15 && canWrap && wrapSize > nameSize);
               const wrapName = !showName && canWrap;
-              const rateSize = showName ? Math.max(11, Math.round(nameSize * 0.72)) : Math.max(11, Math.round(wrapSize * 0.85));
+              const minRate = pro ? 9 : 11;
+              const rateSize = showName ? Math.max(minRate, Math.round(nameSize * 0.72)) : Math.max(minRate, Math.round(wrapSize * 0.85));
               // 접은 이름 아래에도 등락률 (예전엔 빠져 하나금융지주 칸이 색만으로 등락을 전했음 — impeccable, WCAG 1.4.1)
-              const showRate = showName
-                ? h >= nameSize * 1.2 + rateSize * 1.25 + 8 && w >= 44
+              const showRate0 = showName
+                ? h >= nameSize * 1.2 + rateSize * 1.25 + (pro ? 4 : 8) && w >= (pro ? 30 : 44)
                 : wrapName && h >= wrapLinesFor * wrapSize * 1.2 + rateSize * 1.25 + 8;
+              // 전문가 지도: 등락률이 한 줄에 들어갈 때만 ('+5.04 / %' 처럼 꺾였음 — 11/18). 숫자·기호 폭 약 0.62em
+              const rateW = (String(fmtRate(it.changeRate)).length + (it.priceLimit ? 4 : 0)) * rateSize * 0.62 + 6;
+              const showRate = showRate0 && (!pro || rateW <= w);
               // 기사 수 표시 (11/16 사용자: 어떤 칸은 '기사 n건'이 있고 어떤 칸은 없음, 큰 칸만 알약 모양이 없음 → 한 가지 알약으로 통일)
               // 자리가 되면 '기사 n건', 좁으면 'n건', 기사가 없으면 '기사 없음'. 자리 계산: 이름·등락 줄 높이를 뺀 나머지
               const digits = String(n).length;

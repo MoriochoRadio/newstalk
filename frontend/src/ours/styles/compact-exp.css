@@ -149,7 +149,7 @@ a.cc-row:hover { background: var(--surface-hover); }
 .cap-map-pro .cm-tile:hover,
 .cap-map-pro .cm-tile:focus-visible { outline: 1px solid var(--text); outline-offset: -1px; filter: none; }
 .cap-map-pro .cm-name { font-weight: 700; letter-spacing: -0.02em; }
-.cap-map-pro .cm-rate { font-weight: 600; }
+.cap-map-pro .cm-rate { font-weight: 600; white-space: nowrap; }
 .cap-map-pro .cm-news-corner { top: 2px; right: 2px; padding: 0 3px; border-radius: 0; font-size: 10px; }
 
 /* --- 종목 작게: 순위표 줄 높이를 줄이고 30줄 모두 --- */
@@ -157,3 +157,25 @@ a.cc-row:hover { background: var(--surface-hover); }
 .sl-dense .table th { padding-top: 5px; padding-bottom: 5px; }
 .sl-dense .table td .muted { display: none; } /* 코드·최근 시각 둘째 줄을 숨겨 한 줄로 */
 .sl-dense .table { font-size: var(--fs-sm); }
+
+/* --- 시장 지도 '한눈에' (components/MapPro.jsx): 큰 FINVIZ 지도 + 색 막대 + 오른·내린·업종 표 --- */
+.mp-map .cc-pb { padding: 0; }
+.mp-scale { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; height: 18px; overflow: hidden; border-top: 1px solid var(--cc-line); }
+.mp-scale .cm-tile { position: static; height: 18px; padding: 0; }
+.mp-scale .cm-rate { font-size: 10.5px; }
+.mp-bottom { margin-top: 0; }
+@media (min-width: 1100px) {
+  .mp-g, .mp-l { grid-column: span 4; }
+  .mp-s { grid-column: span 4; }
+}
+.mp-mv { grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) auto 64px; }
+.mp-sec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-sr { grid-template-columns: minmax(0, 1fr) 90px 58px 22px; }
+.mp-sr > :last-child { text-align: right; }
+.mp-sbar { position: relative; height: 6px; background: var(--surface-3); }
+.mp-sbar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--cc-line); }
+.mp-sbar i { position: absolute; top: 0; bottom: 0; }
+.mp-sbar i.up { background: var(--up); }
+.mp-sbar i.down { background: var(--down); }
+.map-cc .cap-map-pro .cm-head { font-size: 11px; }
+
