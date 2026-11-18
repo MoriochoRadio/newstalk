@@ -1,6 +1,7 @@
 // 데이터 상태(GET /api/status)를 화면 여러 곳(위 줄 상태 표시·홈 숫자)이 한 번만 불러 나눠 씀. 1분마다 새로
 import { useEffect, useState } from 'react';
 import { statusApi } from '../../api';
+import { REFRESH_EVENT } from '../../hooks/useApi';
 
 const FRESH_MS = 30_000;
 const REFRESH_MS = 60_000;
@@ -36,10 +37,17 @@ export function useStatus() {
     const t = setInterval(() => !document.hidden && load(), REFRESH_MS);
     const onVisible = () => !document.hidden && load();
     document.addEventListener('visibilitychange', onVisible);
+    // '새로 불러오기': 30초 안에 받은 값도 다시
+    const onRefresh = () => {
+      shared.at = 0;
+      load();
+    };
+    window.addEventListener(REFRESH_EVENT, onRefresh);
     return () => {
       alive = false;
       clearInterval(t);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(REFRESH_EVENT, onRefresh);
     };
   }, []);
   return state;
