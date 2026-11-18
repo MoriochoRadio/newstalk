@@ -333,6 +333,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | 400 | `RECOVERY_ANSWER_MISMATCH` | 비밀번호 찾기: 확인 질문 답이 틀림 |
 | 404 | `RECOVERY_NOT_SET` / `ACCOUNT_NOT_FOUND` | 질문을 안 정했거나 없는 아이디 / 아이디 찾기에서 맞는 계정 없음 |
 | 429 | `TOO_MANY_ATTEMPTS` | 비밀번호 확인·확인 질문 답을 10분 안에 5번 틀림 → 10분 동안 막힘 |
+| 429 | `TOO_MANY_REQUESTS` | 같은 접속 주소(IP)에서 `/api/**` 를 1분에 600번 넘게 부름 (`Retry-After` 헤더에 몇 초 뒤 풀리는지). 2026-11-18 |
 | 403 | `FORBIDDEN` | 권한 없음 |
 | 403 | `NOT_POST_OWNER` / `NOT_COMMENT_OWNER` | 남의 글·댓글 삭제 |
 | 404 | `NOT_FOUND` | 없는 주소 |

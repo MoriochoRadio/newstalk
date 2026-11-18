@@ -18,6 +18,8 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "이 주소에서 쓸 수 없는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "요청 본문은 JSON(Content-Type: application/json)이어야 합니다."),
     NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "응답은 JSON 으로만 줄 수 있습니다."),
+    // 같은 곳(IP)에서 1분에 600번 넘게 부름 (ApiRateLimitFilter, 2026-11-18)
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
 
     // 종목
     STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "종목을 찾을 수 없습니다."),
