@@ -77,7 +77,7 @@ function useHomeVariant() {
   return [v, set, compare];
 }
 
-// 11/18 실험(test/fe-dashboard-compact): '기본 / 한눈에' — 한눈에 = 토스증권 첫 화면 같은 컨트롤 센터 (components/HomeControl.jsx). 고른 것은 기억
+// 11/18: '기본 / 한눈에' — 한눈에 = 토스증권 첫 화면 같은 컨트롤 센터 (components/HomeControl.jsx). 고른 것은 기억
 const VIEWS = [
   { key: 'basic', label: '기본' },
   { key: 'cc', label: '한눈에' },

@@ -17,7 +17,7 @@ import { Empty, ErrorBox, LimitBadge, SkeletonRows } from '../components/ui';
 import CategoryBar, { MARKETS } from '../components/CategoryBar';
 
 const LIMIT = 30;
-// 11/18 실험(test/fe-dashboard-compact): 크게 = 화제 종목 카드 + 순위 15줄, 작게 = 카드 없이 순위 30줄을 촘촘히 (뉴스·공시의 크게·작게와 같은 단추)
+// 11/18: 크게 = 화제 종목 카드 + 순위 15줄, 작게 = 카드 없이 순위 30줄을 촘촘히 (뉴스·공시의 크게·작게와 같은 단추)
 const VIEW_KEY = 'snm_stocks_view';
 const VIEWS = [
   { key: 'card', label: '크게', icon: LayoutList },
