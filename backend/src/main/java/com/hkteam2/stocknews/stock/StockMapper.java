@@ -30,7 +30,12 @@ public interface StockMapper {
     /** from 이후 글에 많이 나온 종목 순 limit개. sourceType이 null이면 뉴스·SNS 모두 (API 기본은 서비스가 NEWS로 넘김) */
     List<StockIssueRow> findIssues(@Param("from") LocalDateTime from,
                                    @Param("sourceType") String sourceType,
+                                   @Param("market") String market,
+                                   @Param("theme") String theme,
                                    @Param("limit") int limit);
+
+    /** 테마마다 종목 수와 from 이후 뉴스 기사 수 (기사 많은 순). 분류별 보기 고르기용 */
+    List<StockThemeResponse> findThemes(@Param("from") LocalDateTime from);
 
     /** 그날 AI 종합 요약. 아직 안 만들었으면 Optional.empty() */
     Optional<StockDailySummaryRow> findDailySummary(@Param("stockCode") String stockCode,

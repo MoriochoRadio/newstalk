@@ -14,7 +14,8 @@ public interface ArticleMapper {
 
     /**
      * 조건은 모두 선택 (null이면 안 거름). watchUserId: 그 회원의 관심 종목이 하나라도 연결된 기사,
-     * likeKeyword: 제목·요약·키워드 검색어 (LIKE 특수 문자 처리된 값), from: 이 시각 이후 작성
+     * likeKeyword: 제목·요약·키워드 검색어 (LIKE 특수 문자 처리된 값), from: 이 시각 이후 작성,
+     * market: 이 시장(KOSPI·KOSDAQ) 종목이 하나라도 연결된 기사, theme: 이 테마 종목이 하나라도 연결된 기사
      */
     long countArticles(@Param("sourceType") String sourceType,
                        @Param("stockCode") String stockCode,
@@ -22,7 +23,9 @@ public interface ArticleMapper {
                        @Param("watchUserId") Long watchUserId,
                        @Param("likeKeyword") String likeKeyword,
                        @Param("from") LocalDateTime from,
-                       @Param("sentiment") String sentiment);
+                       @Param("sentiment") String sentiment,
+                       @Param("market") String market,
+                       @Param("theme") String theme);
 
     /** sort: latest(최신순) 또는 relevance(관련도순) */
     List<ArticleRow> findArticles(@Param("sourceType") String sourceType,
@@ -32,6 +35,8 @@ public interface ArticleMapper {
                                   @Param("likeKeyword") String likeKeyword,
                                   @Param("from") LocalDateTime from,
                                   @Param("sentiment") String sentiment,
+                                  @Param("market") String market,
+                                  @Param("theme") String theme,
                                   @Param("sort") String sort,
                                   @Param("limit") int limit,
                                   @Param("offset") int offset);

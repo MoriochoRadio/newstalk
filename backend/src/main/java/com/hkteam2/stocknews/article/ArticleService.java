@@ -17,6 +17,7 @@ import com.hkteam2.stocknews.common.TimeUtils;
 import com.hkteam2.stocknews.common.error.BusinessException;
 import com.hkteam2.stocknews.common.error.ErrorCode;
 import com.hkteam2.stocknews.stock.MentionPeriod;
+import com.hkteam2.stocknews.stock.StockCategory;
 import com.hkteam2.stocknews.stock.StockMapper;
 
 @Service
@@ -39,7 +40,7 @@ public class ArticleService {
 
     /** 기사 목록 거르기 조건 묶음. 모두 선택 (null이면 안 거름). SQL listCondition과 한 칸씩 짝 */
     private record Filter(String sourceType, String stockCode, BigDecimal minRelevance, Long watchUserId,
-                          String likeKeyword, LocalDateTime from, String sentiment) {
+                          String likeKeyword, LocalDateTime from, String sentiment, String market, String theme) {
     }
 
     /**
@@ -50,6 +51,15 @@ public class ArticleService {
     public ListResponse<ArticleResponse> getArticles(String source, String sort, Integer minRelevance,
                                                      String stockCode, String q, String period,
                                                      String sentiment, PageQuery pageQuery) {
+        return getArticles(source, sort, minRelevance, stockCode, q, period, sentiment, null, null, pageQuery);
+    }
+
+    /** market·theme: 분류별 보기 (2026-11-18). 시장은 KOSPI·KOSDAQ, 테마는 stock_theme 이름 (없는 테마면 0건) */
+    @Transactional(readOnly = true)
+    public ListResponse<ArticleResponse> getArticles(String source, String sort, Integer minRelevance,
+                                                     String stockCode, String q, String period,
+                                                     String sentiment, String market, String theme,
+                                                     PageQuery pageQuery) {
         String sourceType = toSourceType(source);
         checkSort(sort);
         BigDecimal minRelevanceDecimal = toMinRelevance(minRelevance);
@@ -58,7 +68,7 @@ public class ArticleService {
         }
         String likeKeyword = SearchKeyword.escapeLike(SearchKeyword.normalize(q));
         return findPage(new Filter(sourceType, stockCode, minRelevanceDecimal, null, likeKeyword, toFrom(period),
-                        toSentiment(sentiment)),
+                        toSentiment(sentiment), StockCategory.market(market), StockCategory.theme(theme)),
                 sort, pageQuery);
     }
 
@@ -73,16 +83,17 @@ public class ArticleService {
         String sourceType = toSourceType(source);
         checkSort(sort);
         return findPage(new Filter(sourceType, null, toMinRelevance(minRelevance), userId, null, toFrom(period),
-                        toSentiment(sentiment)),
+                        toSentiment(sentiment), null, null),
                 sort, pageQuery);
     }
 
     /** 조건에 맞는 기사 한 페이지 + 관련 종목 칩 (목록·관심 종목 글·검색이 같이 씀) */
     private ListResponse<ArticleResponse> findPage(Filter f, String sort, PageQuery pageQuery) {
         long totalCount = articleMapper.countArticles(f.sourceType(), f.stockCode(), f.minRelevance(),
-                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment());
+                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), f.market(), f.theme());
         List<ArticleRow> rows = articleMapper.findArticles(f.sourceType(), f.stockCode(), f.minRelevance(),
-                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), sort, pageQuery.limit(), pageQuery.offset());
+                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), f.market(), f.theme(), sort,
+                pageQuery.limit(), pageQuery.offset());
         if (rows.isEmpty()) {
             return new ListResponse<>(List.of(), totalCount);
         }

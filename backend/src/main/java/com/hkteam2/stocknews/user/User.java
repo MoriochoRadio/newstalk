@@ -9,6 +9,8 @@ public class User {
     private String loginId;
     private String passwordHash;
     private String role;
+    private String recoveryQuestion;      // 계정 찾기 확인 질문 코드 (V17, 안 정했으면 null)
+    private String recoveryAnswerHmac;    // 답의 HMAC (원문 아님)
     private LocalDateTime createdAt;
 
     /** MyBatis가 조회 결과를 담을 때 사용 */
@@ -38,6 +40,20 @@ public class User {
 
     public String getRole() {
         return role;
+    }
+
+    public String getRecoveryQuestion() {
+        return recoveryQuestion;
+    }
+
+    public String getRecoveryAnswerHmac() {
+        return recoveryAnswerHmac;
+    }
+
+    /** 가입할 때 확인 질문도 같이 정함 (선택) */
+    public void setRecovery(String question, String answerHmac) {
+        this.recoveryQuestion = question;
+        this.recoveryAnswerHmac = answerHmac;
     }
 
     public LocalDateTime getCreatedAt() {

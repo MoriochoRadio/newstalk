@@ -44,9 +44,23 @@ public class StockController {
     public ListResponse<StockIssueResponse> getIssues(
             @Parameter(description = "출처: NEWS 또는 SNS (없으면 NEWS. SNS는 뉴스 많은 종목만 모아서 섞지 않음)", example = "NEWS")
             @RequestParam(required = false) String source,
+            @Parameter(description = "시장: KOSPI 또는 KOSDAQ (없으면 둘 다)", example = "KOSDAQ")
+            @RequestParam(required = false) String market,
+            @Parameter(description = "테마: GET /api/stocks/themes 의 이름 (없으면 전체)", example = "반도체")
+            @RequestParam(required = false) String theme,
             @Parameter(description = "몇 개까지 (1~50)", example = "10")
             @RequestParam(defaultValue = "10") int limit) {
-        return stockService.getIssues(source, limit);
+        return stockService.getIssues(source, market, theme, limit);
+    }
+
+    @Operation(summary = "테마 목록 (분류별 보기)",
+            description = "테마마다 묶인 종목 수(stockCount)와 기간 안 그 종목들이 나온 뉴스 기사 수(articleCount, 공시 제외). "
+                    + "기사 많은 순. period: today(기본)·7d·30d. 여기 이름을 /api/articles·/api/stocks/issues 의 theme 으로 넘김")
+    @GetMapping("/themes")
+    public ListResponse<StockThemeResponse> getThemes(
+            @Parameter(description = "기간: today, 7d, 30d", example = "today")
+            @RequestParam(required = false) String period) {
+        return stockService.getThemes(period);
     }
 
     @Operation(summary = "종목의 오늘 종합 요약·감성 비율",

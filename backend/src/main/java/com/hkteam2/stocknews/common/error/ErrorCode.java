@@ -18,6 +18,8 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "이 주소에서 쓸 수 없는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "요청 본문은 JSON(Content-Type: application/json)이어야 합니다."),
     NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "응답은 JSON 으로만 줄 수 있습니다."),
+    // 같은 곳(IP)에서 1분에 600번 넘게 부름 (ApiRateLimitFilter, 2026-11-18)
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
 
     // 종목
     STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "종목을 찾을 수 없습니다."),
@@ -35,6 +37,14 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
     // 10분 안에 5번 틀리면 10분 동안 (LoginAttemptLimiter)
     TOO_MANY_LOGIN_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "로그인을 여러 번 실패했습니다. 10분 뒤에 다시 시도해 주세요."),
+    // 계정 관리 (2026-11-18). 401 은 화면이 '로그인이 풀림'으로 받으므로, 로그인한 채로 비밀번호를 잘못 넣은 것은 400
+    WRONG_PASSWORD(HttpStatus.BAD_REQUEST, "비밀번호가 맞지 않습니다."),
+    SAME_PASSWORD(HttpStatus.BAD_REQUEST, "지금 비밀번호와 다른 비밀번호를 입력해 주세요."),
+    RECOVERY_NOT_SET(HttpStatus.NOT_FOUND, "확인 질문을 정하지 않았거나 없는 아이디입니다."),
+    RECOVERY_ANSWER_MISMATCH(HttpStatus.BAD_REQUEST, "확인 질문의 답이 맞지 않습니다."),
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "입력한 질문·답·비밀번호와 맞는 계정이 없습니다."),
+    // 확인 질문·비밀번호 확인을 10분 안에 5번 틀리면 10분 동안 (LoginAttemptLimiter 를 다른 이름표로 같이 씀)
+    TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "여러 번 틀렸습니다. 10분 뒤에 다시 시도해 주세요."),
 
     // 관심 종목
     ALREADY_IN_WATCHLIST(HttpStatus.CONFLICT, "이미 관심 종목에 있습니다."),

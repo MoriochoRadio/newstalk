@@ -34,7 +34,8 @@ import com.hkteam2.stocknews.common.TimeUtils;
  *
  * KIS 시세는 끔: 내 PC .env 에 KIS_ENABLED=true 가 있어도 테스트는 실제 KIS를 부르지 않음 (키 없는 CI와 같은 조건)
  */
-@SpringBootTest(properties = "KIS_ENABLED=false")
+// 호출 수 제한(ApiRateLimitFilter)은 끔: 테스트 수백 개가 같은 주소(127.0.0.1)로 1분 안에 600번을 넘게 부름. 제한 자체는 ApiRateLimitFilterTest
+@SpringBootTest(properties = {"KIS_ENABLED=false", "app.rate-limit.per-minute=0"})
 @AutoConfigureMockMvc
 @Transactional
 public abstract class ApiTestSupport {

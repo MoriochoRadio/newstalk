@@ -15,13 +15,15 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final LoginAttemptLimiter loginLimiter;
+    private final AccountService accountService;
 
     public UserService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider,
-                       LoginAttemptLimiter loginLimiter) {
+                       LoginAttemptLimiter loginLimiter, AccountService accountService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.loginLimiter = loginLimiter;
+        this.accountService = accountService;
     }
 
     @Transactional
@@ -31,6 +33,7 @@ public class UserService {
         }
 
         User user = User.newUser(request.loginId(), passwordEncoder.encode(request.password()));
+        accountService.applySignupRecovery(user, request.recoveryQuestion(), request.recoveryAnswer()); // 선택
         try {
             userMapper.insert(user);
         } catch (DuplicateKeyException e) {

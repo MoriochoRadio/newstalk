@@ -45,9 +45,13 @@ public class ArticleController {
             @Parameter(description = "감성: POSITIVE, NEGATIVE, NEUTRAL (없으면 전체). 종목을 골랐으면 그 종목, 아니면 주인공 종목 기준",
                     example = "POSITIVE")
             @RequestParam(required = false) String sentiment,
+            @Parameter(description = "시장: KOSPI 또는 KOSDAQ. 이 시장 종목이 하나라도 연결된 글만", example = "KOSDAQ")
+            @RequestParam(required = false) String market,
+            @Parameter(description = "테마: GET /api/stocks/themes 의 이름. 이 테마 종목이 하나라도 연결된 글만", example = "반도체")
+            @RequestParam(required = false) String theme,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "" + PageQuery.DEFAULT_SIZE) int size) {
-        return articleService.getArticles(source, sort, minRelevance, stockCode, q, period, sentiment,
+        return articleService.getArticles(source, sort, minRelevance, stockCode, q, period, sentiment, market, theme,
                 new PageQuery(page, size));
     }
 
