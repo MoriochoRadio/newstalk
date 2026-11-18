@@ -106,6 +106,8 @@ erDiagram
         VARCHAR(30) login_id UK
         VARCHAR(100) password_hash
         VARCHAR(20) role
+        VARCHAR(30) recovery_question
+        CHAR(64) recovery_answer_hmac
         DATETIME created_at
     }
     watchlist {
@@ -281,9 +283,13 @@ erDiagram
 | 2 | login_id | VARCHAR(30) | UK | Y | | 로그인 아이디 |
 | 3 | password_hash | VARCHAR(100) | | Y | | BCrypt로 암호화한 비밀번호 |
 | 4 | role | VARCHAR(20) | CHECK | Y | 'USER' | 권한: USER, ADMIN |
-| 5 | created_at | DATETIME | | Y | CURRENT_TIMESTAMP | 가입 시각 |
+| 5 | recovery_question | VARCHAR(30) | IDX | N | | 계정 찾기 확인 질문 코드 (V17, 안 정했으면 NULL) |
+| 6 | recovery_answer_hmac | CHAR(64) | IDX | N | | 확인 질문 답의 HMAC-SHA256 16진수 (V17, 답 원문 저장 안 함) |
+| 7 | created_at | DATETIME | | Y | CURRENT_TIMESTAMP | 가입 시각 |
 
 - UK `uk_users_login_id (login_id)`: 아이디 중복 금지
+- IDX `idx_users_recovery (recovery_question, recovery_answer_hmac)`: 아이디 찾기 (V17)
+- 탈퇴: 앱이 board_like → board_comment → board_post → watchlist → users 순서로 지움 (외래 키가 CASCADE 가 아니라서, 한 트랜잭션)
 - CHECK `ck_users_role`: `role IN ('USER', 'ADMIN')`
 
 ### watchlist · 관심 종목 (V4)

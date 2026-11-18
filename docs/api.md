@@ -40,16 +40,27 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 
 | | 방식 | 주소 | 설명 |
 |---|---|---|---|
-| 🔓 | POST | `/api/auth/signup` | 회원가입 `{ loginId, password }` · 아이디 영문 소문자·숫자 4~20자, 비밀번호 8~64자 |
+| 🔓 | POST | `/api/auth/signup` | 회원가입 `{ loginId, password, recoveryQuestion?, recoveryAnswer? }` · 아이디 영문 소문자·숫자 4~20자, 비밀번호 8~64자. 확인 질문은 선택(둘 다 주거나 둘 다 비움) |
 | 🔓 | POST | `/api/auth/login` | 로그인 → `{ accessToken, tokenType, expiresIn }`. 같은 아이디·같은 곳에서 10분 안에 5번 틀리면 10분 동안 `429 TOO_MANY_LOGIN_ATTEMPTS` |
-| 🔒 | GET | `/api/auth/me` | 내 정보 `{ userId, loginId, role }` |
+| 🔒 | GET | `/api/auth/me` | 내 정보 `{ userId, loginId, role, recoveryQuestion: {code,text}\|null, createdAt }`. 2026-11-18부터 DB 에서 읽음 → 탈퇴한 계정의 토큰이면 401 |
+| 🔒 | PUT | `/api/auth/me/password` | 비밀번호 바꾸기 `{ currentPassword, newPassword }` → 204. 틀리면 400 `WRONG_PASSWORD`, 같으면 400 `SAME_PASSWORD` |
+| 🔒 | PUT | `/api/auth/me/recovery` | 확인 질문 정하기·바꾸기 `{ password, question, answer }` → 내 정보. 답은 원문 저장 안 함(HMAC) |
+| 🔒 | DELETE | `/api/auth/me` | 탈퇴 (본문 `{ password }`) → 204. 관심 종목·쓴 글·댓글·공감도 함께 지움, 되돌릴 수 없음 |
+| 🔓 | GET | `/api/auth/recovery/questions` | 확인 질문 목록 `[{ code, text }]` |
+| 🔓 | POST | `/api/auth/recovery/question` | 비밀번호 찾기 ① `{ loginId }` → 그 아이디의 질문 `{ code, text }`. 없는 아이디·질문 안 정함은 같은 404 `RECOVERY_NOT_SET` |
+| 🔓 | POST | `/api/auth/recovery/reset` | 비밀번호 찾기 ② `{ loginId, answer, newPassword }` → 204. 답이 틀리면 400 `RECOVERY_ANSWER_MISMATCH` |
+| 🔓 | POST | `/api/auth/recovery/find-id` | 아이디 찾기 `{ question, answer, password }` → `{ loginId }`. 셋 다 맞아야 함, 없으면 404 `ACCOUNT_NOT_FOUND` |
+
+- 비밀번호·답을 맞혀 보는 곳(비밀번호 바꾸기·질문·탈퇴·찾기)은 **10분에 5번**까지, 넘으면 10분 동안 429 `TOO_MANY_ATTEMPTS` (로그인 제한과 같은 방식, 이름표만 다름)
+- 답은 띄어쓰기를 지우고 영문을 소문자로 바꿔 비교 (`서울 마포` = `서울마포`, `Mimi` = `mimi`)
 
 ### 종목
 
 | | 방식 | 주소 | 설명 |
 |---|---|---|---|
 | 🔓 | GET | `/api/stocks?q=삼성&page=1&size=20` | **종목 검색**. 종목명(포함)·종목코드(시작)·별칭(포함)·**테마(q와 딱 같을 때)**로 찾음. 이름이 딱 맞는 것 → 별칭이 딱 맞는 것(`현대차` → 현대자동차) → 이름이 q로 시작 → 코드 → 나머지(가운데 글자·**테마**) 순. 같은 순위 안에서는 **최근 7일 분석이 끝난 글에 많이 나온 종목 먼저**(`삼성` → 삼성전자가 삼성공조보다 앞), 그다음 이름이 짧은 순. `q`가 없으면 전체 2,655개를 이름순으로 페이지. 항목 `{ stockCode, stockName, market, sector, matchedTheme }` — 아래 참고 |
-| 🔓 | GET | `/api/stocks/issues?source=&limit=10` | **오늘의 이슈 종목 순위**. 아래 참고 |
+| 🔓 | GET | `/api/stocks/issues?source=&limit=10&market=&theme=` | **오늘의 이슈 종목 순위**. 아래 참고. `market`(KOSPI·KOSDAQ)·`theme`(테마 이름)으로 거르면 순위는 1부터 다시 |
+| 🔓 | GET | `/api/stocks/themes?period=today` | **테마 목록 (분류별 보기)** `{ items: [{ theme, stockCount, articleCount }] }`. 기사 많은 순. articleCount = 기간 안 그 테마 종목이 나온 뉴스 기사 수(공시 제외, 같은 기사는 한 번). period `today`(기본)·`7d`·`30d` |
 | 🔓 | GET | `/api/stocks/{stockCode}` | 종목 하나 `{ stockCode, stockName, market, sector }` |
 | 🔓 | GET | `/api/stocks/{stockCode}/summary?source=` | **오늘의 종합 요약·감성 비율**. 아래 참고 |
 | 🔒 | POST | `/api/stocks/{stockCode}/summary` | **종합 요약 다시 생성** (F-08). AI 서버가 오늘 기사로 새로 만들고 다시 읽은 요약을 돌려줌. 아래 참고 |
@@ -123,6 +134,8 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | `minRelevance` | 0~100 (%). 관련도가 이 값 이상인 종목이 있는 글만. `stockCode`와 같이 쓰면 그 종목 기준 | 관련도 필터 |
 | `q` | 검색어 (50자 이하). 제목·요약·키워드에 들어 있는 글만 | 검색 |
 | `period` | `today` / `7d` / `30d` (없으면 전체). 7d = 오늘 포함 7일 (언급량 그래프와 같은 뜻) | 기간 버튼 |
+| `market` | `KOSPI` / `KOSDAQ` (대소문자 무관, 그 밖의 값은 400). 이 시장 종목이 하나라도 연결된 글만 | 분류별 보기 (2026-11-18) |
+| `theme` | 테마 이름 (`/api/stocks/themes`, 50자 이하). 이 테마 종목이 하나라도 연결된 글만. 없는 테마면 0건 | 분류별 보기 (2026-11-18) |
 | `sentiment` | `POSITIVE` / `NEGATIVE` / `NEUTRAL` (없으면 전체). `stockCode`가 있으면 그 종목에 대한 감성, 없으면 주인공 종목의 감성 (카드에 보이는 감성과 같은 뜻). 관심 종목 글(`/api/watchlist/articles`)도 같음 | 감성 버튼 |
 | `page`, `size` | 1부터, 1~100 (기본 20) | |
 
@@ -316,6 +329,10 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | 401 | `UNAUTHORIZED` | 로그인 필요한 API에 토큰 없음·만료·위조 |
 | 401 | `INVALID_CREDENTIALS` | 로그인 실패 (아이디 또는 비밀번호 틀림) |
 | 429 | `TOO_MANY_LOGIN_ATTEMPTS` | 로그인을 10분 안에 5번 틀림 → 10분 동안 맞는 비밀번호도 막힘 (화면: "10분 뒤에 다시" 안내) |
+| 400 | `WRONG_PASSWORD` / `SAME_PASSWORD` | 내 계정: 지금 비밀번호가 틀림 / 새 비밀번호가 지금과 같음 (로그인한 채라 401 이 아니라 400) |
+| 400 | `RECOVERY_ANSWER_MISMATCH` | 비밀번호 찾기: 확인 질문 답이 틀림 |
+| 404 | `RECOVERY_NOT_SET` / `ACCOUNT_NOT_FOUND` | 질문을 안 정했거나 없는 아이디 / 아이디 찾기에서 맞는 계정 없음 |
+| 429 | `TOO_MANY_ATTEMPTS` | 비밀번호 확인·확인 질문 답을 10분 안에 5번 틀림 → 10분 동안 막힘 |
 | 403 | `FORBIDDEN` | 권한 없음 |
 | 403 | `NOT_POST_OWNER` / `NOT_COMMENT_OWNER` | 남의 글·댓글 삭제 |
 | 404 | `NOT_FOUND` | 없는 주소 |
