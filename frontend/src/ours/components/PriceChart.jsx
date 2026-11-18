@@ -490,9 +490,11 @@ export default function PriceChart({ stockCode, stockName, dayCounts = null, art
           let { items, date: cursor } = r;
           const { tried } = r;
           if (minBars && items.length > 0 && items.length < minBars) {
-            // 하루 봉 수로 모자란 날 수를 셈 (오늘이 덜 끝났으면 하루치보다 적으므로 넉넉히 +1). 공휴일은 빈 날로 그냥 넘어감
+            // 하루 봉 수로 모자란 날 수를 셈. 오늘 받은 봉 수(items)를 이미 뺐으므로 딱 그만큼만 (11/18: 예전 +1 은
+            // 하루치 = 서버가 KIS 에 4번 더 묻는 것이라 뺌 → 종목 화면 첫 로딩이 짧아짐).
+            // 공휴일이 끼면 그날이 비어 120봉보다 조금 적을 수 있음 → 왼쪽으로 끌면 이어 받음
             const perDay = { '1m': 381, '5m': 78, '30m': 13, '60m': 7 }[unit] || 13;
-            const need = Math.min(6, Math.ceil((minBars - items.length) / perDay) + 1);
+            const need = Math.min(6, Math.ceil((minBars - items.length) / perDay));
             const days = [];
             for (let d = cursor, i = 0; i < need; i += 1) {
               d = prevWeekday(d);
