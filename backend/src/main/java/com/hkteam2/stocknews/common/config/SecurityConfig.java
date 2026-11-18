@@ -24,7 +24,7 @@ public class SecurityConfig {
 
     /** 로그인(JWT)이 있어야 하는 주소 (모든 방식) */
     private static final String[] AUTHENTICATED_PATHS = {
-            "/api/auth/me",
+            "/api/auth/me", "/api/auth/me/**",   // 내 정보·비밀번호 바꾸기·확인 질문·탈퇴 (2026-11-18)
             "/api/watchlist", "/api/watchlist/**",
     };
 
