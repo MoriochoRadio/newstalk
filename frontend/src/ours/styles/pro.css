@@ -101,8 +101,10 @@
   .ps-label { font-size: 12px; }
 }
 
-/* 관심 종목 표: 한눈에에서는 칸 안 글자를 꺾지 않음 (이름·코드·시장·좋은/나쁜 소식 한 줄), 넘치면 표만 옆으로 밀어 보기 */
-:root[data-pro] .wl-body .table th,
-:root[data-pro] .wl-body .table td { white-space: nowrap; }
-:root[data-pro] .wl-body .table-wrap { overflow-x: auto; }
+/* 관심 종목 표: 한눈에(넓은 화면)에서는 칸 안 글자를 꺾지 않음 (이름·코드·시장·좋은/나쁜 소식 한 줄).
+   휴대폰에서도 걸었더니 표가 화면보다 넓어져 가로로 밀렸음 (11/18 점검) → 넓은 화면만 */
+@media (min-width: 1100px) {
+  :root[data-pro] .wl-body .table th,
+  :root[data-pro] .wl-body .table td { white-space: nowrap; }
+}
 
