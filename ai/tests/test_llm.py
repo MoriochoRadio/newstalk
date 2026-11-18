@@ -71,4 +71,73 @@ def test_step8_rules():
     assert _line(side) == "브랜드 가치가 올랐다.", "조연은 다른 종목 요약을 쓰지 않음"
     assert counts([main, side]) == {"pos": 1, "neg": 0, "neu": 1}
     with mock.patch("hk_llm.steps.step8_daily.ChatOpenAI", side_effect=AssertionError("1건이면 LLM 안 부름")):
-        assert combine("삼성전자", ["한 줄이다."]) == "한 줄이다."
+        assert combine("삼성전자", ["삼성전자가 한 줄을 냈다."]) == "삼성전자가 한 줄을 냈다."
+    # 그 줄에 종목 이름이 없으면 주어를 밝히게 LLM 에 맡김 (11/16 밤: SK스퀘어 요약 주어가 SK하이닉스)
+    fake = mock.MagicMock()
+    with mock.patch("hk_llm.steps.step8_daily.llm_call", return_value="삼성전자는 한 줄을 냈다.") as called:
+        assert combine("삼성전자", ["한 줄이다."], llm=fake) == "삼성전자는 한 줄을 냈다."
+        assert called.called, "이름 없는 1줄은 LLM 을 부름"
+
+def test_step8_skips_unchanged_even_with_unjudged_links():
+    """11/17: 판단 보류 연결(감성 NULL)이 있는 종목은 저장된 감성 수와 기사 수가 늘 달라 매시간 다시 만들었음"""
+    from datetime import date, datetime
+    from unittest import mock
+
+    from hk_llm.steps import step8_daily as s8
+
+    s8._LAST.clear()
+    t = datetime(2026, 11, 17, 10, 0)
+    rows = [{"stock_code": "005930", "stock_name": "삼성전자", "is_main": 1, "summary": "삼성전자 요약.", "reason": "r",
+             "sentiment": "POSITIVE", "created_at": t},
+            {"stock_code": "005930", "stock_name": "삼성전자", "is_main": 1, "summary": "전망 기사.", "reason": "r",
+             "sentiment": None, "created_at": t}]
+    engine = mock.MagicMock()
+    conn = engine.connect.return_value.__enter__.return_value
+    conn.execute.return_value = [("005930", 1)]   # 저장된 감성 수 = 1 (NULL 은 안 셈)
+    day = date(2026, 11, 17)
+    with mock.patch.object(s8, "load_rows", return_value=rows), mock.patch.object(s8, "_save_stock") as save:
+        assert s8.summarize_day(engine, day)[2] == 1, "재시작 직후: 감성 있는 연결 수가 같으면 그대로"
+        assert s8.summarize_day(engine, day)[2] == 1, "다음 시간: 기사가 그대로면 그대로"
+        assert not save.called
+        rows.append({**rows[1], "created_at": datetime(2026, 11, 17, 11, 0)})   # 판단 보류 기사가 새로 옴
+        assert s8.summarize_day(engine, day)[0] == 1, "감성 수는 같아도 새 기사가 오면 다시 만듦"
+        assert s8.summarize_day(engine, day)[2] == 1
+        assert save.call_count == 1
+    s8._LAST.clear()
+
+
+def test_step8_single_mention_needs_no_llm():
+    """함께 언급된 기사 1건뿐이면 LLM 없이 그 기사 요약 첫 문장 (이유 한 줄로 지어내던 것)"""
+    from unittest import mock
+
+    from hk_llm.steps import step8_daily as s8
+
+    row = {"stock_code": "035420", "stock_name": "NAVER", "is_main": 0, "sentiment": "NEUTRAL",
+           "summary": "A사가 NAVER에 서버를 공급한다. 계약 규모는 100억원이다.", "reason": "공급계약의 상대방이다."}
+    engine = mock.MagicMock()
+    conn = engine.begin.return_value.__enter__.return_value
+    with mock.patch.object(s8, "llm_call", side_effect=AssertionError("LLM 을 부르면 안 됨")):
+        assert s8._save_stock(engine, "035420", [row], "2026-11-17") == "함께 언급된 기사: A사가 NAVER에 서버를 공급한다."
+    assert conn.execute.call_args.args[1]["text"].startswith("함께 언급된 기사")
+
+def test_step8_etf_holding_needs_product_name():
+    """11/17: ETF 편입 소식이 '삼성전자는 … 신규 편입됐고 편입 비중을 … 확대했다' 로 회사가 한 일처럼 나옴 → 한 번 다시, 그래도면 거부"""
+    from unittest import mock
+
+    from hk_llm.steps import step8_daily as s8
+
+    news = ["한투운용은 ACE 글로벌반도체TOP4 Plus ETF 리밸런싱에서 삼성전자 편입 비중을 3.43%에서 19.75%로 올렸다.",
+            "삼성전자는 엑시노스 탑재를 늘린다."]
+    bad = "삼성전자는 엑시노스 탑재를 늘린다. 또한 편입 비중을 3.43%에서 19.75%로 크게 확대했다."
+    good = "삼성전자는 엑시노스 탑재를 늘린다. ACE 글로벌반도체TOP4 Plus ETF 가 삼성전자 편입 비중을 3.43%에서 19.75%로 늘렸다."
+    assert s8.missing_product(bad, "\n".join(news)) and not s8.missing_product(good, "\n".join(news))
+    assert not s8.missing_product("삼성전자는 매출 비중이 늘었다.", "- 매출 비중이 늘었다"), "ETF 소식이 없으면 안 봄"
+    with mock.patch.object(s8, "llm_call", side_effect=[bad, good]) as called:
+        assert s8.combine("삼성전자", news, llm=mock.MagicMock()) == good
+        assert called.call_count == 2, "한 번 다시 물음"
+    with mock.patch.object(s8, "llm_call", side_effect=[bad, bad]):
+        try:
+            s8.combine("삼성전자", news, llm=mock.MagicMock())
+            raise AssertionError("거부해야 함")
+        except s8.RejectedAnswer:
+            pass

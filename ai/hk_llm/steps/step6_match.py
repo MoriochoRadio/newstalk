@@ -325,7 +325,9 @@ def evidence(body, item, names, title=None):
             # 06-3: 화면에 "이 종목의 근거"로 나가므로 그 종목 이름이 있어야 함. 없으면(개발용 152개 중 14%) 아래 방식으로 이름이 있는 문장
             # 13: "앞 문장에 이어지는 문장(주어 생략)도 살리기"를 시험했지만 가린 판정에서 나아지지 않아 뺌 — 화면엔 문장 하나만 보여
             #     이름 없는 문장은 누구 이야기인지 모름 (06-3 의 이유가 맞음). 괄호 이름만 고침
-            if _named(norm(picked), code, name, names):
+            # 0번(제목)은 화면에서 제목을 한 번 더 보여 주는 셈이라 근거가 약함 (11/16 밤 PM 리뷰: '보도된 사실' = 제목 반복)
+            # → 본문에 이름이 나온 문장이 있으면 아래 방식으로 본문 문장, 없을 때만 제목
+            if _named(norm(picked), code, name, names) and i != 0:
                 return picked
     words = {norm(name)} | {n for n, cc in names.items() if cc == code and len(n) >= 2}
     reason = set(re.findall(r"[가-힣A-Za-z0-9]{2,}", c.get("reason", "")))

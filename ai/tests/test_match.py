@@ -147,7 +147,9 @@ def test_step6_match():
     assert numbered("제목", body) == ["제목", "삼성전자가 행사에 참석했다.", "삼성전자는 HBM 공급 계약을 맺어 실적 개선이 기대된다.", "두산은 별도 소식이다."]
     picked = ("A", {"is_main": True, "reason": "r", "evidence": 1}, 1.0, "삼성전자")
     assert evidence(body, picked, names, "삼성전자 제목") == "삼성전자가 행사에 참석했다.", "LLM 이 고른 번호"
-    assert evidence(body, ("A", {**picked[1], "evidence": 0}, 1.0, "삼성전자"), names, "삼성전자 제목") == "삼성전자 제목"
+    # 0번(제목)을 골라도 본문에 이름 있는 문장이 있으면 본문 문장 (11/16 밤: 화면 '보도된 사실'이 제목 반복), 없을 때만 제목
+    assert evidence(body, ("A", {**picked[1], "evidence": 0}, 1.0, "삼성전자"), names, "삼성전자 제목") == "삼성전자가 행사에 참석했다."
+    assert evidence("두산 소식만 있다.", ("A", {**picked[1], "evidence": 0}, 1.0, "삼성전자"), names, "삼성전자 제목") == "삼성전자 제목"
     noname = ("A", {"is_main": True, "reason": "HBM 공급 계약으로 실적 개선", "evidence": 3}, 1.0, "삼성전자")
     assert evidence(body, noname, names, "제목") == "삼성전자는 HBM 공급 계약을 맺어 실적 개선이 기대된다.", \
         "LLM 이 고른 문장에 종목 이름이 없으면 이름 있는 문장으로 (06-3)"

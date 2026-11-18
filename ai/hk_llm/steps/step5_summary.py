@@ -68,7 +68,8 @@ class Company(BaseModel):
     role: Role = Field(description="[역할]")
     fact_type: FactType = Field(description="[사실 종류] 근거 문장이 어떤 문장인가")
     sentiment: CompanySentiment = Field(description="[감성]")
-    reason: str = Field(description="[이유] 역할·감성을 정한 까닭 한 문장, 40자 이내")
+    # 11/16 밤 화면 리뷰: 글 상세 'AI 메모'가 "…실적 개선 신호가 나온다"처럼 앞날을 말함 → 기사 속 사실로
+    reason: str = Field(description="[이유] 역할·감성을 정한 까닭 한 문장, 40자 이내. 기사에 쓰인 사실로 쓰고 '신호·기대·전망' 같은 앞날 판단은 쓰지 않는다")
 
 
 class ArticleSummary(BaseModel):
