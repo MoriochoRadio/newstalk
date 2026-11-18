@@ -36,7 +36,7 @@ import com.hkteam2.stocknews.common.TimeUtils;
  * | 무엇 | 캐시 | KIS 호출 |
  * | 현재가 | 5초 | 1번 |
  * | 현재가 여러 종목 (홈·관심 종목) | 종목마다 5초 (현재가와 같은 캐시) | 캐시에 없는 종목만 모아 1번 (30종목까지) |
- * | 분봉 1·5·10·30분 (그날 하루) | 오늘 장중 60초, 15:40 이후·지난 날 1시간 | 4번 동시에 (120분 구간씩), 주말 0번 → 서버가 n분씩 묶음 |
+ * | 분봉 1·5·10·30분 (그날 하루) | 오늘 장중 60초, 15:40 이후·지난 날 하루 | 4번 동시에 (120분 구간씩), 주말 0번 → 서버가 n분씩 묶음 |
  * | 주·월·년봉 | 10분 | 1번 (최근 100개, 년봉은 상장 이후) |
  * | 일봉 1년 (차트 첫 화면 + 급등·급락 이력, 같은 캐시) | 10분 | 3번 (140일씩 나눠서) |
  * | 일·주·월봉 이어 받기 (to 이전 100개) | 1시간 | 1번 |
@@ -60,8 +60,11 @@ public class QuoteService {
     static final Duration MINUTE_TTL = Duration.ofSeconds(60);
     static final Duration DAY_TTL = Duration.ofMinutes(10);
     static final Duration TICK_TTL = Duration.ofSeconds(5);
-    /** 지난 날 분봉은 바뀌지 않으므로 길게 */
-    static final Duration PAST_MINUTE_TTL = Duration.ofHours(1);
+    /**
+     * 지난 날 분봉은 바뀌지 않으므로 길게 (11/18: 1시간 → 하루). 종목 화면 5분봉은 오전에 지난 날을 며칠 더 받는데
+     * 하루치가 KIS 4번 → 같은 종목을 다시 열 때 다시 묻지 않게. 하루치 1분봉은 약 390개라 메모리 부담은 작음
+     */
+    static final Duration PAST_MINUTE_TTL = Duration.ofHours(24);
     /** 지난 구간 일·주·월봉 (to 있음)도 바뀌지 않으므로 길게 */
     static final Duration PAST_PERIOD_TTL = Duration.ofHours(1);
     /** 09:00~15:30 = 391분, KIS는 한 번에 120분 → 4구간 (+ 여유 1) */
