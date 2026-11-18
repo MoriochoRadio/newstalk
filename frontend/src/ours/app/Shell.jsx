@@ -2,7 +2,7 @@
 // 면책 문구는 맨 아래 한 번만. 화면을 옮기면(뒤로 가기 제외) 맨 위로
 import { Suspense, useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
-import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, Settings, Star, Sun, User } from 'lucide-react';
+import { CandlestickChart, Home, LayoutGrid, LogIn, LogOut, Moon, Newspaper, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Sun, User } from 'lucide-react';
 import { useSession } from './session';
 import LivePill from '../components/LivePill';
 import { useNetStatus } from '../lib/netStatus';
@@ -11,7 +11,6 @@ import AuthModal from '../components/AuthModal';
 import { useFocusTrap } from '../lib/focusTrap';
 import { SkeletonRows } from '../components/ui';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { REFRESH_EVENT } from '../../hooks/useApi';
 
 const NAV = [
   { to: '/', label: '홈', icon: Home, end: true },
@@ -159,40 +158,6 @@ function useNavCollapsed() {
       return !c;
     });
   return [collapsed, toggleNav];
-}
-
-/**
- * 새로 불러오기 (11/18 사용자: '새 기사 확인' 옆에 지금 화면을 최신으로 다시 받는 버튼)
- * 화면을 다시 그리지 않고 떠 있는 API 만 다시 부름(useApi·현재가·당일 차트·수집 상태가 REFRESH_EVENT 를 들음) → 깜빡임·스크롤 튐 없음
- * 여러 번 누르기 막기: 누르면 10초 동안 잠김 (1초 '불러오는 중' → '방금 불러옴'). AI(LLM)는 부르지 않음 — 저장된 결과를 다시 읽기만
- */
-const REFRESH_COOLDOWN_MS = 10_000;
-function RefreshButton() {
-  const [phase, setPhase] = useState('idle'); // idle | busy | cool
-  const timers = useRef([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const run = () => {
-    if (phase !== 'idle') return;
-    setPhase('busy');
-    window.dispatchEvent(new Event(REFRESH_EVENT));
-    timers.current = [setTimeout(() => setPhase('cool'), 1000), setTimeout(() => setPhase('idle'), REFRESH_COOLDOWN_MS)];
-  };
-  const label = phase === 'busy' ? '불러오는 중' : phase === 'cool' ? '방금 불러옴' : '새로 불러오기';
-  return (
-    <button
-      type="button"
-      className={`refresh-btn ${phase !== 'idle' ? 'is-done' : ''}`}
-      onClick={run}
-      aria-disabled={phase !== 'idle'}
-      title={phase === 'idle' ? '지금 보는 화면의 기사·시세를 최신으로 다시 받아요' : '10초 뒤에 다시 누를 수 있어요'}
-    >
-      <RefreshCw className={`icon-sm ${phase === 'busy' ? 'spin' : ''}`} aria-hidden="true" />
-      <span className="refresh-text">{label}</span>
-      <span className="sr-only" aria-live="polite">
-        {phase === 'cool' ? '최신 내용으로 다시 불러왔어요' : ''}
-      </span>
-    </button>
-  );
 }
 
 /** 서버 연결 띠: 끊기면 한 번만 크게, 다시 연결되면 '새로 불러오기' (카드마다 반복되던 긴 오류 대신) */
@@ -440,7 +405,6 @@ export default function Shell() {
           <SearchBox className="desktop-search" />
           <div className="topbar-right">
             <LivePill className="desktop-only" />
-            <RefreshButton />
             <button type="button" className="icon-btn mobile-only" aria-label="검색" onClick={() => setMobileSearch(true)}>
               <Search className="icon" aria-hidden="true" />
             </button>

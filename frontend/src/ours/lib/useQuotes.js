@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { quoteApi } from '../../api';
 import { usePageVisible } from '../../hooks/usePageVisible';
 import { useQuoteStream } from '../../hooks/useQuoteStream';
-import { REFRESH_EVENT } from '../../hooks/useApi';
 
 const REFRESH_MS = 60_000;
 const CHUNK = 10;
@@ -86,21 +85,7 @@ export function useQuotes(codes, { live = false } = {}) {
     };
     run();
     const timer = setInterval(run, FAIL_RETRY_MS); // 신선한 값은 건너뛰므로 실제 호출은 실패·1분 지난 종목만
-    // '새로 불러오기': 이 화면 종목을 오래된 것으로 쳐서 바로 다시 받음 (받은 값은 새 값이 올 때까지 그대로 보임)
-    // 백엔드도 KIS 값을 5초(장 마감 뒤 1분) 캐시하므로 여러 번 눌러도 KIS 로 가는 호출은 늘지 않음
-    const onRefresh = () => {
-      list.forEach((c) => {
-        const e = cache.get(c);
-        if (e) e.at = 0;
-        failedAt.delete(c);
-      });
-      run();
-    };
-    window.addEventListener(REFRESH_EVENT, onRefresh);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener(REFRESH_EVENT, onRefresh);
-    };
+    return () => clearInterval(timer);
   }, [key, visible]);
 
   const onQuote = useCallback((q) => {

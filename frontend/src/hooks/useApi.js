@@ -1,9 +1,6 @@
 // API 하나를 불러 { data, error, loading, reload } 로 돌려주는 작은 도구
 import { useEffect, useState } from 'react';
 
-/** 이 이름의 window 이벤트가 오면 모든 useApi 가 다시 부름 (머리줄 '새로 불러오기') */
-export const REFRESH_EVENT = 'snm:refresh';
-
 const keyOf = (deps) => {
   try {
     return JSON.stringify(deps);
@@ -61,14 +58,6 @@ export function useApi(fetcher, deps, { refreshMs, enabled = true } = {}) {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [refreshMs, enabled]);
-
-  // '새로 불러오기' 버튼(11/18): 화면에 떠 있는 API 를 한꺼번에 다시 부름. 이전 결과는 둔 채로 바꿔서 깜빡이거나 스크롤이 튀지 않음
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const onRefresh = () => setTick((t) => t + 1);
-    window.addEventListener(REFRESH_EVENT, onRefresh);
-    return () => window.removeEventListener(REFRESH_EVENT, onRefresh);
-  }, [enabled]);
 
   // deps 가 막 바뀐 그 그리기(효과가 돌기 전)에도 이전 결과를 내보내지 않음
   const view = state.key === key ? state : { data: null, error: null, loading: enabled };
