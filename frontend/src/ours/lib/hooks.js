@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-const APP_NAME = 'StockNews';
+const APP_NAME = '뉴스톡'; // 11/18 서비스 이름 확정 (이전: StockNews)
 
-/** 브라우저 탭 제목 "삼성전자 · StockNews" */
+/** 브라우저 탭 제목 "삼성전자 · 뉴스톡" */
 export function useTitle(title) {
   useEffect(() => {
     document.title = title ? `${title} · ${APP_NAME}` : `${APP_NAME} · 뉴스로 보는 종목`;

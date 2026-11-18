@@ -49,7 +49,7 @@ export default function NoticePage() {
 
         <div className="notice-body card">
           <p className="notice-lead">
-            StockNews는 뉴스·공시가 <b>어떤 종목과, 왜</b> 이어지는지 AI로 정리해 보여 주는 정보 서비스예요. 매수·매도를 권하지 않고,
+            뉴스톡은 뉴스·공시가 <b>어떤 종목과, 왜</b> 이어지는지 AI로 정리해 보여 주는 정보 서비스예요. 매수·매도를 권하지 않고,
             주가를 예측하지 않아요. <b>투자 판단과 그 결과의 책임은 투자자 본인에게 있어요.</b>
           </p>
 

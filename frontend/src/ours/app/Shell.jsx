@@ -53,9 +53,11 @@ function useTheme() {
   return { dark: effectiveTheme(choice) === 'dark', toggle };
 }
 
-const Mark = () => (
-  <span className="brand-mark" aria-hidden="true">
-    <CandlestickChart className="icon-sm" />
+// 11/18 로고 확정: 신문 위 캔들·상승 화살표 아이콘(흰 둥근 판) + '뉴스톡' (뉴스 = 남색, 톡 = 파랑, 로고와 같은 색 나눔)
+const Mark = () => <img className="brand-mark brand-logo" src="/brand/logo-mark.png" alt="" width="32" height="32" aria-hidden="true" />;
+const Wordmark = () => (
+  <span className="brand-word">
+    뉴스<span className="brand-word-accent">톡</span>
   </span>
 );
 
@@ -352,10 +354,10 @@ export default function Shell() {
       </a>
       <aside className="sidenav" aria-label="사이드바">
         <div className="brand-row">
-          <Link to="/" className="brand" aria-label="StockNews 홈">
+          <Link to="/" className="brand" aria-label="뉴스톡 홈">
             <Mark />
             <span className="nav-text">
-              StockNews
+              <Wordmark />
               <span className="brand-sub">뉴스로 보는 종목</span>
             </span>
           </Link>
@@ -398,9 +400,11 @@ export default function Shell() {
 
       <div className="main">
         <header className="topbar">
-          <Link to="/" className="mobile-brand" aria-label="StockNews 홈">
+          <Link to="/" className="mobile-brand" aria-label="뉴스톡 홈">
             <Mark />
-            <span className="brand-text">StockNews</span>
+            <span className="brand-text">
+              <Wordmark />
+            </span>
           </Link>
           <SearchBox className="desktop-search" />
           <div className="topbar-right">
