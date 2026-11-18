@@ -230,7 +230,7 @@ export default function HomePage() {
 
   return (
     <>
-      <div className="page-head home-head dash-head">
+      <div className={`page-head home-head dash-head ${view === 'cc' ? 'is-cc' : ''}`}>
         <div style={{ minWidth: 0 }}>
           <h1 className="page-title">
             오늘의 뉴스 브리핑 <span className="title-date num">{todayLabel()}</span>
@@ -267,7 +267,7 @@ export default function HomePage() {
               priceOff={priceOff}
               capMap={capMap}
               capNews={capNews}
-              topics={topics}
+              topics={topicMix(groupStories(newsArticles), 10)}
               feedAt={feedAt}
             />
           )}

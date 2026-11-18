@@ -10,10 +10,10 @@ import { squarify } from './MarketMap';
 import { fmtRate, shortTime } from '../lib/format';
 import { marketState } from '../lib/market';
 
-const HEAD = 28; // 업종 머리줄 높이 (이름 · 평균 등락 · 기사 수)
-const PAD = 6; // 업종 상자 안 여백
-const SGAP = 10; // 업종 상자 사이
-const GAP = 6; // 칸 사이 여백 (꽉 찬 느낌 줄이기)
+const HEAD0 = 28; // 업종 머리줄 높이 (이름 · 평균 등락 · 기사 수)
+const PAD0 = 6; // 업종 상자 안 여백
+const SGAP0 = 10; // 업종 상자 사이
+const GAP0 = 6; // 칸 사이 여백 (꽉 찬 느낌 줄이기)
 
 function useWidth(ref) {
   const [w, setW] = useState(0);
@@ -60,7 +60,12 @@ export function capText(eok) {
  * items: [{ stockCode, stockName, sector, marketCap, changeRate, priceLimit }]
  * news: { [code]: { count, top: { id, title } } } — 오늘 기사 수와 대표 제목
  */
-export default function CapMap({ items, news = {}, height: height0 = 520, limit = 20, maxShare = 0.24, sizeKind = 'cap', onDrawn }) {
+/** pro: 홈 '한눈에'(컨트롤 센터)용 FINVIZ 지도 — 칸 사이 1px·업종 사이 2px, 얇은 업종 이름 띠, 각진 칸, 기사 수는 모서리 숫자만 (11/18 실험) */
+export default function CapMap({ items, news = {}, height: height0 = 520, limit = 20, maxShare = 0.24, sizeKind = 'cap', onDrawn, pro = false }) {
+  const GAP = pro ? 1 : GAP0;
+  const SGAP = pro ? 2 : SGAP0;
+  const PAD = pro ? 0 : PAD0;
+  const HEAD = pro ? 15 : HEAD0;
   const boxRef = useRef(null);
   const width = useWidth(boxRef);
   // 휴대폰(좁은 폭)은 칸 16개가 들어가게 높이를 최소 520 으로
@@ -108,7 +113,7 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
       const sct = sectors[r.i];
       const bw = r.w - (grouped ? SGAP : 0);
       const bh = r.h - (grouped ? SGAP : 0);
-      const showHead = Boolean(sct.name) && bh >= HEAD + 40 && bw >= 70;
+      const showHead = Boolean(sct.name) && bh >= HEAD + (pro ? 22 : 40) && bw >= (pro ? 40 : 70);
       const top = showHead ? HEAD : grouped ? PAD : 0;
       const pad = grouped ? PAD : 0;
       // 칸이 오른쪽·아래 GAP 을 빼므로 상자 안을 GAP 만큼 넓게 나눔 (상자 없는 홈 지도는 예전 그대로)
@@ -119,7 +124,7 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
       const newsSum = sct.list.reduce((t, x) => t + (news[x.stockCode]?.count || 0), 0);
       return { ...r, w: bw, h: bh, name: sct.name, grouped, showHead, top, pad, avg, newsSum, tiles: inner.map((t) => ({ ...t, it: sct.list[t.i] })) };
     });
-  }, [items, width, height, limit, maxShare, news]);
+  }, [items, width, height, limit, maxShare, news, pro]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 마우스로 띄운 설명도 Esc 로 닫기 (WCAG 1.4.13 — 예전엔 지도 안에 초점이 있을 때만)
   useEffect(() => {
@@ -136,7 +141,7 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
   }, [drawn, onDrawn]);
 
   return (
-    <div className="cap-map" ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)} onKeyDown={(e) => e.key === 'Escape' && setTip(null)}>
+    <div className={`cap-map ${pro ? 'cap-map-pro' : ''}`} ref={boxRef} style={{ height }} onMouseLeave={() => setTip(null)} onKeyDown={(e) => e.key === 'Escape' && setTip(null)}>
       {layout.map((sec) => (
         <section
           key={sec.name}
@@ -147,8 +152,8 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
           {sec.showHead && (
             <h3 className="cm-head">
               <span className="cm-head-name">{sec.name}</span>
-              {sec.w >= 150 && <span className={`cm-head-rate num ${sec.avg > 0.05 ? 'up' : sec.avg < -0.05 ? 'down' : ''}`}>{fmtRate(Math.round(sec.avg * 100) / 100)}</span>}
-              {sec.w >= 220 && <span className="cm-head-news num">기사 {sec.newsSum}건</span>}
+              {sec.w >= (pro ? 110 : 150) && <span className={`cm-head-rate num ${sec.avg > 0.05 ? 'up' : sec.avg < -0.05 ? 'down' : ''}`}>{fmtRate(Math.round(sec.avg * 100) / 100)}</span>}
+              {sec.w >= 220 && !pro && <span className="cm-head-news num">기사 {sec.newsSum}건</span>}
             </h3>
           )}
           <ul style={{ top: sec.top, left: sec.pad, right: sec.pad, bottom: sec.pad }}>
@@ -159,11 +164,11 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               const h = t.h - GAP;
               // 글자 폭(em): 한글 0.95, 영문·숫자 0.62 ('LG에너지솔루션'을 한글 8자로 쳐서 칸에 안 들어간다고 숨겼음)
               const len = Math.max(2, [...it.stockName].reduce((t, ch) => t + (/[가-힣]/.test(ch) ? 0.95 : 0.62), 0));
-              const roomy = w >= 130 && h >= 96; // 큰 칸: 증권 앱 지도처럼 왼쪽 위에 이름·등락, 왼쪽 아래 기사 수
+              const roomy = !pro && w >= 130 && h >= 96; // 큰 칸: 증권 앱 지도처럼 왼쪽 위에 이름·등락, 왼쪽 아래 기사 수
               const newsSize = roomy ? Math.max(14, Math.min(17, Math.round(Math.sqrt(w * h) / 16))) : 12; // 기사 줄 글자 (먼저 정함)
               // 이름·등락·기사 세 줄이 칸 높이에 들어가게 이름 크기를 맞춤: 이름 1.2 + 등락 0.9 + 기사 줄 + 여백
               const fitByH = (h - 10 - newsSize * 1.45) / 2.05;
-              const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8, fitByH)));
+              const nameSize = Math.round(Math.max(10, Math.min(roomy ? Math.min(28, Math.max(18, Math.sqrt(w * h) / 9)) : pro ? Math.min(17, Math.max(11, Math.sqrt(w * h) / 7)) : 18, (w - (roomy ? 24 : 8)) / len, h / 2.8, fitByH)));
               // 이름이 칸 너비에 다 들어갈 때만 (잘린 이름 '삼성엔지니…' 대신 빈 칸 + 마우스를 올리면 정보)
               const fitsOneLine = w >= 30 && h >= nameSize * 1.2 + 4 && len * nameSize <= w - 4;
               // 좁고 긴 칸: 한 줄에 안 들어가는 긴 이름(한화에어로스페이스 등)은 두세 줄로 접어서 (빈 칸으로 남던 것 — 11/16)
@@ -186,8 +191,9 @@ export default function CapMap({ items, news = {}, height: height0 = 520, limit 
               const wrapLines = wrapName ? wrapLinesFor : 0;
               const usedH = (showName ? nameSize * 1.2 : wrapLines * wrapSize * 1.2) + (showRate ? rateSize * 1.25 : 0);
               const roomV = h - usedH - 8 >= newsSize * 1.4;
-              const newsText =
-                roomV && fullW <= w - 8 ? (n > 0 ? `기사 ${n}건` : '기사 없음') : roomV && shortW <= w - 8 ? (n > 0 ? `${n}건` : '없음') : null;
+              const newsText = pro
+                ? null
+                : roomV && fullW <= w - 8 ? (n > 0 ? `기사 ${n}건` : '기사 없음') : roomV && shortW <= w - 8 ? (n > 0 ? `${n}건` : '없음') : null;
               // 세로 자리가 없으면 오른쪽 위 작은 알약 'n건' (이름과 안 겹칠 때만)
               const cornerNews = !newsText && n > 0 && w >= shortW + 8 && h >= 22 && (!showName || w - len * nameSize >= shortW * 2 + 8);
               // 기사가 많을수록 진하게: 없음 회색 · 1~2건 보통 · 3~5건 보라 · 6건 이상 진한 보라
