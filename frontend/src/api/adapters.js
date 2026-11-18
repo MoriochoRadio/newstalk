@@ -2,6 +2,11 @@
 // 화면 조각(글 카드·상세·감성 막대 등)이 처음 만들어질 때 쓰던 칸 이름에 맞춤 → 화면 코드를 덜 고치고 연결
 // 원칙: 백엔드에 없는 값은 지어내지 않음 (가짜 감성 %·가짜 연결 이유 금지) → 비워 두고 화면에서 "준비 중"
 
+/** 원문 주소는 http(s) 만 (11/17 QA: React 는 javascript: 만 막고 data: 같은 것은 통과). 아니면 undefined → 링크에 주소가 안 붙음 */
+export function safeUrl(u) {
+  return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : undefined;
+}
+
 const EMPTY_RATIO = Object.freeze({ positive: 0, neutral: 0, negative: 0 });
 
 /**
@@ -12,8 +17,8 @@ const EMPTY_RATIO = Object.freeze({ positive: 0, neutral: 0, negative: 0 });
  */
 export const SENTIMENT_LABEL = Object.freeze({ POSITIVE: '긍정', NEGATIVE: '부정', NEUTRAL: '중립' });
 export const SENTIMENT_NONE_LABEL = '판단 보류';
-export const ROLE_LABEL = Object.freeze({ MAIN: '주인공', MENTIONED: '함께 언급' });
-export const FACT_TYPE_LABEL = Object.freeze({ FACT: '일어난 일', PLAN: '회사 계획', FORECAST: '전망', RUMOR: '소문' });
+export const ROLE_LABEL = Object.freeze({ MAIN: '중심 종목', MENTIONED: '함께 언급' }); // 11/16 MTS PM 리뷰: '주인공'은 증권 앱 말투와 거리
+export const FACT_TYPE_LABEL = Object.freeze({ FACT: '보도된 사실', PLAN: '회사 계획', FORECAST: '전망', RUMOR: '확인 안 된 이야기' }); // 11/16: '일어난 일'은 단정처럼 읽힘
 // 공시의 의무/자율 (보고서 이름의 "(자율공시)"·"(공정공시)" 표시로 나눔. 그 밖은 주요사항보고서·수시공시 = 의무)
 export const DISCLOSURE_KIND_LABEL = Object.freeze({ MANDATORY: '의무', VOLUNTARY: '자율', FAIR: '공정공시' });
 
@@ -99,6 +104,10 @@ export function toUiArticle(item) {
         sameNewsCount: Number.isInteger(s.sameNewsCount) ? s.sameNewsCount : null,
         firstReportPress: s.firstReportPress || '',
         firstReport: s.firstReport === true,
+        // 같은 소식 묶음의 AI 판단 수 (11/17 백엔드): 제목만 받은 기사도 같은 소식의 판단으로 링을 그리려고. 없으면 null
+        group: Number.isInteger(s.groupPositive)
+          ? { pos: s.groupPositive, neg: s.groupNegative || 0, neu: s.groupNeutral || 0 }
+          : null,
         matchedKeywords: s.matchedKeywords || [],
         // 목록 API에는 없고 상세 API(articleApi.get)에만 있음. 없으면 빈 값 (가짜 문장을 채우지 않음)
         reason: s.reason || '',
@@ -144,7 +153,7 @@ export function toUiArticle(item) {
     publishedAt: toDisplayTime(item.publishedAt),
     publishedAtIso: item.publishedAt || null,
     daysAgo: daysAgoKst(item.publishedAt),
-    url: item.url || '',
+    url: safeUrl(item.url),
     analysisStatus: 'COMPLETED',
     summary: disclosurePending ? [] : summaryLines.slice(0, 3),
     // AI 요약이 없는 글 (AI 활용 금지 언론사·원문 요약 전 공시 등) → 화면 "AI 요약 없음 · 원문 보기"
@@ -164,7 +173,7 @@ export function toUiArticle(item) {
       publishedAt: toDisplayTime(s.publishedAt),
       time: toClock(s.publishedAt),
       sentiment: null,
-      url: s.url || '',
+      url: safeUrl(s.url),
     })),
   };
 }
@@ -196,7 +205,7 @@ export function toUiSummary(res) {
 
 /**
  * 종목 토론 게시판 글 → 화면 댓글 모양 (화면은 댓글형, 서버는 게시판: 댓글 하나 = 게시판 글 하나, 내용은 제목 칸)
- * likedByMe 는 목록 API에 없어서 처음에는 false, 공감을 누르면 서버 답으로 바뀜
+ * likedByMe: 목록 API 의 likedByMe (로그인 안 했으면 false, 11/17)
  */
 export function toUiBoardComment(item, stockCode) {
   return {
@@ -207,7 +216,7 @@ export function toUiBoardComment(item, stockCode) {
     content: item.title,
     createdAt: item.createdAt,
     likes: item.likeCount,
-    likedByMe: false,
+    likedByMe: Boolean(item.likedByMe),
   };
 }
 

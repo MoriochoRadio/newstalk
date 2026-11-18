@@ -1,0 +1,33 @@
+// 수집 상태 알약 (V7 "실시간 매칭 · 시각"을 우리 말로): 살아 있으면 초록 점이 깜박, 멈췄으면 노랑
+import { useStatus, isLive } from '../lib/useStatus';
+import { relativeTime, shortTime } from '../lib/format';
+import { useNetStatus } from '../lib/netStatus';
+
+export default function LivePill({ className = '' }) {
+  const { data, error } = useStatus();
+  const { offline } = useNetStatus();
+  if (offline) {
+    // 연결이 끊긴 동안 옛 시각을 '정상'처럼 보이지 않게
+    return (
+      <span className={`live-pill off ${className}`}>
+        <i aria-hidden="true" />
+        연결 끊김
+      </span>
+    );
+  }
+  if (error && !data) return null;
+  if (!data) return <span className={`live-pill skeleton ${className}`} style={{ width: 150 }} aria-hidden="true" />;
+  const live = isLive(data);
+  const at = data.newsCollectedAt;
+  return (
+    <span
+      className={`live-pill ${live ? 'on' : 'off'} ${className}`}
+      title={`뉴스 수집 ${at ? shortTime(at) : '기록 없음'} · 종목 요약 ${data.summaryGeneratedAt ? shortTime(data.summaryGeneratedAt) : '기록 없음'}`}
+    >
+      <i aria-hidden="true" />
+      {/* 11/13 사용자 눈으로: '실시간 매칭'은 우리 내부 말이라 일반 사용자는 뜻을 모름 → '새 소식 확인 시각' */}
+      {/* 시세 시각으로 읽히지 않게 '새 소식' (11/16 MTS PM 리뷰) */}
+      {live ? `새 기사 확인 ${shortTime(at)}` : at ? `새 기사 확인 ${relativeTime(at)}` : '수집 기록 없음'}
+    </span>
+  );
+}

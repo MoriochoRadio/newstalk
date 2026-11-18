@@ -1,0 +1,391 @@
+/* 우리 안(태경 안) 디자인 토큰 — 색·글자·모양은 전부 여기서만 정함
+   바탕: test/fe-ui-redesign 목업의 "토스풍" 프리셋 (theme=toss card=soft radius=round fx=lift)
+   - 라이트/다크: <html data-theme="light|dark">. 속성이 없으면 운영체제 설정(prefers-color-scheme)을 따름
+   - 글자색은 바탕 대비 4.5:1 이상 (본문·보조 모두). 채움색(--accent 등)은 아이콘·막대·포커스용
+   - 상승 빨강 · 하락 파랑 (국내 증권 앱 관례) */
+
+:root {
+  color-scheme: light;
+
+  /* 글꼴 (v3 에서 명조를 시도했다가 'Claude 화면 같다'는 피드백으로 되돌림 — 제목도 Pretendard) */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  --font-serif: var(--font-sans);
+
+  /* 근거·핵심 문장 강조 (형광펜 대신 은은한 밑칠) */
+  --mark-soft: #e8f3ff;
+
+  /* 글자 크기 7단계 (본문 14) */
+  /* 11/13 피드백 '글씨가 전체적으로 작음' → 두 번 키움 (본문 14→17, 가장 작은 글씨 12→14) */
+  --fs-xs: 14px;
+  --fs-sm: 15px;
+  --fs-md: 17px;
+  --fs-lg: 19px;
+  --fs-xl: 24px;
+  --fs-2xl: 30px;
+  --fs-3xl: 34px;
+  --lh-tight: 1.3;
+  --lh: 1.6;
+
+  /* 바탕·면 */
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --surface-3: #f2f4f6;
+  --surface-hover: #f4f6f8;
+  --line: #e5e8eb;
+  --line-strong: #d1d6db;
+
+  /* 글자 (흰 바탕 기준 대비: text 16.1 · text-2 7.3 · text-3 5.1) */
+  --text: #191f28;
+  --text-2: #4e5968;
+  --text-3: #636e7b;
+  --text-on-accent: #ffffff;
+
+  /* 강조 (토스 파랑). accent-strong 은 흰 글자를 올려도 5.4:1 */
+  --accent: #3182f6;
+  --accent-strong: #1b64da;
+  --accent-soft: #e8f3ff;
+  --accent-text: #1b64da;
+
+  /* 등락 (글자용은 4.5:1 이상, 차트용은 채움색) */
+  --up: #c8202f;
+  --up-soft: #fdecee;
+  --up-chart: #f04452;
+  --down: #2563eb;
+  --down-soft: #e8f0fe;
+  --down-chart: #3182f6;
+  --flat: #636e7b;
+
+  /* 상태색 */
+  --warn: #9a5b00;
+  --warn-soft: #fff4e0;
+  --ok: #0f7a55;
+  --ok-soft: #e6f6ef;
+  --danger: #c4222f;
+  --danger-soft: #fdecee;
+  --danger-solid: #c4222f;
+  --star: #b88400; /* 노랑: 나쁜 소식 주황(#a3480a)과 같은 계열로 보이지 않게 (11/16 디자이너 리뷰). 11/17 QA: #e3a008 은 흰 바탕 2.26:1 → 그림 요소 기준 3:1 을 넘게 어둡게 (흰 3.31, 회색 3.0) */
+
+  /* 차트 이동평균 선 */
+  --ma5: #e8a317;
+  --ma20: #8b5cf6;
+  --ma60: #0ea5a4;
+
+  /* 모양 (radius=round) */
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* 그림자 (card=soft: 선 없이 부드러운 그림자) */
+  --shadow-card: 0 2px 12px rgba(25, 31, 40, 0.06), 0 1px 2px rgba(25, 31, 40, 0.04);
+  --shadow-hover: 0 6px 20px rgba(25, 31, 40, 0.1);
+  --shadow-pop: 0 16px 40px rgba(25, 31, 40, 0.18);
+
+  /* 크기 */
+  --control-h: 40px;
+  --control-h-sm: 32px;
+  --nav-w: 208px; /* 11/12: 232 → 208 (공간을 과하게 차지한다는 피드백), 접으면 64 */
+  --content-max: 1400px; /* 11/13 '여백이 신경 쓰임': 넓은 모니터에서 양옆이 비지 않게 1180 → 1400 */
+  --gutter: 20px;
+
+  --skeleton-a: #eceef1;
+  --skeleton-b: #f6f7f9;
+  --overlay: rgba(0, 0, 0, 0.45);
+
+  /* v2: 시장 지도 칸 색 (등락 세기 3단계). 진한 칸만 흰 글자, 나머지는 --heat-ink (대비 4.5:1 이상) */
+  --heat-up-3: #c8202f;
+  --heat-up-2: #f6bcc2;
+  --heat-up-1: #fde6e9;
+  --heat-down-3: #1d4ed8;
+  --heat-down-2: #bcd1fb;
+  --heat-down-1: #e4edfd;
+  --heat-flat: #e9ecef;
+  --heat-none: #eef0f3;
+  --heat-ink: #191f28;
+  --heat-ink-strong: #ffffff;
+
+  /* v2: 평소 대비 보도량 강조 (등락 빨강·파랑과 헷갈리지 않게 보라) */
+  --buzz: #6d28d9;
+  --buzz-soft: #f1e8ff;
+  --buzz-solid: #6d28d9;
+
+  /* v2: 시간대별 보도량 */
+  --bar-news: var(--buzz-solid); /* 기사 수 막대 = 보라 (11/16 리뷰: 파랑이면 '내림'으로 읽힘, 차트의 기사 수 막대와 같은 색) */
+  --bar-disclosure: #9aa4b2;
+}
+
+/* 다크 값 (두 곳에서 같은 값을 씀: 운영체제 다크 + 직접 고른 다크) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #101115;
+    --surface: #1b1c22;
+    --surface-2: #202128;
+    --surface-3: #26272f;
+    --surface-hover: #24252c;
+    --line: #2c2e36;
+    --line-strong: #3a3d47;
+    --text: #eceef1;
+    --text-2: #c1c7cf;
+    --text-3: #9ea6b1;
+    --text-on-accent: #ffffff;
+    --accent: #4a90f7;
+    --accent-strong: #2f6fdb;
+    --accent-soft: rgba(74, 144, 247, 0.16);
+    --accent-text: #79acff;
+    --up: #ff6b76;
+    --up-soft: rgba(255, 107, 118, 0.14);
+    --up-chart: #ff5c68;
+    --down: #6ea8ff;
+    --down-soft: rgba(110, 168, 255, 0.14);
+    --down-chart: #4a90f7;
+    --flat: #9ea6b1;
+    --warn: #f3b552;
+    --warn-soft: rgba(243, 181, 82, 0.14);
+    --ok: #4cc795;
+    --ok-soft: rgba(76, 199, 149, 0.14);
+    --danger: #ff7b85;
+    --danger-soft: rgba(255, 123, 133, 0.14);
+    --danger-solid: #c9303c;
+    --star: #facc15;
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.35);
+    --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --skeleton-a: #24252c;
+    --mark-soft: rgba(74, 144, 247, 0.18);
+    --skeleton-b: #2c2d35;
+    --overlay: rgba(0, 0, 0, 0.6);
+
+    --heat-up-3: #b8232f;
+    --heat-up-2: #6b2a31;
+    --heat-up-1: #3b2529;
+    --heat-down-3: #2453c2;
+    --heat-down-2: #263f78;
+    --heat-down-1: #1f2a43;
+    --heat-flat: #2a2c33;
+    --heat-none: #24252c;
+    --heat-ink: #eceef1;
+    --heat-ink-strong: #ffffff;
+    --buzz: #c9b2ff;
+    --buzz-soft: rgba(167, 139, 250, 0.16);
+    --buzz-solid: #7c3aed;
+    --bar-news: var(--buzz-solid); /* 기사 수 막대 = 보라 (11/16 리뷰: 파랑이면 '내림'으로 읽힘, 차트의 기사 수 막대와 같은 색) */
+    --bar-disclosure: #6b7380;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #101115;
+  --surface: #1b1c22;
+  --surface-2: #202128;
+  --surface-3: #26272f;
+  --surface-hover: #24252c;
+  --line: #2c2e36;
+  --line-strong: #3a3d47;
+  --text: #eceef1;
+  --text-2: #c1c7cf;
+  --text-3: #9ea6b1;
+  --text-on-accent: #ffffff;
+  --accent: #4a90f7;
+  --accent-strong: #2f6fdb;
+  --accent-soft: rgba(74, 144, 247, 0.16);
+  --accent-text: #79acff;
+  --up: #ff6b76;
+  --up-soft: rgba(255, 107, 118, 0.14);
+  --up-chart: #ff5c68;
+  --down: #6ea8ff;
+  --down-soft: rgba(110, 168, 255, 0.14);
+  --down-chart: #4a90f7;
+  --flat: #9ea6b1;
+  --warn: #f3b552;
+  --warn-soft: rgba(243, 181, 82, 0.14);
+  --ok: #4cc795;
+  --ok-soft: rgba(76, 199, 149, 0.14);
+  --danger: #ff7b85;
+  --danger-soft: rgba(255, 123, 133, 0.14);
+  --danger-solid: #c9303c;
+  --star: #facc15;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --skeleton-a: #24252c;
+  --skeleton-b: #2c2d35;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --mark-soft: rgba(74, 144, 247, 0.18);
+
+  --heat-up-3: #b8232f;
+  --heat-up-2: #6b2a31;
+  --heat-up-1: #3b2529;
+  --heat-down-3: #2453c2;
+  --heat-down-2: #263f78;
+  --heat-down-1: #1f2a43;
+  --heat-flat: #2a2c33;
+  --heat-none: #24252c;
+  --heat-ink: #eceef1;
+  --heat-ink-strong: #ffffff;
+  --buzz: #c9b2ff;
+  --buzz-soft: rgba(167, 139, 250, 0.16);
+  --buzz-solid: #7c3aed;
+  --bar-news: var(--buzz-solid); /* 기사 수 막대 = 보라 (11/16 리뷰: 파랑이면 '내림'으로 읽힘, 차트의 기사 수 막대와 같은 색) */
+  --bar-disclosure: #6b7380;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --gutter: 16px;
+    --fs-2xl: 26px;
+    --fs-3xl: 30px;
+  }
+}
+
+/* ===== 시안 E (11/12, "토스 같다" 피드백): 파랑은 그대로 + 어두운 화면만 중립 회색 (사용자: '파랑이 제일 좋다') ===== */
+
+/* 어두운 화면: 푸른 기가 없는 중립 회색 바탕 (토스의 푸른 검정과 구분) */
+:root[data-variant='e'][data-theme='dark'] {
+  --bg: #121212;
+  --surface: #1c1c1c;
+  --surface-2: #222222;
+  --surface-3: #2a2a2a;
+  --surface-hover: #262626;
+  --line: #2f2f2f;
+  --line-strong: #3d3d3d;
+  --text: #ededed;
+  --text-2: #c4c4c4;
+  --text-3: #a0a0a0;
+  --skeleton-a: #262626;
+  --skeleton-b: #2e2e2e;
+  --heat-flat: #2c2c2c;
+  --heat-none: #262626;
+}
+
+@media (prefers-color-scheme: dark) {
+  /* (운영체제 다크 설정을 따를 때도 같은 값) */
+  :root[data-variant='e']:not([data-theme='light']) {
+    --bg: #121212;
+    --surface: #1c1c1c;
+    --surface-2: #222222;
+    --surface-3: #2a2a2a;
+    --surface-hover: #262626;
+    --line: #2f2f2f;
+    --line-strong: #3d3d3d;
+    --text: #ededed;
+    --text-2: #c4c4c4;
+    --text-3: #a0a0a0;
+    --skeleton-a: #262626;
+    --skeleton-b: #2e2e2e;
+    --heat-flat: #2c2c2c;
+    --heat-none: #262626;
+  }
+}
+
+/* ===== 최종 G (11/12 밤): 파랑 강조 + 중립 회색 + 덜 둥근 카드(soft) + 남색 사이드바(ink) =====
+   OursApp.jsx 가 <html data-variant="e" data-shape="soft" data-nav="ink"> 를 정함. 다른 시안(b·c·d, sharp·flat)은 11/13 지움 */
+/* 기본(토스 원본) 값 — 아래 모양 토큰을 쓰는 곳이 바뀌지 않게 */
+:root {
+  --card-border: 0 solid transparent;
+}
+
+/* E 밝은 화면: 토스의 푸른 회색 대신 중립 회색 (글자 대비: text-2 7.7 · text-3 5.3 — 흰 카드 기준, 회색 바탕 4.8) */
+:root[data-variant='e'] {
+  --bg: #f4f4f5;
+  --surface-2: #fafafa;
+  --surface-3: #f4f4f5;
+  --surface-hover: #f4f4f5;
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+  --text: #18181b;
+  --text-2: #52525b;
+  --text-3: #6b6b74; /* 11/12 접근성 점검: #71717a 는 회색 바탕(#f4f4f5) 위 4.4 로 미달 → 4.8 */
+  --skeleton-a: #ececee;
+  --skeleton-b: #f6f6f7;
+  --heat-flat: #ececee;
+  --heat-none: #f0f0f2;
+}
+
+/* 모양: 부드럽지만 덜 둥글게 (토스 18px → 12px) */
+:root[data-shape='soft'] {
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 14px;
+}
+
+/* 사이드바: 남색 (밝은 화면에서도 왼쪽 메뉴만 어둡게 — 업무용 단말기 느낌). 글자 대비 9:1 · 보조 5.4:1 */
+:root[data-nav='ink'] {
+  --nav-bg: #0f1d36;
+  --nav-border: #0f1d36;
+  --nav-text: #b9c4d6;
+  --nav-text-strong: #ffffff;
+  --nav-text-3: #8a97ad;
+  --nav-hover: rgba(255, 255, 255, 0.07);
+  --nav-active-bg: rgba(74, 144, 247, 0.24);
+  --nav-active-text: #ffffff;
+}
+:root[data-nav='ink'][data-theme='dark'] {
+  --nav-bg: #0b0b0c;
+  --nav-border: #232325;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-nav='ink']:not([data-theme='light']) {
+    --nav-bg: #0b0b0c;
+    --nav-border: #232325;
+  }
+}
+
+/* 좋은·나쁜 소식 색 (11/12 저녁): 시세 색(상승 빨강·하락 파랑)과 일부러 다르게.
+   사용자: "빨강·파랑으로 강조하니 주식이 떨어진 것처럼 느껴진다" → 소식의 성격은 초록·주황, 값의 움직임만 빨강·파랑
+   글자 대비 4.5:1 이상 (밝은 화면 알약 바탕 위 4.9·5.2, 어두운 화면 7 이상) */
+:root {
+  --good: #047857;
+  --good-soft: #e7f6ee;
+  --bad: #a3480a;
+  --bad-soft: #fdf1e3;
+  /* 칸 채움(뉴스 지도): 밝은 화면은 같은 진한 색 + 흰 글자 */
+  --good-fill: #047857;
+  --bad-fill: #a3480a;
+  --on-tone-fill: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --good: #34d399;
+    --good-soft: rgba(52, 211, 153, 0.13);
+    --bad: #f5a524;
+    --bad-soft: rgba(245, 165, 36, 0.13);
+    /* 어두운 화면: 링·점과 같은 밝은 색으로 채우고 글자는 검정 (11/16 디자이너 리뷰: 칸은 진한 초록, 링은 민트라 같은 뜻이 두 색) */
+    --good-fill: #34d399;
+    --bad-fill: #f5a524;
+    --on-tone-fill: #111111;
+  }
+}
+:root[data-theme='dark'] {
+  --good: #34d399;
+  --good-soft: rgba(52, 211, 153, 0.13);
+  --bad: #f5a524;
+  --bad-soft: rgba(245, 165, 36, 0.13);
+  --good-fill: #34d399;
+  --bad-fill: #f5a524;
+  --on-tone-fill: #111111;
+}
+
+/* 이동평균선 색 (11/12, dataviz 스킬 validate_palette.js 로 검사)
+   밝은 화면 #a16207·#7c3aed·#0d9488: 세 색끼리 + 캔들 빨강·파랑과 모든 쌍 통과 (예전 주황 #e8a317 은 캔들 빨강과 색약 기준 ΔE 5.4 로 겹침, 흰 바탕 대비 2.1)
+   어두운 화면 #c4870c·#9061f9·#13a394: 세 색끼리 통과. 캔들과는 일부 쌍이 가까움 → 선(얇은 줄) vs 몸통(채운 칸) 모양 차이 + 값 줄의 이름·값으로 보완 */
+:root {
+  --ma5: #a16207;
+  --ma20: #475569; /* 11/16 밤: 보라(#7c3aed)가 아래 기사 수 막대(보라)와 겹쳐 회청색 */
+  --ma60: #0d9488;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ma5: #c4870c;
+    --ma20: #94a3b8;
+    --ma60: #13a394;
+  }
+}
+:root[data-theme='dark'] {
+  --ma5: #c4870c;
+  --ma20: #94a3b8;
+  --ma60: #13a394;
+}

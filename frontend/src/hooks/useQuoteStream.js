@@ -8,6 +8,7 @@
 // 네트워크 끊김은 브라우저가 알아서 다시 연결하지만, 연속 MAX_ERRORS 번이면 멈춤 (백엔드가 꺼진 채로 계속 두드리지 않게)
 import { useEffect, useRef } from 'react';
 import { quoteApi } from '../api';
+import { usePageVisible } from './usePageVisible';
 
 export const MAX_STREAM_CODES = 5; // 백엔드 QuoteController.MAX_STREAM_CODES 와 같게
 const MAX_ERRORS = 3;
@@ -21,9 +22,10 @@ export function useQuoteStream(codes, onQuote) {
   onQuoteRef.current = onQuote; // 함수가 바뀌어도 다시 연결하지 않게
 
   const key = [...new Set((codes || []).filter(Boolean))].slice(0, MAX_STREAM_CODES).join(',');
+  const visible = usePageVisible(); // 탭을 숨긴 지 30초가 지나면 끊고, 다시 보면 다시 붙음 (생중계 자리를 돌려씀)
 
   useEffect(() => {
-    if (!key || typeof EventSource === 'undefined') return undefined;
+    if (!key || !visible || typeof EventSource === 'undefined') return undefined;
     const source = new EventSource(quoteApi.streamUrl(key.split(',')));
     let errors = 0;
 
@@ -44,5 +46,5 @@ export function useQuoteStream(codes, onQuote) {
     };
 
     return () => source.close();
-  }, [key]);
+  }, [key, visible]);
 }
