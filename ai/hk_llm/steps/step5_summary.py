@@ -25,7 +25,7 @@ from sqlalchemy import bindparam, text
 from hk_llm.core.config import KST, LOG_DIR
 from hk_llm.core.db import get_engine, to_db
 from hk_llm.core.press_policy import title_only_presses
-from hk_llm.core.util import get_logger
+from hk_llm.core.util import get_logger, write_json
 
 # 날짜 붙은 고정 버전 (11/06): 별칭 "gpt-5.4-nano" 는 OpenAI 가 가리키는 버전을 바꾸면 결과가 조용히 달라질 수 있음 → 고정.
 # 이 모델은 2027-04-01 종료 예정 (OpenAI Deprecations, 대체 gpt-6-luna). 바꿀 때는 정답지 회귀 시험(eval/regress.py)을 먼저 통과시킬 것
@@ -33,7 +33,7 @@ MODEL = "gpt-5.4-nano-2026-03-17"  # 실측 1건 약 $0.0006~0.0011 → 하루 3
 MAX_CHARS = 3000  # ponytail: 본문 앞 3,000자만 (한글 약 2,000토큰). 기사 핵심은 앞쪽. 길이 문제 생기면 토큰 단위로
 BATCH = 200  # 1번 실행에 최대 200건 (약 $0.13)
 MAX_TRIES = 3
-# 요약 동시 호출 수 (11/18). 평가 스크립트(eval/regress.py)도 4. 비용은 같고(호출 수 그대로) 시간만 약 1/4.
+# 요약 동시 호출 수 (팀 main 11/18). 평가 스크립트(eval/regress.py)도 4. 비용은 같고(호출 수 그대로) 시간만 약 1/4.
 # 하루 상한은 호출 전에 확인하므로 동시에 걸린 몇 건(최대 WORKERS-1건, 약 $0.003)만큼 넘을 수 있음
 WORKERS = 4
 PRICE_IN, PRICE_OUT = 0.20 / 1_000_000, 1.25 / 1_000_000  # 달러/토큰. 200건 실측(입력 348,662·출력 49,042 = $0.1310)에 맞는 값, 캐시 할인 안 침
@@ -195,14 +195,10 @@ def _add_usage(by_model):
         day["input"] += tokens_in
         day["output"] += tokens_out
         day["usd"] = round(day["usd"] + usd, 6)
-        tmp = USAGE_FILE.with_name(f"{USAGE_FILE.stem}.{os.getpid()}.{threading.get_ident()}.tmp")  # 프로세스끼리 안 겹치게
         try:
-            USAGE_FILE.parent.mkdir(exist_ok=True)
-            tmp.write_text(json.dumps(usage), encoding="utf-8")
-            tmp.replace(USAGE_FILE)
+            write_json(USAGE_FILE, usage)
         except OSError as e:  # 기록 때문에 이미 돈을 낸 LLM 답을 버리면 안 됨. ponytail: 동시에 쓰면 한쪽 기록이 빠질 수 있음 (추정치라 감수)
             log.warning("LLM 비용 기록 실패: %s", e)
-            tmp.unlink(missing_ok=True)
 
 
 def daily_limit():
@@ -260,14 +256,40 @@ def _strip_tag(text_):
     return text_.replace("<", "＜").replace(">", "＞")
 
 
+# 감성 이유가 주가 움직임뿐인가: 라벨 기준 v2.1 3절(ai/docs/평가/라벨_기준_v2.md) 규칙 5 "급등했다만 있고 원인이 없으면 중립",
+# 규칙 2 "판단할 사실이 전망·소문뿐이면 판단 보류" 를 답 검사로 강제. 프롬프트에도 있지만 LLM 이 어김
+# (11/11 검토: 긍정·부정 연결 980개 중 약 45개, 예 "전 거래일 대비 주가가 8.71% 상승해 주가 레벨이 회복됐다")
+# ponytail: 낱말 목록 규칙. 원인 낱말이 하나라도 있으면 LLM 판단을 그대로 둠 (잘못 끄는 것보다 놓치는 쪽)
+PRICE_MOVE = re.compile(r"주가.{0,15}(?:상승|하락|올|내|급등|급락|뛰|떨어)|\d[\d.]*\s?%\s?(?:대\s?)?(?:상승|하락|급등|급락)"
+                        r"|(?:상승|하락|급등|급락)\s?(?:폭|세|흐름)|[\d,]+원(?:까지|에|을|선)")
+CAUSE = re.compile(r"실적|영업이익|매출|이익|손실|손익|적자|흑자|계약|수주|임상|공개매수|상장폐지|상폐|상장 철회|IPO|유가|금리|환율|약가|규정|규제"
+                   r"|블록딜|오버행|인수|합병|특허|기술수출|신약|파업|지분|전망치|컨센서스|기대치|증자|감자|배당|자사주|주주환원|소송|제재|승인|허가|수출|공시"
+                   r"|제도|정책")
+SPECULATIVE = re.compile(r"우려|기대|가능성|의구심|전망|관측|소문|루머")  # 원인이 이것뿐이면 판단 보류 (프롬프트 UNCERTAIN)
+
+
+def price_only(reason):
+    return bool(PRICE_MOVE.search(reason)) and not CAUSE.search(reason)
+
+
 def check(s, title, body):
-    """LLM 답 검사: 기사에 없는 연도면 거부(재시도), 기사에 실제로 나온 회사만 남기고 개수·길이를 자름"""
-    text_ = title + "\n" + body[:MAX_CHARS]
+    """LLM 답 검사: 기사에 없는 연도·숫자면 거부(재시도), 기사에 실제로 나온 회사만 남기고 개수·길이를 자름,
+    감성 이유가 주가 움직임뿐이면 NEUTRAL, 그 원인이 우려·전망뿐이면 UNCERTAIN (라벨 기준 v2.1 규칙 5·2)"""
+    from hk_llm.steps.step6_match import article_text
+    from hk_llm.steps.step8_daily import unknown_numbers  # 하루 요약과 같은 숫자 규칙 (단위를 풀어 값으로 비교)
+    # LLM 이 본 글(numbered: 관련종목 줄을 뺀 뒤 앞 3,000자)과 같은 범위로 검사. 전엔 원문 앞 3,000자라 범위가 어긋났음 (11/17 외부 리뷰)
+    text_ = title + "\n" + article_text(body)[:MAX_CHARS]
     answer = s.summary + " ".join(c.reason for c in s.companies)
     wrong = [y for y in re.findall(r"(?<!\d)((?:19|20)\d\d)년", answer) if y not in text_]
     if wrong:
         raise ValueError(f"기사에 없는 연도: {wrong}")
+    wrong = unknown_numbers(s.summary, text_)
+    if wrong:
+        raise ValueError(f"기사에 없는 숫자: {wrong}")
     s.companies = [c for c in s.companies if c.name and c.name in text_]
+    for c in s.companies:
+        if c.sentiment in ("POSITIVE", "NEGATIVE") and price_only(c.reason):
+            c.sentiment = "UNCERTAIN" if SPECULATIVE.search(c.reason) else "NEUTRAL"
     # 연결하는 역할을 앞으로 (나열·출처까지 다 적게 해서 개수가 늘었음, 05-1) 뒤 12개까지
     s.companies = sorted(s.companies, key=lambda c: c.role not in ("SUBJECT", "PARTY", "COMPARISON"))[:12]
     for c in s.companies:
@@ -286,12 +308,12 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
         # 밀렸을 때 실제로 최근에 나온 기사부터 (작성 시각순). 기사 번호순이면 RSS 를 피드 순서대로 저장해서 뒤에 저장된 언론사만 먼저 처리됨 (2026-11-10 지승현 지적)
         rows = conn.execute(text("""SELECT article_id, title, body, retry_count FROM article
                                     WHERE status = 'FETCHED' AND source_type = 'NEWS' AND published_at >= :since
-                                      AND press NOT IN :skip
+                                      AND body IS NOT NULL AND press NOT IN :skip
                                     ORDER BY published_at DESC, article_id DESC LIMIT :n""").bindparams(bindparam("skip", expanding=True)),
                             {"since": since, "n": limit, "skip": title_only_presses()}).all()  # AI 활용 금지 언론사는 LLM 에 안 보냄
     skipped = 0
-    todo = []
     names = None
+    todo = []
     for r in rows:
         if names is None:
             from hk_llm.steps.step6_match import could_link, load_dictionary  # 6단계 사전·규칙을 그대로 씀
@@ -304,8 +326,8 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
             continue
         todo.append(r)
 
-    # 11/18: 요약을 WORKERS 개씩 동시에 (밀린 341건 요약이 한 건씩 약 12분 → 화면에 15분 동안 새 글이 없었음)
-    # 글마다 LLM 호출 1번·DB 저장 1번이라 서로 겹칠 것이 없음. 비용 기록은 DB 가 한 번에 더함(_db_add)
+    # 팀 main 11/18: 요약을 WORKERS 개씩 동시에 (밀린 341건이 한 건씩 약 12분 → 화면에 15분 동안 새 글이 없었음)
+    # 글마다 LLM 호출 1번·DB 저장 1번이라 서로 겹칠 것이 없음. 비용 기록은 _usage_lock·DB 가 한 번에 더함
     # OpenAI 쪽 문제(STOP_ERRORS)나 하루 상한이면 stop 을 켜서 아직 시작 안 한 글은 건너뜀 (예전 break·raise 와 같은 뜻)
     stop = threading.Event()
 
@@ -316,10 +338,7 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
             s, _ = summarize(r.title, r.body, model)
             _save(engine, r.article_id, s, model)  # 저장 실패(값 이상 등)도 재시도 횟수에 넣음
             return "done"
-        except BudgetExceeded as e:  # 뉴스 수집·연결은 계속 돌아야 하니 실행 실패로 안 남김
-            stop.set()
-            return e
-        except STOP_ERRORS as e:
+        except STOP_ERRORS as e:  # BudgetExceeded 포함. # 뉴스 수집·연결은 계속 돌아야 하니 상한은 실행 실패로 안 남김
             stop.set()
             return e
         except Exception as e:
@@ -331,18 +350,17 @@ def summarize_articles(engine=None, limit=BATCH, model=MODEL, since=None):
             log.warning("요약 실패 %d/%d (article_id %d): %s", tries, MAX_TRIES, r.article_id, e)
             return "failed"
 
+    results = []
     if todo:
         with ThreadPoolExecutor(max_workers=min(WORKERS, len(todo))) as ex:
             results = list(ex.map(one, todo))
-    else:
-        results = []
     done, failed = results.count("done"), results.count("failed")
     errors = [x for x in results if isinstance(x, BaseException)]
-    budget = next((e for e in errors if isinstance(e, BudgetExceeded)), None)
     stop_error = next((e for e in errors if not isinstance(e, BudgetExceeded)), None)
     if stop_error is not None:
         log.error("OpenAI 쪽 문제로 요약 중단 (%d건 요약 후)", done, exc_info=stop_error)
         raise stop_error
+    budget = next((e for e in errors if isinstance(e, BudgetExceeded)), None)
     if budget is not None:
         log.warning("요약 중단 (%d건 요약 후): %s", done, budget)
     log.info("요약: %d건 중 %d건 저장, 실패 %d건, LLM 전 거르기 %d건", len(rows), done, failed, skipped)

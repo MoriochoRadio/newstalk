@@ -44,7 +44,7 @@
 | ④ 검사·연결 | 회사 이름 → 종목코드(사전·별칭), 부고·시황·명단 기사 거르기, 근거 문장에 종목 이름 확인 | `steps/step6_match.py`, AI 금지 언론사는 `title_only.py` | `article_stock` (`DONE` / `NO_STOCK`) |
 | ⑤ 묶기·요약 | 같은 종목·24시간·제목이 비슷하면 같은 소식으로 묶음. 1시간마다 종목 하루 요약 | `steps/step7_group.py`, `step8_daily.py` | `article_stock.group_article_id`, `stock_daily_summary` |
 | ⑥ 백엔드 | 화면용 API. 이슈 순위·감성 비율·언급량은 SQL 로 집계 | `backend/.../article`, `stock`, `search`, `status`, `watchlist`, `board`, `user` (+ `mapper/*.xml`) | 읽기 (회원·관심·게시판은 쓰기) |
-| ⑦ 화면 | 홈(글 목록·이슈 종목), 글 상세, 종목별 조회, 검색, 관심 종목, 토론 | `frontend/src/pages/DashboardPageV7.jsx`, `api/index.js`(API 부르기), `api/adapters.js`(응답 → 화면 모양), `hooks/useApi.js` | — |
+| ⑦ 화면 | 홈(글 목록·이슈 종목), 글 상세, 종목별 조회, 검색, 관심 종목, 토론 | `frontend/src/pages/DashboardPageV8.jsx`(화면 이동) + `hooks/`(상태·서버 부르기) + `components/dashboard/`(홈·종목·관심 종목 화면과 부품), `api/index.js`(API 부르기), `api/adapters.js`(응답 → 화면 모양), `hooks/useApi.js` | — |
 
 - 테이블 구조: [db/schema.md](db/schema.md) · API 칸 하나하나: [api.md](api.md) · AI 파트 자세히: [ai/README.md](../ai/README.md)
 

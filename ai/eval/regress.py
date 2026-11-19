@@ -5,7 +5,9 @@
     --gold 정답지폴더 (기본: 레포 data/eval/gold-v2)    --save 파일 (--llm 의 답을 저장해 다음에 --answers 로)
 
 - 정답지는 기사 본문이 들어 있어 Git 에 없음 (data/ 는 커밋 제외, 저작권). 정답지가 있는 PC 에서만 돎
-- 봉인 시험용(gold_test)은 읽지 않음
+- 봉인 시험용(gold_test)은 평소엔 읽지 않음. 발표 전 마지막 1번만 --split test 로 채점 (그 뒤로 규칙을 고치면 봉인이 깨짐)
+    python -m eval.regress --llm --split test --save 답_test.jsonl     약 $0.11, 결과는 기준 통과 여부 없이 숫자와 95% 구간만
+- 본문은 DB 에서 7일 뒤 지워짐 → DB 본문이 없으면 정답지 폴더 articles.jsonl 의 body 를 씀. 둘 다 없으면 "본문 없음"으로 세어 보여 줌
 - 지표 (라벨 기준 v2.1 6절): 핵심 연결(주인공·당사자) Precision·Recall, 맞은 연결의 감성 일치 (판단 보류 = NULL)
 - 기준(아래 THRESHOLDS): 11/06 새 프롬프트 3번(06-2 끈 뒤 핵심 P 0.922~0.923 / R 0.87~0.89 / 맞은 핵심 연결 감성 0.60~0.71)의 가장 낮은 값보다 조금 아래.
   기준 아래로 떨어지면 종료 코드 1 → 바꾼 것을 다시 봄
@@ -29,13 +31,26 @@ CORE = {"SUBJECT", "PARTY"}
 DEFAULT_GOLD = Path(__file__).resolve().parents[2] / "data" / "eval" / "gold-v2"
 
 
-def load(gold_dir):
+def load(gold_dir, split="dev"):
+    """(정답 {url_key: 정답}, 정답지에 저장된 본문 {url_key: body})"""
     excluded = json.loads((gold_dir / "sample.json").read_text(encoding="utf-8")).get("excluded", {})
     arts = {a["url_key"]: a for a in map(json.loads, (gold_dir / "articles.jsonl").read_text(encoding="utf-8").splitlines())
-            if a["split"] == "dev" and a["id"] not in excluded}
-    gold = {g["url_key"]: g for g in map(json.loads, (gold_dir / "gold_dev.jsonl").read_text(encoding="utf-8").splitlines())
+            if a["split"] == split and a["id"] not in excluded}
+    path = gold_dir / f"gold_{split}.jsonl"
+    if not path.exists():
+        sys.exit(f"정답 파일이 없음: {path}")
+    gold = {g["url_key"]: g for g in map(json.loads, path.read_text(encoding="utf-8").splitlines())
             if g["url_key"] in arts}
-    return gold
+    return gold, {k: a.get("body") for k, a in arts.items()}
+
+
+def wilson(k, n, z=1.96):
+    """95% 신뢰구간 (라벨 기준 v2.1 6절)"""
+    if not n:
+        return None
+    p, d = k / n, 1 + z * z / n
+    mid, half = (p + z * z / (2 * n)) / d, z * (p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5 / d
+    return [round(mid - half, 3), round(mid + half, 3)]
 
 
 def score(gold, rows, answers, dictionary):
@@ -82,15 +97,20 @@ def main(argv=None):
     p.add_argument("--llm", action="store_true")
     p.add_argument("--gold", default=str(DEFAULT_GOLD))
     p.add_argument("--save")
+    p.add_argument("--split", choices=["dev", "test"], default="dev", help="test = 봉인 시험 (발표 전 1번만)")
     args = p.parse_args(argv)
     if bool(args.answers) == args.llm:
         p.error("--answers 파일 또는 --llm 중 하나")
-    gold = load(Path(args.gold))
+    gold, saved = load(Path(args.gold), args.split)
     engine = get_engine()
     with engine.connect() as conn:
-        rows = {r.url_key: (r.title, r.body) for r in conn.execute(
+        rows = {r.url_key: (r.title, r.body or saved.get(r.url_key)) for r in conn.execute(
             text("SELECT url_key, title, body FROM article WHERE url_key IN :k").bindparams(bindparam("k", expanding=True)),
             {"k": list(gold)})}
+    no_body = sorted(k for k in gold if not (rows.get(k) or ("", None))[1])
+    if no_body and args.llm:  # 본문 없이 LLM 을 부르면 연결 없음으로 세져 점수가 조용히 낮아짐
+        print(f"주의: 본문 없음 {len(no_body)}건 (LLM 을 안 부르고 연결 없음으로 셈)", file=sys.stderr)
+        rows = {k: v for k, v in rows.items() if k not in no_body}
     if args.llm:
         answers = run_llm(rows)
         if args.save:
@@ -99,8 +119,13 @@ def main(argv=None):
     else:
         answers = {a["url_key"]: a for a in map(json.loads, Path(args.answers).read_text(encoding="utf-8").splitlines())}
     res = score(gold, rows, answers, m.load_dictionary(engine))
+    ci = {"core_precision_95": wilson(res["tp"], res["tp"] + res["fp"]), "core_recall_95": wilson(res["tp"], res["tp"] + res["fn"])}
+    if args.split == "test":  # 봉인 시험은 숫자를 보고하는 것. 기준으로 통과·실패를 가르지 않음
+        print(json.dumps({"정답지": "봉인 시험", "기사": len(gold), "본문 없음": len(no_body), **res, **ci}, ensure_ascii=False))
+        return 0
     failed = [k for k, v in THRESHOLDS.items() if res[k] < v]
-    print(json.dumps({"기사": len(gold), **res, "기준": THRESHOLDS, "통과": not failed, "기준 아래": failed}, ensure_ascii=False))
+    print(json.dumps({"기사": len(gold), "본문 없음": len(no_body), **res, **ci, "기준": THRESHOLDS, "통과": not failed,
+                      "기준 아래": failed}, ensure_ascii=False))
     return 1 if failed else 0
 
 

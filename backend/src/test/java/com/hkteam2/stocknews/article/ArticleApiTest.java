@@ -234,6 +234,51 @@ class ArticleApiTest extends ApiTestSupport {
     }
 
     @Test
+    void 홈_전체는_뉴스와_요약을_기다리지_않는_주요_공시만() throws Exception {
+        long news = insertArticle("기아 수주", "NEWS", "DONE", today(1));
+        long routine = insertArticle("기아 사업보고서", "NEWS", "DONE", today(2));
+        long pending = insertArticle("기아 단일판매ㆍ공급계약체결", "NEWS", "DONE", today(3));
+        long summarized = insertArticle("기아 영업(잠정)실적", "NEWS", "DONE", today(4));
+        long old = insertArticle("기아 유상증자결정", "NEWS", "DONE", today(5).minusDays(3));
+        for (long id : new long[] {news, routine, pending, summarized, old}) {
+            link(id, KIA, 0.9);
+        }
+        // dart.py 처럼 공시는 요약 전(model·summarized_at 비어 있음)으로 들어옴
+        jdbc.update("UPDATE article SET channel = 'DART', model = NULL, summarized_at = NULL WHERE article_id IN (?, ?, ?, ?)",
+                routine, pending, summarized, old);
+        // dart.py 가 일반 공시에 남기는 표시 (dart.py ROUTINE)
+        jdbc.update("UPDATE article SET retry_count = 3, last_error = '일반 공시: LLM 요약 대상 아님' WHERE article_id = ?", routine);
+        jdbc.update("UPDATE article SET summarized_at = NOW() WHERE article_id = ?", summarized);
+
+        // 일반 공시와 요약 대기(어제 이후·요약 전) 주요 공시는 빠짐. 지난 공시(요약 대상 밖)는 보임
+        mvc.perform(get("/api/articles").param("channel", "MAJOR"))
+                .andExpect(jsonPath("$.items[*].title", contains("기아 영업(잠정)실적", "기아 수주", "기아 유상증자결정")));
+        // 공시 버튼은 전부
+        mvc.perform(get("/api/articles").param("channel", "DISCLOSURE"))
+                .andExpect(jsonPath("$.totalCount").value(4));
+    }
+
+    @Test
+    void 판단_보류는_NONE_으로_거르고_뉴스와_공시를_나눠_받는다() throws Exception {
+        long judged = insertArticle("기아 수주", "NEWS", "DONE", today(1));
+        link(judged, KIA, "POSITIVE", new BigDecimal("0.90"), true);
+        long unjudged = insertArticle("기아 공시", "NEWS", "DONE", today(2));
+        link(unjudged, KIA, null, new BigDecimal("0.50"), true);
+        jdbc.update("UPDATE article SET channel = 'DART' WHERE article_id = ?", unjudged);
+
+        // 판단 보류(감성 NULL: 요약 전 공시·제목만 연결)는 sentiment=NONE (2026-11-11)
+        mvc.perform(get("/api/articles").param("sentiment", "none"))
+                .andExpect(jsonPath("$.items[*].title", contains("기아 공시")));
+        // 뉴스만·공시만 (공시가 몰리면 한 쪽이 공시로 차서, 화면이 뉴스만 받을 수 있게)
+        mvc.perform(get("/api/articles").param("channel", "DISCLOSURE"))
+                .andExpect(jsonPath("$.items[*].title", contains("기아 공시")));
+        mvc.perform(get("/api/articles").param("channel", "news"))
+                .andExpect(jsonPath("$.items[*].title", contains("기아 수주")));
+        mvc.perform(get("/api/articles").param("channel", "PAPER"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 페이지는_1부터_size만큼() throws Exception {
         for (int i = 1; i <= 3; i++) {
             insertArticle("글" + i, "NEWS", "DONE", today(i));

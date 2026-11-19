@@ -6,7 +6,8 @@
 
 묶는 조건: 같은 종목 + 비슷한 제목·요약 + 가까운 시각. 기사를 버리지 않는다.
 유사도: 제목+AI 요약에서 괄호·기호·공백과 종목명을 뺀 뒤 글자 2개씩 자른 조각의 겹침 비율 (Jaccard)
-  - 요약이 없는 기사(제목만 언론사·요약 전)는 제목만으로 비교
+  - 한쪽만 요약이 있으면(제목만 언론사·요약 전) 위 비교에 더해 제목끼리도 봄, 기준 0.10 (11/11: 제목+요약 대 제목만은 글자 수가 달라
+    점수가 낮아져 같은 소식을 놓쳤음. 팀 데이터 섞인 쌍 1,430개에서 113쌍을 더 묶고 지금 묶음은 그대로. 표본 12쌍 중 1쌍은 다른 회사 실적)
   - 2026-11-10: 제목만 → 제목+요약, 기준 0.10 → 0.09. 같은 종목·24시간 후보 쌍 119개(점수 가린 판정 + 사람 확인 30쌍,
     판정 기준 v2)에서 정밀도 84.7 → 89.3%, 재현율 72.2 → 81.7% (구간 가중). 5겹 교차 검증 F1 73.9 → 79.7%.
     표본이 작아 부트스트랩 구간은 0 을 포함 → 둘 다 좋아지고 비용 0 이라 채택, 쌓이면 다시 잼 (백엔드1 로컬 기록 ai-improve/20)
@@ -23,6 +24,7 @@ from hk_llm.core.util import get_logger
 log = get_logger(__name__)
 
 SIMILAR = 0.09  # 제목+요약 겹침 기준 (위 설명). 틀려도 기사는 안 지워짐
+TITLE_SIMILAR = 0.10  # 한쪽만 요약이 있을 때 제목끼리 겹침 기준 (11/09 측정에서 제목만일 때 가장 좋았던 값)
 WINDOW = timedelta(hours=24)
 RECENT = timedelta(hours=72)  # ponytail: 최근 72시간만 다시 묶음. 더 오래된 묶음은 그대로 둠, 사슬이 3일을 넘는 사건은 나뉠 수 있음
 
@@ -43,6 +45,14 @@ def _text(row):
     return f"{row['title']} {row.get('summary') or ''}".strip()
 
 
+def same_news(a, b, similar=SIMILAR):
+    """제목+요약이 겹치면 같은 소식. 한쪽만 요약이 있으면 제목끼리 겹쳐도 같은 소식"""
+    name = a["stock_name"]
+    if similarity(_text(a), _text(b), name) >= similar:
+        return True
+    return bool(a.get("summary")) != bool(b.get("summary")) and similarity(a["title"], b["title"], name) >= TITLE_SIMILAR
+
+
 def group_articles(rows, similar=SIMILAR, window=WINDOW):
     """[{stock_code, stock_name, article_ids}] — 2건 이상인 묶음만. 한 기사가 여러 종목 묶음에 들어갈 수 있음"""
     by_stock = {}
@@ -61,7 +71,7 @@ def group_articles(rows, similar=SIMILAR, window=WINDOW):
         for i, a in enumerate(items):  # ponytail: 종목 안에서 모든 쌍 비교. 하루치 기준이라 충분, 많아지면 시각순으로 자르기
             for b in items[i + 1:]:
                 near = abs(a["published_at"] - b["published_at"]) <= window
-                if near and similarity(_text(a), _text(b), a["stock_name"]) >= similar:
+                if near and same_news(a, b, similar):
                     parent[find(a["article_id"])] = find(b["article_id"])
         found = {}
         for r in items:
@@ -86,13 +96,16 @@ def has_column(engine):
         return bool(conn.execute(sql).scalar())
 
 
-def save_groups(engine=None):
-    """저장한 묶음 수. 대표 기사 = 묶음에서 가장 먼저 저장된 기사. 칸이 없으면 0"""
+def save_groups(engine=None, everything=False):
+    """저장한 묶음 수. 대표 기사 = 묶음에서 가장 먼저 저장된 기사. 칸이 없으면 0
+    everything=True: 기간 제한 없이 전체를 다시 묶음 (python -m hk_llm.steps.step7_group --all).
+    평소(5분마다)는 최근 72시간만 보므로, 칸(V13, 11/09)이 생기기 전 기사는 한 번도 묶이지 않았음
+    → 지난 날짜의 "같은 소식 n건"·eventCount 가 빠짐 (2026-11-10 지승현 검토: 11/02~06 연결 912개 중 묶음 0). 한 번 돌리면 채워짐"""
     engine = engine or get_engine()
     if not has_column(engine):
         log.info("group_article_id 칸이 아직 없어 기사 묶음 저장을 건너뜀")
         return 0
-    rows = load_rows(engine, to_db(datetime.now(KST) - RECENT))
+    rows = load_rows(engine, None if everything else to_db(datetime.now(KST) - RECENT))
     if not rows:
         return 0
     groups = group_articles(rows)
@@ -109,6 +122,11 @@ def save_groups(engine=None):
 
 
 if __name__ == "__main__":
+    import sys
+
+    if "--all" in sys.argv:  # 전체 기간 다시 묶어 저장 (LLM 비용 없음, DB 켜져 있어야 함)
+        print("묶음", save_groups(everything=True), "개 저장")
+        sys.exit()
     # 실제 샘플 (읽기만, DB 켜져 있어야 함)
     rows = load_rows(get_engine())
     title = {r["article_id"]: r["title"] for r in rows}

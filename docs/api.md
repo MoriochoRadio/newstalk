@@ -41,18 +41,19 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | | 방식 | 주소 | 설명 |
 |---|---|---|---|
 | 🔓 | POST | `/api/auth/signup` | 회원가입 `{ loginId, password, recoveryQuestion?, recoveryAnswer? }` · 아이디 영문 소문자·숫자 4~20자, 비밀번호 8~64자. 확인 질문은 선택(둘 다 주거나 둘 다 비움) |
-| 🔓 | POST | `/api/auth/login` | 로그인 → `{ accessToken, tokenType, expiresIn }`. 같은 아이디·같은 곳에서 10분 안에 5번 틀리면 10분 동안 `429 TOO_MANY_LOGIN_ATTEMPTS` |
-| 🔒 | GET | `/api/auth/me` | 내 정보 `{ userId, loginId, role, recoveryQuestion: {code,text}\|null, createdAt }`. 2026-11-18부터 DB 에서 읽음 → 탈퇴한 계정의 토큰이면 401 |
-| 🔒 | PUT | `/api/auth/me/password` | 비밀번호 바꾸기 `{ currentPassword, newPassword }` → 204. 틀리면 400 `WRONG_PASSWORD`, 같으면 400 `SAME_PASSWORD` |
+| 🔓 | POST | `/api/auth/login` | 로그인 → `{ accessToken, tokenType, expiresIn }`. 같은 아이디·같은 곳(IP)에서 10분 안에 5번 틀리면 1분 동안 `429 TOO_MANY_LOGIN_ATTEMPTS` (또 틀리면 2·4·8분…) |
+| 🔒 | GET | `/api/auth/me` | 내 정보 `{ userId, loginId, role, recoveryQuestion: {code,text}\|null, createdAt, watchlistCount, postCount, commentCount }`. DB 에서 읽음 → 탈퇴한 계정의 토큰이면 401 |
+| 🔒 | PUT | `/api/auth/me/password` | 비밀번호 바꾸기 `{ currentPassword, newPassword }` → 204. 틀리면 400 `WRONG_PASSWORD`, 같으면 400 `SAME_PASSWORD` (2026-11-19 팀 main 에서 가져옴) |
 | 🔒 | PUT | `/api/auth/me/recovery` | 확인 질문 정하기·바꾸기 `{ password, question, answer }` → 내 정보. 답은 원문 저장 안 함(HMAC) |
-| 🔒 | DELETE | `/api/auth/me` | 탈퇴 (본문 `{ password }`) → 204. 관심 종목·쓴 글·댓글·공감도 함께 지움, 되돌릴 수 없음 |
+| 🔒 | DELETE | `/api/auth/me` | **회원탈퇴** `{ password }` → 204. 회원·관심 종목·글·댓글·공감·연결 신고를 모두 지움(되돌릴 수 없음). 비밀번호가 틀리면 `400 WRONG_PASSWORD`(401 아님: 화면이 로그아웃되지 않게), 여러 번 틀리면 `429 TOO_MANY_ATTEMPTS` |
 | 🔓 | GET | `/api/auth/recovery/questions` | 확인 질문 목록 `[{ code, text }]` |
-| 🔓 | POST | `/api/auth/recovery/question` | 비밀번호 찾기 ① `{ loginId }` → 그 아이디의 질문 `{ code, text }`. 없는 아이디·질문 안 정함은 같은 404 `RECOVERY_NOT_SET` |
-| 🔓 | POST | `/api/auth/recovery/reset` | 비밀번호 찾기 ② `{ loginId, answer, newPassword }` → 204. 답이 틀리면 400 `RECOVERY_ANSWER_MISMATCH` |
-| 🔓 | POST | `/api/auth/recovery/find-id` | 아이디 찾기 `{ question, answer, password }` → `{ loginId }`. 셋 다 맞아야 함, 없으면 404 `ACCOUNT_NOT_FOUND` |
+| 🔓 | POST | `/api/auth/recovery/question` | 비밀번호 찾기 ① `{ loginId }` → 그 아이디의 질문 `{ code, text }`. 없는 아이디·질문 안 정함은 같은 404 `RECOVERY_NOT_SET`. 같은 곳에서 10분 안에 404 가 20번이면 10분 동안 429 (가입자 목록 모으기 막기, 2026-11-19. ② 의 없는 아이디도 같이 셈) |
+| 🔓 | POST | `/api/auth/recovery/reset` | 비밀번호 찾기 ② `{ loginId, answer, newPassword }` → 204. 답이 틀리면 400 `RECOVERY_ANSWER_MISMATCH`. 접속 주소와 상관없이 **계정 하나에 하루 10번** 틀리면 하루 동안 429 (2026-11-19, 로그인은 안 막힘) |
+| 🔓 | POST | `/api/auth/recovery/find-id` | 아이디 찾기 `{ question, answer, password }` → `{ loginId }`. 셋 다 맞아야 함, 없으면 404 `ACCOUNT_NOT_FOUND`. **서비스 전체에서 하루 20번** 틀린 뒤로는 틀릴 때마다 1시간 동안 429 (2026-11-19, 로그인 제한을 돌아가는 통로가 되지 않게). 성공해도 틀린 횟수는 그대로 |
 
-- 비밀번호·답을 맞혀 보는 곳(비밀번호 바꾸기·질문·탈퇴·찾기)은 **10분에 5번**까지, 넘으면 10분 동안 429 `TOO_MANY_ATTEMPTS` (로그인 제한과 같은 방식, 이름표만 다름)
+- 비밀번호·답을 맞혀 보는 곳(비밀번호 바꾸기·질문·탈퇴·찾기)은 **10분에 5번**까지, 넘으면 1분 동안 429 `TOO_MANY_ATTEMPTS` (로그인 제한과 같은 방식, 이름표만 다름. 동시에 보낸 시도도 미리 셈)
 - 답은 띄어쓰기를 지우고 영문을 소문자로 바꿔 비교 (`서울 마포` = `서울마포`, `Mimi` = `mimi`)
+- 2026-11-19: '휴대폰 번호 뒷자리 네 개'(FIRST_PHONE) 질문을 뺌 (숫자 4자리라 맞혀 보기 쉬움). 이미 정한 계정은 '질문 안 정함'으로 보임
 
 ### 종목
 
@@ -75,11 +76,13 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 - 오늘(한국 시간 **0시 ~ 지금**) 작성된 글에 **많이 나온 종목** 순. 글 수가 같으면 평균 관련도가 높은 순
 - `source`: `NEWS` / `SNS` (**없으면 `NEWS`**), `limit`: 1~50 (기본 10). 페이지 없음
   - 기본이 뉴스만인 이유: AI가 SNS를 "최근 뉴스가 많은 종목"만 골라 모으므로, 섞어서 세면 같은 종목을 두 번 세게 됨. SNS 순위는 `source=SNS`로 따로
-- 한 건: `{ rank, stockCode, stockName, articleCount, eventCount, disclosureCount, avgRelevance, lastPublishedAt }`
+- 한 건: `{ rank, stockCode, stockName, articleCount, eventCount, disclosureCount, positiveCount, negativeCount, avgRelevance, lastPublishedAt }`
+  - **2026-11-17:** `positiveCount`·`negativeCount` = 그 종목에 대한 감성이 긍정·부정인 뉴스 수 (홈 이슈 맵 색)
   - **2026-11-10: 순위는 뉴스 기사 수로만.** `articleCount`·`eventCount`·`avgRelevance`·`lastPublishedAt`은 뉴스만 세고, 공시(`channel` `DART`)는 `disclosureCount`(오늘 공시 수)로 따로 줌. 공시만 있는 종목은 순위에 없음. 화면은 "글 n건 · 소식 m건 · 공시 k"처럼 배지로 (근거: `decisions.md` 2026-11-10 이슈 순위와 공시)
   - `articleCount`: 오늘 이 종목이 나온 글 수(보도량, **순위 기준**), `avgRelevance`: 평균 관련도 %(없으면 `null`), `lastPublishedAt`: 가장 최근 글 시각
   - `eventCount` (2026-11-09): **같은 소식 묶음을 1건으로 센 소식 수**. 예: 같은 실적 기사를 3곳이 쓰고 다른 소식이 1건이면 `articleCount` 4, `eventCount` 2. 화면은 "글 4건 · 소식 2건"처럼 정보로 보여 주면 됨. 묶음은 AI가 5분마다 저장(같은 종목 + 24시간 안 + 제목·요약이 비슷함, V13). 묶음이 아직 없으면 `articleCount`와 같음
-- 오늘 글이 없으면 `items: []`. 0시가 막 지나면 비어 있을 수 있음
+- 응답: `{ date, items, totalCount }`. **`date`** = 순위를 센 날 (2026-11-12)
+- **오늘 글이 없으면**(이른 아침·주말·수집 멈춤) 글이 있는 **가장 최근 날 하루**(0시~24시)로 세고 `date`에 그 날짜. 화면은 오늘이 아니면 "11/10 기준"처럼 표시. 글이 아예 없으면 `items: []`, `date`는 오늘
 
 **오늘의 종합 요약** (종목별 조회 화면 가운데)
 
@@ -97,9 +100,10 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 
 - `newsSummary`·`snsSummary`: AI가 1시간마다 만드는 오늘 요약. **아직 없으면 `null`** → "요약 준비 중" 표시. SNS 글이 없는 종목은 `snsSummary`만 `null`일 수 있음
 - `generatedAt`: **뉴스 요약**을 만든 시각. 뉴스 요약이 없으면(SNS 반응 요약만 있어도) `null`. 데이터 상태(`/api/status`)의 `summaryGeneratedAt`도 뉴스 요약 기준
-- `sentiment`: 오늘(한국 시간 0시~지금) 이 종목이 나온 글을 **지금** 센 것 (이 종목에 대한 감성 기준). 감성을 판단하지 않은 연결(`null`, 제목만 연결한 기사)은 세지 않음. `positive`·`negative`·`neutral`은 % 정수이고 **합이 항상 100**. 오늘 글이 없으면 모두 0
+- `sentiment`: 오늘(한국 시간 0시~지금) 이 종목이 나온 글을 **지금** 센 것 (이 종목에 대한 감성 기준). 감성을 판단하지 않은 연결(`null`, 제목만 연결한 기사)은 세지 않음. `positive`·`negative`·`neutral`은 % 정수이고 **합이 항상 100**. 오늘 글이 없으면 모두 0 (단 오늘 요약도 없으면 아래처럼 지난 날 것)
   - 기본은 **뉴스·SNS 합계** (요구사항 F-08). `source=NEWS` / `source=SNS`를 붙이면 그 출처 글만 셈 (요약 문장은 그대로)
 - `sentimentByEvent` (2026-11-09): 같은 소식 묶음을 **1표**로 센 감성 비율 (모양은 `sentiment`와 같고, 안의 `articleCount`·`…Count`는 **글 수가 아니라 소식 수**). 같은 호재 소식을 7곳이 쓰면 `sentiment`는 호재 7표, `sentimentByEvent`는 1표. 한 묶음 안에서 기사마다 감성이 다르면 각 감성에 1표씩. 출처 조건(`source`)도 똑같이 적용
+- **오늘 요약도 오늘 글도 없으면** 뉴스 요약이 있는 **가장 최근 날**의 요약과 그날 하루 감성 비율을 주고 `date`에 그 날짜 (2026-11-12). 오늘 글이 하나라도 있으면 오늘 기준 (요약은 `null`일 수 있음). 화면은 오늘이 아니면 "11/10 기준"
 - 없는 종목은 404 `STOCK_NOT_FOUND`
 
 **언급량 추이** (종목별 조회 화면 그래프)
@@ -136,7 +140,8 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | `period` | `today` / `7d` / `30d` (없으면 전체). 7d = 오늘 포함 7일 (언급량 그래프와 같은 뜻) | 기간 버튼 |
 | `market` | `KOSPI` / `KOSDAQ` (대소문자 무관, 그 밖의 값은 400). 이 시장 종목이 하나라도 연결된 글만 | 분류별 보기 (2026-11-18) |
 | `theme` | 테마 이름 (`/api/stocks/themes`, 50자 이하). 이 테마 종목이 하나라도 연결된 글만. 없는 테마면 0건 | 분류별 보기 (2026-11-18) |
-| `sentiment` | `POSITIVE` / `NEGATIVE` / `NEUTRAL` (없으면 전체). `stockCode`가 있으면 그 종목에 대한 감성, 없으면 주인공 종목의 감성 (카드에 보이는 감성과 같은 뜻). 관심 종목 글(`/api/watchlist/articles`)도 같음 | 감성 버튼 |
+| `channel` | `NEWS`(공시 아닌 글) / `DISCLOSURE`(공시) / `MAJOR`(뉴스 + 주요 공시, 2026-11-17) (없으면 둘 다, 2026-11-11) | 뉴스·공시 버튼 |
+| `sentiment` | `POSITIVE` / `NEGATIVE` / `NEUTRAL` / `NONE`(판단 보류, 2026-11-11) (없으면 전체). `stockCode`가 있으면 그 종목에 대한 감성, 없으면 주인공 종목의 감성 (카드에 보이는 감성과 같은 뜻). 관심 종목 글(`/api/watchlist/articles`)도 같음 | 감성 버튼 |
 | `page`, `size` | 1부터, 1~100 (기본 20) | |
 
 예: 홈 `GET /api/articles` · 삼성전자 화면 `GET /api/articles?stockCode=005930` · SNS만 관련도순 `GET /api/articles?source=SNS&sort=relevance`
@@ -169,7 +174,7 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
   - `stocks[].sameNewsCount`: 이 종목에서 **같은 소식으로 묶인 기사 수** (V13 `group_article_id`, 화면에 나오는 `DONE` 글만 셈). 묶이지 않았으면 `null`
   - `stocks[].firstReportPress`: 그 묶음에서 **발행이 가장 빠른 기사**의 언론사 (같은 시각이면 글 번호가 작은 쪽). 묶이지 않았으면 `null`
   - `stocks[].firstReport`: 이 기사가 그 첫 보도인가 (`true`/`false`). 화면은 `sameNewsCount` 2 이상일 때 "같은 소식 n건 · 첫 보도 ○○" 또는 "첫 보도 · 같은 소식 n건"
-  - `stocks[].groupPositive`·`groupNegative`·`groupNeutral` (11/17): 그 같은 소식 묶음(`DONE` 글)의 AI 판단(감성) 수. 제목만 받은 기사(감성 `null`)도 같은 소식의 다른 기사가 받은 판단으로 화면이 링을 그림. 묶이지 않았으면 `null`
+  - `stocks[].groupPositive`·`groupNegative`·`groupNeutral` (11/17, 글 상세 `stocks[]` 에도 11/18): 그 같은 소식 묶음(`DONE` 글)의 AI 판단(감성) 수. 제목만 받은 기사(감성 `null`)도 같은 소식의 다른 기사가 받은 판단으로 화면이 링을 그림. 묶이지 않았으면 `null`
 - `sourceType`이 `SNS`면 "참고용 · 확인되지 않은 정보" 표시 (요구사항 N-05)
   - **SNS 글은 네이버 검색 결과 그대로 보여 주기:** `summary`는 네이버 검색 미리보기(AI 요약 아님). 카드에 관련도·직접/간접·감성을 붙이지 않고, 제목은 `url`(원문)로 바로 연결 (네이버 검색 API 약관 특약 2.1 "검색 결과에 다른 내용을 끼워 넣지 않음"). SNS 감성은 종목 화면의 감성 비율(`source=SNS`)과 `snsSummary`로 따로 보여 줌. 예: 데모 화면
   - SNS 글은 모은 지 **7일이 지나면 지워집니다** (약관 7.3 "별도 DB로 쌓아 두지 않음"). 그래서 30일 언급량 그래프의 SNS는 최근 7일만 있음. 종목 하루 요약의 `snsSummary`는 남음
@@ -190,6 +195,17 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | `model`, `summarizedAt` | 요약을 만든 AI 모델과 시각 → "AI가 만든 요약" 안내용 (N-05) |
 | `stocks[]` | 목록 칩 칸 + **`reason`**(연결 이유, 항상 있음), **`evidence`**(근거 문장, 없으면 `null`. 팀원 PC 처럼 데이터 파일로 받은 DB 에는 없음), `matchedKeywords`(목록, 없으면 `[]`). `sentiment`는 감성을 판단하지 않은 연결이면 `null` |
 | `relatedSns[]` | **뉴스일 때만.** 같은 종목이 나온 SNS 중 작성 시각 앞뒤 24시간 안, 가까운 순 최대 5개 `{ articleId, channel, title, press, publishedAt, summary, url }`. SNS 글이면 `[]` |
+
+### 연결 의견 ("연결이 틀렸어요", 2026-11-13)
+
+| 로그인 | 메서드 | 주소 | 설명 |
+|---|---|---|---|
+| 🔒 | POST | `/api/articles/{articleId}/stocks/{stockCode}/feedback` | 이 글의 이 종목 연결이 틀렸다고 알림. 본문 `{ "kind": "WRONG_STOCK" }` |
+
+- `kind`: `WRONG_STOCK`(이 종목 이야기가 아님) / `WRONG_SENTIMENT`(기사 내용 판단이 틀림). 다른 값은 400 `INVALID_REQUEST`
+- 응답 204 (본문 없음). 같은 사람이 같은 연결·같은 종류를 다시 보내도 204, 저장은 1건 (`link_feedback` UNIQUE)
+- 이 글에 이 종목 연결이 없으면 404 `LINK_NOT_FOUND`
+- 쓰는 곳: AI `python -m eval.feedback` 이 모아 보여 줌 → 사람이 기사를 읽고 정답지·매칭 규칙에 반영 (의견 자체를 정답으로 쓰지 않음)
 
 ### 통합 검색
 
@@ -234,6 +250,11 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | 🔒 | POST | `/api/posts/{postId}/comments` | 댓글 쓰기 `{ content }` · 1000자 |
 | 🔒 | DELETE | `/api/comments/{commentId}` | 댓글 삭제 (본인만) |
 | 🔒 | POST | `/api/posts/{postId}/like` | 공감 토글 → `{ liked, likeCount }` (누르면 공감, 다시 누르면 취소) |
+
+- 글 목록 한 건: `{ postId, title, authorLoginId, createdAt, commentCount, likeCount }`
+- 글 상세: 목록 칸 + `{ stockCode, stockName, content }`
+- 댓글 한 건: `{ commentId, postId, content, authorLoginId, createdAt }`
+- `authorLoginId`: 쓴 사람의 로그인 아이디 (본인 글·댓글인지 `/api/auth/me`의 `loginId`와 비교해 삭제 버튼을 보여 줄 때)
 
 ### 데이터 상태
 
@@ -328,14 +349,15 @@ Swagger에서는 오른쪽 위 **Authorize**에 토큰을 넣으면 로그인이
 | 400 | `INVALID_PAGE` | page·size 범위 밖 | 아주 큰 page 는 오류 없이 빈 `items`
 | 401 | `UNAUTHORIZED` | 로그인 필요한 API에 토큰 없음·만료·위조 |
 | 401 | `INVALID_CREDENTIALS` | 로그인 실패 (아이디 또는 비밀번호 틀림) |
-| 429 | `TOO_MANY_LOGIN_ATTEMPTS` | 로그인을 10분 안에 5번 틀림 → 10분 동안 맞는 비밀번호도 막힘 (화면: "10분 뒤에 다시" 안내) |
+| 429 | `TOO_MANY_LOGIN_ATTEMPTS` | 로그인을 10분 안에 5번 틀림 → 1분 동안 맞는 비밀번호도 막힘 (화면: "1분 뒤에 다시" 안내). 1분이 지나면 다시 시도할 수 있고, 10분이 지나기 전에 또 틀리면 2분·4분·8분… 으로 늘어남(10분까지) (2026-11-19: 전에는 10분 끝까지 막혔음) |
 | 400 | `WRONG_PASSWORD` / `SAME_PASSWORD` | 내 계정: 지금 비밀번호가 틀림 / 새 비밀번호가 지금과 같음 (로그인한 채라 401 이 아니라 400) |
 | 400 | `RECOVERY_ANSWER_MISMATCH` | 비밀번호 찾기: 확인 질문 답이 틀림 |
 | 404 | `RECOVERY_NOT_SET` / `ACCOUNT_NOT_FOUND` | 질문을 안 정했거나 없는 아이디 / 아이디 찾기에서 맞는 계정 없음 |
-| 429 | `TOO_MANY_ATTEMPTS` | 비밀번호 확인·확인 질문 답을 10분 안에 5번 틀림 → 10분 동안 막힘 |
-| 429 | `TOO_MANY_REQUESTS` | 같은 접속 주소(IP)에서 `/api/**` 를 1분에 600번 넘게 부름 (`Retry-After` 헤더에 몇 초 뒤 풀리는지). 2026-11-18 |
+| 429 | `TOO_MANY_ATTEMPTS` | 비밀번호 확인·확인 질문 답을 10분 안에 5번 틀림 → 1분 동안 막힘 |
+| 429 | `TOO_MANY_REQUESTS` | 같은 접속 주소(IP)에서 `/api/**` 를 1분에 600번 넘게 부름 (`Retry-After` 헤더에 몇 초 뒤 풀리는지). 2026-11-18 (팀 main 에서 2026-11-19 가져옴). 접속 주소는 nginx 뒤에서도 실제 IP (`forward-headers-strategy: native`) |
 | 403 | `FORBIDDEN` | 권한 없음 |
 | 403 | `NOT_POST_OWNER` / `NOT_COMMENT_OWNER` | 남의 글·댓글 삭제 |
+| 404 | `LINK_NOT_FOUND` | 연결 의견: 이 글에 연결되지 않은 종목 |
 | 404 | `NOT_FOUND` | 없는 주소 |
 | 405 | `METHOD_NOT_ALLOWED` | 그 주소에 없는 요청 방식 (예: `PUT /api/articles`) |
 | 406 | `NOT_ACCEPTABLE` | JSON 이 아닌 응답을 요청 (`Accept: application/xml` 등) |

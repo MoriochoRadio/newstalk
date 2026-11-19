@@ -1,12 +1,15 @@
-"""공통 도구: 로그 남기기, 실패하면 다시 해보기
+"""공통 도구: 로그 남기기, 실패하면 다시 해보기, 상태 파일 쓰기
 
-    from hk_llm.core.util import get_logger, retry
+    from hk_llm.core.util import get_logger, retry, write_json
     log = get_logger(__name__)
     log.info("RSS %d건", n)                              # 화면 + logs/hk_llm.log
     res = retry(lambda: requests.get(url, timeout=10))  # 실패하면 3번까지 다시
 """
+import json
 import logging
 import logging.handlers
+import os
+import threading
 import time
 
 import requests
@@ -44,6 +47,18 @@ def _retryable(e):
     if isinstance(e, requests.HTTPError) and e.response is not None:
         return e.response.status_code >= 500 or e.response.status_code == 429
     return False
+
+
+def write_json(path, data, **kw):
+    """임시 파일에 다 쓴 뒤 이름만 바꿈 (원자적). 쓰다 죽어도 반쯤 쓴 파일이 남지 않아 다음에 빈 값으로 읽히지 않음 (11/13)
+    프로세스·스레드마다 임시 이름이 달라 서로 안 겹침. 실패하면 OSError 를 그대로 던짐 (호출한 쪽이 로그)"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.stem}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, **kw), encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 MAX_WAIT = 30.0  # 한 실행 안에서 기다리는 최대 시간(초). 서버가 더 오래 기다리라고 하면 여기서 안 기다리고 차단기에 맡김

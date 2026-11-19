@@ -15,9 +15,13 @@ spring:
     # 예시 기사를 켰다가 끈 PC에서도 서버가 멈추지 않게 (기록엔 있는데 파일 위치가 빠진 반복 지시서는 무시)
     ignore-migration-patterns: "*:future,repeatable:missing"
 
+# 접속한 사람의 IP (로그인 시도 제한용, 2026-11-16): 화면 요청은 nginx 를 거쳐 오므로 nginx 가 붙인 X-Forwarded-For 를 읽음
+# native = Tomcat RemoteIpValve: 보낸 쪽이 내부망(127.*, 10.*, 172.16~31.*, 192.168.*)일 때만 믿음. 밖에서 바로 보낸 헤더는 무시
+# 그래서 백엔드 8080 은 이 PC 에서만 열어 둠 (docker-compose.yml 127.0.0.1:8080)
 # 응답 압축(gzip): 브라우저가 받을 수 있다고 하면 1KB 넘는 응답을 줄여 보냄 (11/13: 홈 JSON 약 160KB가 압축 없이 오가던 것)
 # 실시간 시세(SSE, text/event-stream)는 목록에 넣지 않음 — 압축하면 이벤트가 모였다가 늦게 감
 server:
+  forward-headers-strategy: native
   compression:
     enabled: true
     mime-types: application/json,text/html,text/css,application/javascript
@@ -51,7 +55,12 @@ app:
     # 토큰 유효 시간(분)
     expiration-minutes: 60
 
+# API 문서(Swagger)·demo.html 켜기 (11/19 QA): 개발·시연은 켬(기본). 실제로 내보낼 때는 .env 에 API_DOCS_ENABLED=false
+# 꺼지면 /swagger-ui.html·/v3/api-docs 는 404, /demo.html 은 SecurityConfig 가 막음
 springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
   swagger-ui:
+    enabled: ${API_DOCS_ENABLED:true}
     # API 문서 화면 주소: http://localhost:8080/swagger-ui.html
     path: /swagger-ui.html

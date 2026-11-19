@@ -134,6 +134,8 @@
             <arg column="article_count" javaType="_long"/>
             <arg column="event_count" javaType="_long"/>
             <arg column="disclosure_count" javaType="_long"/>
+            <arg column="positive_count" javaType="_long"/>
+            <arg column="negative_count" javaType="_long"/>
             <arg column="avg_relevance" javaType="java.math.BigDecimal"/>
             <arg column="last_published_at" javaType="java.time.LocalDateTime"/>
         </constructor>
@@ -157,6 +159,8 @@
                COUNT(DISTINCT CASE WHEN a.channel &lt;&gt; 'DART'
                                    THEN COALESCE(s.group_article_id, s.article_id) END) AS event_count,
                SUM(a.channel = 'DART') AS disclosure_count,
+               SUM(CASE WHEN a.channel &lt;&gt; 'DART' AND s.sentiment = 'POSITIVE' THEN 1 ELSE 0 END) AS positive_count,
+               SUM(CASE WHEN a.channel &lt;&gt; 'DART' AND s.sentiment = 'NEGATIVE' THEN 1 ELSE 0 END) AS negative_count,
                AVG(CASE WHEN a.channel &lt;&gt; 'DART' THEN s.relevance END) AS avg_relevance,
                MAX(CASE WHEN a.channel &lt;&gt; 'DART' THEN a.published_at END) AS last_published_at
         FROM article_stock s
@@ -164,6 +168,9 @@
         JOIN stock_info i ON i.stock_code = s.stock_code
         WHERE a.status = 'DONE'
           AND a.published_at >= #{from}
+          <if test="to != null">
+              AND a.published_at &lt; #{to}
+          </if>
           <if test="sourceType != null">
               AND a.source_type = #{sourceType}
           </if>
@@ -177,6 +184,25 @@
         HAVING article_count &gt; 0
         ORDER BY article_count DESC, avg_relevance DESC, i.stock_name
         LIMIT #{limit}
+    </select>
+
+    <!-- before(오늘 0시) 전에 이슈 순위에 들 글(분석 끝난 뉴스, 공시 제외)이 있는 가장 최근 날. 없으면 NULL -->
+    <select id="findLatestIssueDate" resultType="java.time.LocalDate">
+        SELECT DATE(MAX(a.published_at))
+        FROM article a
+        JOIN article_stock s ON s.article_id = a.article_id
+        WHERE a.status = 'DONE'
+          AND a.channel &lt;&gt; 'DART'
+          AND a.published_at &lt; #{before}
+          <if test="sourceType != null">
+              AND a.source_type = #{sourceType}
+          </if>
+          <if test="market != null">
+              AND EXISTS (SELECT 1 FROM stock_info i WHERE i.stock_code = s.stock_code AND i.market = #{market})
+          </if>
+          <if test="theme != null">
+              AND EXISTS (SELECT 1 FROM stock_theme t WHERE t.stock_code = s.stock_code AND t.theme = #{theme})
+          </if>
     </select>
 
     <!--
@@ -223,6 +249,15 @@
         WHERE stock_code = #{stockCode} AND summary_date = #{date}
     </select>
 
+    <!-- before 전에 뉴스 요약이 있는 가장 최근 날. 없으면 NULL -->
+    <select id="findLatestSummaryDate" resultType="java.time.LocalDate">
+        SELECT MAX(summary_date)
+        FROM stock_daily_summary
+        WHERE stock_code = #{stockCode}
+          AND summary_date &lt; #{before}
+          AND news_summary IS NOT NULL
+    </select>
+
     <!--
         감성 비율 재료: from(오늘 0시) 이후 이 종목이 나온 글을 감성별로 묶어서(GROUP BY) 셈
         글 전체 감성(article.sentiment)이 아니라 "이 종목에 대한" 감성(article_stock.sentiment)
@@ -242,6 +277,9 @@
           AND s.sentiment IS NOT NULL   -- 감성을 판단하지 않은 연결(제목만 연결, V12)은 비율에서 뺌
           AND NOT (a.channel = 'DART' AND a.summarized_at IS NULL)  -- 원문 요약 전 공시의 기본값 NEUTRAL 은 판단이 아님 (11/12)
           AND a.published_at >= #{from}
+          <if test="to != null">
+              AND a.published_at &lt; #{to}
+          </if>
           <if test="sourceType != null">
               AND a.source_type = #{sourceType}
           </if>

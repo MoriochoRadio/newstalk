@@ -1,5 +1,7 @@
 package com.hkteam2.stocknews.stock;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.hkteam2.stocknews.common.ListResponse;
 import com.hkteam2.stocknews.common.PageQuery;
+import com.hkteam2.stocknews.common.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,9 +42,10 @@ public class StockController {
 
     @Operation(summary = "오늘의 이슈 종목 순위",
             description = "오늘(한국 시간 0시~지금) 작성된 글에 많이 나온 종목 순. 글 수가 같으면 평균 관련도 높은 순."
+                    + " 오늘 글이 없으면 글이 있는 가장 최근 날 하루로 세고 date 에 그 날짜."
                     + " avgRelevance는 %(관련도가 아직 없으면 null). 페이지 없이 위에서 limit개 (1~50, 기본 10)")
     @GetMapping("/issues")
-    public ListResponse<StockIssueResponse> getIssues(
+    public StockIssuesResponse getIssues(
             @Parameter(description = "출처: NEWS 또는 SNS (없으면 NEWS. SNS는 뉴스 많은 종목만 모아서 섞지 않음)", example = "NEWS")
             @RequestParam(required = false) String source,
             @Parameter(description = "시장: KOSPI 또는 KOSDAQ (없으면 둘 다)", example = "KOSDAQ")
@@ -66,6 +70,7 @@ public class StockController {
     @Operation(summary = "종목의 오늘 종합 요약·감성 비율",
             description = "newsSummary·snsSummary는 AI가 1시간마다 만든 오늘 요약 (아직 없으면 null)."
                     + " sentiment는 오늘(한국 시간 0시~지금) 이 종목이 나온 글을 지금 센 것. %는 합이 100."
+                    + " 오늘 요약도 글도 없으면 뉴스 요약이 있는 가장 최근 날 것을 주고 date 에 그 날짜."
                     + " source가 없으면 뉴스·SNS 합계, NEWS/SNS면 그 출처만. 없는 종목이면 404 STOCK_NOT_FOUND")
     @GetMapping("/{stockCode}/summary")
     public StockSummaryResponse getSummary(
@@ -78,11 +83,12 @@ public class StockController {
     @Operation(summary = "종목 종합 요약 다시 생성 (로그인 필요)",
             description = "AI 서버가 오늘 기사로 요약을 새로 만들어 저장하고, 다시 읽은 요약·감성 비율을 돌려줌 (최대 30초)."
                     + " 같은 종목은 10분에 한 번만 새로 만들고 그 안에는 regenerated=false 로 저장된 요약."
+                    + " 한 사람이 10분에 5번 넘게 부르면 429 AI_BUSY."
                     + " 401 로그인 필요, 404 없는 종목, 503 AI_UNAVAILABLE·AI_NOT_CONFIGURED, 429 AI_BUSY")
     @PostMapping("/{stockCode}/summary")
-    public SummaryRegenerateResponse regenerateSummary(
+    public SummaryRegenerateResponse regenerateSummary(@AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "종목코드 6자리", example = "005930") @PathVariable String stockCode) {
-        return stockService.regenerateSummary(stockCode);
+        return stockService.regenerateSummary(CurrentUser.id(jwt), stockCode);
     }
 
     @Operation(summary = "종목 언급량 추이 (그래프)",

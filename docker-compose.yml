@@ -21,7 +21,8 @@ services:
       - --default-time-zone=+09:00
     ports:
       # 내 PC 포트(DB_PORT) -> 컨테이너 안 3306
-      - "${DB_PORT}:3306"
+      # 127.0.0.1: 이 PC 안에서만 (학원 와이파이 등 같은 네트워크의 다른 기기는 못 붙음, 2026-11-11)
+      - "127.0.0.1:${DB_PORT}:3306"
     volumes:
       # 컨테이너를 지워도 데이터는 남도록 별도 보관
       - db-data:/var/lib/mysql
@@ -43,7 +44,8 @@ services:
       # "다시 생성" AI 서버 (ai 프로필을 안 켜면 그 버튼만 503, 다른 화면은 그대로)
       AI_SERVER_URL: ${AI_SERVER_URL_IN_DOCKER:-http://ai-api:8000}
     ports:
-      - "8080:8080"
+      # 이 PC 에서만 (같은 와이파이의 다른 기기가 8080 에 바로 붙어 X-Forwarded-For 를 꾸미지 못하게, 2026-11-16). 화면은 5173(nginx) 으로
+      - "127.0.0.1:8080:8080"
     volumes:
       # KIS 접근 토큰 보관 (backend/data/kis, Git 제외). 다시 켜도 토큰을 재사용 → KIS 발급 1분 1회·알림톡 아낌
       - ./backend/data:/app/data
@@ -79,6 +81,14 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # 헬스체크 (11/19 QA): 수집기는 웹 서버가 아니라서, 차례(5분)마다 건드리는 loop_heartbeat 가 20분 넘게 그대로면 unhealthy
+    # (한 차례가 밀린 글 따라잡기로 길어져도 20분이면 넉넉). 시작할 때 DB 를 최대 2분 기다리므로 처음 5분은 세지 않음
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(time.time() - os.path.getmtime('/app/hk_llm/logs/loop_heartbeat') > 1200)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     profiles: ["ai", "full"]
 
   ai-api:
@@ -95,11 +105,18 @@ services:
       # LLM 비용 기록(llm_usage.json)을 ai·ai-api 가 같이 쓰고, 상자를 다시 만들어도 오늘 금액을 기억
       - ai-logs:/app/hk_llm/logs
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # 백엔드만 부르는 내부 서버라 이 PC 안에서만
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # 헬스체크 (11/19 QA): /health 가 답하는지. slim 이미지에 curl 이 없어 파이썬으로
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     profiles: ["ai", "full"]
 
   # ----- 프론트 (profile: full) — 시연 PC. 개발할 때는 frontend 폴더에서 npm run dev -----
@@ -107,10 +124,17 @@ services:
     build: ./frontend
     ports:
       # http://localhost:5173 (개발 서버와 같은 주소). /api 는 nginx 가 backend 로 넘김 (frontend/nginx.conf)
-      - "5173:80"
+      - "127.0.0.1:5173:80"  # 이 PC 에서만 (같은 와이파이의 다른 기기에서 열리지 않게)
     depends_on:
       - backend
     restart: unless-stopped
+    # 헬스체크 (11/19 QA): nginx 가 화면(index.html)을 주는지. alpine 이미지의 wget 으로
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     profiles: ["full"]
 
 volumes:

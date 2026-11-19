@@ -28,6 +28,10 @@
         WHERE user_id = #{userId}
     </select>
 
+    <select id="countWatchlist" resultType="int">SELECT COUNT(*) FROM watchlist WHERE user_id = #{userId}</select>
+    <select id="countPosts" resultType="int">SELECT COUNT(*) FROM board_post WHERE user_id = #{userId}</select>
+    <select id="countComments" resultType="int">SELECT COUNT(*) FROM board_comment WHERE user_id = #{userId}</select>
+
     <update id="updatePassword">
         UPDATE users SET password_hash = #{passwordHash} WHERE user_id = #{userId}
     </update>
@@ -38,7 +42,7 @@
         WHERE user_id = #{userId}
     </update>
 
-    <!-- idx_users_recovery (V17) 로 찾음 -->
+    <!-- idx_users_recovery (V18) 로 찾음 -->
     <select id="findByRecovery" resultType="com.hkteam2.stocknews.user.User">
         SELECT <include refid="userColumns"/>
         FROM users

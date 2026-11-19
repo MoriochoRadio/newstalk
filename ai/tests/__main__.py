@@ -27,7 +27,10 @@ step5_summary.USAGE_FILE = pathlib.Path(tempfile.mkdtemp()) / "llm_usage.json"
 # python -m tests offline: DB·인터넷이 필요한 시험을 뺌 (CI 용)
 NEEDS_NETWORK = {"test_step3_save", "test_sns_db", "test_robots", "test_llm_usage_db", "test_refetch_db",
                  "test_refetch_waits_for_connection_breaker", "test_disclosure_evidence_db",
-                 "test_disclosure_gives_up_when_document_never_comes"}
+                 "test_disclosure_gives_up_when_document_never_comes",
+                 "test_rematch_keeps_same_news_group", "test_auto_switch_keeps_finished_summaries",
+                 "test_save_groups_everything_reaches_old_articles",  # 뒤 3개는 DB 시험 (2026-11-10)
+                 "test_purge_bodies_after_match"}
 offline = "offline" in sys.argv
 failed = total = 0
 for path in sorted(pathlib.Path(__file__).parent.glob("test_*.py")):

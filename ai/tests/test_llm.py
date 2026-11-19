@@ -26,6 +26,49 @@ def test_step5_check():
     except ValueError:
         pass
     check(ArticleSummary(summary="2027년 말까지 공급한다", sentiment="NEUTRAL", keywords=[], companies=[]), "제목", "2027년 말까지")
+    # LLM 은 관련종목 줄을 뺀 앞 3,000자를 봄 → 그 범위 안 숫자는 원문 3,000자 밖이어도 통과 (11/17)
+    tag = "관련종목 삼성전자(005930)\n" * 200
+    check(ArticleSummary(summary="매출 4,321억원", sentiment="NEUTRAL", keywords=[], companies=[]), "제목", tag + "매출 4,321억원")
+
+
+def test_step5_answer_checks():
+    """11/11: 요약 숫자 검사 (하루 요약과 같은 규칙), 감성 이유가 주가 움직임뿐이면 NEUTRAL (프롬프트 규칙을 LLM 이 어긴 것)"""
+    from hk_llm.steps.step5_summary import ArticleSummary, Company, check, price_only
+
+    def ask(summary="요약", sentiment="POSITIVE", reason="r"):
+        return ArticleSummary(summary=summary, sentiment="NEUTRAL", keywords=[], companies=[
+            Company(name="삼성전자", evidence=0, role="SUBJECT", fact_type="FACT", sentiment=sentiment, reason=reason)])
+
+    body = "삼성전자는 3분기 영업이익 9조4천억원을 냈다. 주가는 20만1000원으로 5.85% 올랐다."
+    assert check(ask("영업이익 9.4조원, 주가 5.85% 상승"), "삼성전자", body).summary, "단위가 달라도 같은 값이면 통과"
+    try:
+        check(ask("영업이익 12조원"), "삼성전자", body)
+        raise AssertionError("기사에 없는 숫자는 거부해야 함")
+    except ValueError:
+        pass
+
+    # 실제 답(11/11 검토 ①): 이유가 주가 움직임뿐 → NEUTRAL, 원인 사실이 있으면 그대로
+    for reason in ("전 거래일 대비 주가가 8.71% 상승해 주가 레벨이 회복됐다.", "프리마켓에서 12.97% 하락하며 주가가 크게 내려갔기 때문이다.",
+                   "장중 주가가 17만9200원까지 내려가 11% 이상 급락해 하락 충격이 제시됐다.", "상장 첫날 공모가 대비 105.88% 급등했다."):
+        assert price_only(reason), reason
+        assert check(ask(reason=reason), "삼성전자", body).companies[0].sentiment == "NEUTRAL", reason
+    for reason in ("3분기 영업이익이 컨센서스 대비 35% 하회해 실적 부진이 주가 급락으로 연결됐다.", "80% 무상감자 단행 소식 이후 주가가 큰 폭으로 하락했다.",
+                   "반도체 수출이 큰 폭으로 늘며 주가가 5%대 상승했다.", "주가가 공개매수 소식에 9.71% 상승했다.", "수주 계약 당사자다"):
+        assert not price_only(reason), reason
+    assert check(ask(sentiment="NEGATIVE", reason="수주 계약이 해지됐다"), "삼성전자", body).companies[0].sentiment == "NEGATIVE"
+    # 원인이 전망·우려뿐이면 중립이 아니라 판단 보류 (프롬프트 [감성] UNCERTAIN), 제도 시행은 사실이라 그대로
+    got = check(ask(sentiment="NEGATIVE", reason="기술료 수입 감소 우려가 제기된 가운데 주가가 16.01% 하락해 거래를 마쳤다."), "삼성전자", body)
+    assert got.companies[0].sentiment == "UNCERTAIN"
+    assert not price_only("저PBR 기업 공표 제도 시행 첫날 11.61% 상승하며 강세를 보였다.")
+
+    # 공시 요약은 숫자 검사를 안 함: 표 머리 단위("단위: 백만원")를 붙여 쓴 맞는 요약을 거부했음 (11/11 실제 공시 3/10)
+    from hk_llm.steps import dart
+    fake = dart.DisclosureSummary(summary="3분기 매출액 24,529백만원, 영업손실 2,854백만원.", evidence="", sentiment="NEGATIVE", reason="적자전환")
+    with mock.patch.object(dart, "llm_call", return_value=fake):
+        assert dart.summarize_one("영업(잠정)실적", "(단위 : 백만원) 매출액 당해실적 24,529 영업이익 당해실적 -2,854").summary
+    # 공시 감성도 판단 보류가 있고 DB 에는 NULL (11/11, 라벨 기준 v2.1)
+    assert dart.final_sentiment("영업(잠정)실적", "UNCERTAIN") is None
+    assert dart.final_sentiment("영업(잠정)실적", "NEGATIVE") == "NEGATIVE"
 
 
 def test_step8_numbers():
@@ -141,6 +184,48 @@ def test_step8_etf_holding_needs_product_name():
             raise AssertionError("거부해야 함")
         except s8.RejectedAnswer:
             pass
+
+
+def test_dart_unjudged_is_null():
+    """요약 전 공시는 판단을 안 한 것 → 감성 NULL (중립 = "판단했더니 영향 없음", 11/11: 공시 연결 7,096개 중 6,329개가 요약 없이 NEUTRAL)"""
+    from datetime import datetime
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import StaticPool
+
+    from hk_llm.core.config import KST
+    from hk_llm.steps import dart
+
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    with engine.begin() as c:
+        c.execute(text("CREATE TABLE stock_info (stock_code)"))
+        c.execute(text("INSERT INTO stock_info VALUES ('005930')"))
+        c.execute(text("""CREATE TABLE article (article_id INTEGER PRIMARY KEY, url_key, url, press, title, description, published_at, status,
+                          summary, sentiment, source_type, channel, collect_mode, model, retry_count, last_error)"""))
+        c.execute(text("CREATE TABLE article_stock (article_id, stock_code, is_main, sentiment, reason, match_type, relevance, matched_keywords)"))
+    row = {"rcept_no": "20261111000001", "stock_code": "005930", "corp_name": "삼성전자", "report_nm": "주식소각결정", "rcept_dt": "20261111"}
+    assert dart.save_disclosures(engine, [row], datetime(2026, 11, 11, 10, tzinfo=KST)) == 1
+    read = text("SELECT a.sentiment, s.sentiment FROM article a JOIN article_stock s USING (article_id) ORDER BY a.article_id")
+    with engine.connect() as c:
+        assert c.execute(read).all() == [(None, None)], "요약 전에는 판단 안 함"
+
+    # 지난 줄 정리: 요약 안 된 공시만 NULL 로. AI 가 판단한 중립과 뉴스는 그대로
+    with engine.begin() as c:
+        c.execute(text("""INSERT INTO article (article_id, channel, model, sentiment) VALUES
+                          (2, 'DART', NULL, 'NEUTRAL'), (3, 'DART', 'm', 'NEUTRAL'), (4, 'RSS', NULL, 'NEUTRAL')"""))
+        c.execute(text("INSERT INTO article_stock (article_id, sentiment) VALUES (2, 'NEUTRAL'), (3, 'NEUTRAL'), (4, 'NEUTRAL')"))
+    assert dart.clear_unjudged(engine) == 1
+    assert dart.clear_unjudged(engine) == 0, "다시 돌려도 안전"
+    with engine.connect() as c:
+        assert c.execute(text("SELECT sentiment FROM article WHERE article_id > 1 ORDER BY article_id")).scalars().all() == [None, "NEUTRAL", "NEUTRAL"]
+        assert c.execute(text("SELECT sentiment FROM article_stock WHERE article_id > 1 ORDER BY article_id")).scalars().all() == [None, "NEUTRAL", "NEUTRAL"]
+
+    # 11/17: 공시는 전부 저장, LLM 요약은 주요 공시만 (일반 공시는 retry_count = MAX_TRIES 로 요약 대상에서 빠짐)
+    routine = dict(row, rcept_no="20261111000002", report_nm="임원ㆍ주요주주특정증권등소유상황보고서")
+    assert dart.save_disclosures(engine, [routine], datetime(2026, 11, 11, 10, tzinfo=KST)) == 1
+    with engine.connect() as c:
+        tries = c.execute(text("SELECT retry_count FROM article ORDER BY article_id")).scalars().all()
+    assert tries == [0, None, None, None, dart.MAX_TRIES], tries
 
 
 def _summary_rows(n):

@@ -1,13 +1,14 @@
-"""공시 수집: DART 공시 목록에서 주요 공시만 골라 저장 → 바로 DONE, 그다음 원문을 LLM 으로 요약·감성 판단
+"""공시 수집: DART 공시 목록을 전부 저장 → 바로 DONE, 그다음 주요 공시만 원문을 LLM 으로 요약·감성 판단
 
     from hk_llm.steps.dart import collect_disclosures, summarize_disclosures
     n = collect_disclosures()    # 새로 저장한 건수. .env 에 DART_API_KEY 필요
     n = summarize_disclosures()  # 요약 안 된 공시를 요약한 건수 (1건 약 $0.0006)
 
-- 범위: 어제~오늘, 코스피·코스닥, 아래 TAKE 에 걸리는 제목만
+- 범위: 어제~오늘, 코스피·코스닥 전부 (11/17 사용자: 공시를 다 넣기). LLM 요약은 아래 TAKE 에 걸리는 주요 공시만
+  (나머지는 retry_count = MAX_TRIES 로 넣어 요약 대상에서 빠짐 → 비용은 전과 같음, 화면엔 제목만)
 - 저장: article (source_type NEWS, channel DART, 요약 = 제목) + article_stock (DART 가 준 종목코드)
-- 요약 전이나 요약 실패 시: 요약 = 제목, 감성 NEUTRAL 로 저장. model·summarized_at 이 비어 있으면 AI 요약이 아님
-  (화면은 이것을 '원문 확인 전'으로 보이고, 백엔드는 감성 비율에서 뺌 — 2026-11-12)
+- 요약 전이나 요약 실패 시: 요약 = 제목, 감성 NULL(판단 안 함, 11/11. 전에는 NEUTRAL 이라 "판단했더니 영향 없음"처럼 보였음).
+  model·summarized_at 이 비어 있으면 AI 요약이 아님 (화면은 이것을 '원문 확인 전'으로 보이고, 백엔드도 감성 비율에서 뺌 — 2026-11-12)
 - 감성 (2026-11-12, 뉴스와 같은 기준으로 맞춤): 팀 라벨 기준 v2.1 3절 '지금 가진 주주에게 공시에 적힌 사실이 좋은 소식인가'.
   주가가 오를지 내릴지는 판단하지 않음 (멘토 11/09 '판단은 투자자, 보수적으로 정보만', decisions.md 11/10).
   판단할 근거가 모자라면 판단 보류(UNCERTAIN → NULL). 목적·방식에 따라 시장 반응이 갈리는 유형
@@ -43,7 +44,8 @@ DOCUMENT = "https://opendart.fss.or.kr/api/document.xml"
 MAX_FILE = 50_000_000  # 압축 푼 공시 문서 상한
 VIEW = "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={}"
 PRESS = "전자공시(DART)"
-REASON = "공시 제목 기준 (내용으로 호재·악재를 판단하지 않음)"
+REASON = "공시 제목 기준 (내용은 아직 판단하지 않음)"
+ROUTINE = "일반 공시: LLM 요약 대상 아님"  # last_error 에 남겨 요약 실패와 구분
 TAKE = re.compile(r"영업\(잠정\)실적|단일판매|공급계약|유상증자|무상증자|감자결정|합병|분할|자기주식|주식소각|최대주주변경"
                   r"|공개매수|타법인주식|투자판단관련|생산중단|영업정지|중대재해|풍문또는보도|조회공시|소송|횡령|배임"
                   r"|상장폐지|관리종목|거래정지|회생|부도|기업가치제고|주요사항보고서")
@@ -112,7 +114,7 @@ def _get_page(key, cls, begin, end, page):
 
 
 def fetch_disclosures(key, today=None, start=None):
-    """start~today 주요 공시 (start 가 없으면 어제~오늘)"""
+    """start~today 공시 전부 (start 가 없으면 어제~오늘). 주요 여부는 save_disclosures 가 important() 로 봄"""
     today = today or datetime.now(KST).date()
     begin, end = (start or today - timedelta(days=1)).strftime("%Y%m%d"), today.strftime("%Y%m%d")
     rows = []
@@ -122,7 +124,7 @@ def fetch_disclosures(key, today=None, start=None):
             got, pages = _get_page(key, cls, begin, end, page)
             rows += got
             page += 1
-    return [r for r in rows if important(r["report_nm"])]
+    return rows
 
 
 def published(rcept_dt, now):
@@ -169,7 +171,7 @@ def backfill_disclosures(start, end, engine=None, key=None, days=7):
 
 
 def save_disclosures(engine, rows, now, mode="REALTIME"):
-    """주요 공시를 article(DONE) + article_stock 에 저장. 이미 있는 공시·사전에 없는 종목은 건너뜀. 새로 저장한 건수"""
+    """공시를 article(DONE) + article_stock 에 저장. 이미 있는 공시·사전에 없는 종목은 건너뜀. 새로 저장한 건수"""
     if not rows:
         return 0
     for r in rows:
@@ -177,14 +179,15 @@ def save_disclosures(engine, rows, now, mode="REALTIME"):
         r["url_key"] = url_key(r["url"])
     have_sql = text("SELECT url_key FROM article WHERE url_key IN :k").bindparams(bindparam("k", expanding=True))
     insert = text("""INSERT INTO article (url_key, url, press, title, description, published_at, status, summary,
-                                          sentiment, source_type, channel, collect_mode)
-                     VALUES (:url_key, :url, :press, :title, NULL, :at, 'DONE', :title, 'NEUTRAL', 'NEWS', 'DART', :mode)""")
+                                          sentiment, source_type, channel, collect_mode, retry_count, last_error)
+                     VALUES (:url_key, :url, :press, :title, NULL, :at, 'DONE', :title, NULL, 'NEWS', 'DART', :mode,
+                             :tries, :note)""")
     # 관련도는 비움(NULL): 관련도 = "이 기사에서 이 종목이 얼마나 중심인가"인데 공시는 회사가 낸 자기 서류라 잴 것이 없음.
     # 예전엔 1.00 을 넣어서 관련도순 첫 페이지 20건이 전부 공시가 됨 (2026-11-10 지승현 지적, V15 로 기존 값 정리).
     # 백엔드는 NULL 을 "점수 없음"으로 보고 관련도순 맨 뒤·평균에서 뺌 (docs/api.md)
     link = text("""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason, match_type, relevance,
                                               matched_keywords)
-                   VALUES (:id, :code, TRUE, 'NEUTRAL', :reason, 'DIRECT', NULL, :name)""")
+                   VALUES (:id, :code, TRUE, NULL, :reason, 'DIRECT', NULL, :name)""")
     new = 0
     with engine.begin() as conn:
         have = set(conn.execute(have_sql, {"k": [r["url_key"] for r in rows]}).scalars())
@@ -194,11 +197,13 @@ def save_disclosures(engine, rows, now, mode="REALTIME"):
             if r["url_key"] in have or code not in stocks:  # 사전에 없는 종목은 FK 때문에 못 넣음
                 continue
             title = f"{r['corp_name'].strip()} {' '.join(r['report_nm'].split())}"[:500]
+            big = important(r["report_nm"])
             aid = conn.execute(insert, {"url_key": r["url_key"], "url": r["url"], "press": PRESS, "title": title,
-                                        "at": to_db(published(r["rcept_dt"], now)), "mode": mode}).lastrowid
+                                        "at": to_db(published(r["rcept_dt"], now)), "mode": mode,
+                                        "tries": 0 if big else MAX_TRIES, "note": None if big else ROUTINE}).lastrowid
             conn.execute(link, {"id": aid, "code": code, "reason": REASON, "name": r["corp_name"].strip()[:300]})
             new += 1
-    log.info("공시: 주요 공시 %d건, 새로 저장 %d건", len(rows), new)
+    log.info("공시: 목록 %d건, 새로 저장 %d건", len(rows), new)
     return new
 
 
@@ -286,13 +291,27 @@ def fetch_document(key, rcept_no):
     return document_text(res.content, rcept_no)
 
 
+def clear_unjudged(engine=None):
+    """요약 안 된 지난 공시의 NEUTRAL 을 NULL 로 (11/11, 한 번만 돌리면 됨. 다시 돌려도 안전). 바뀐 공시 수
+    python -m hk_llm.steps.dart --clear-unjudged  → 그 뒤 export_data 로 팀 데이터 파일도 다시 내보내야 다른 PC 에도 반영됨"""
+    engine = engine or get_engine()
+    unjudged = "SELECT article_id FROM article WHERE channel = 'DART' AND model IS NULL"
+    with engine.begin() as conn:
+        conn.execute(text(f"UPDATE article_stock SET sentiment = NULL WHERE sentiment = 'NEUTRAL' AND article_id IN ({unjudged})"))
+        return conn.execute(text("UPDATE article SET sentiment = NULL WHERE sentiment = 'NEUTRAL' AND channel = 'DART' AND model IS NULL")).rowcount
+
+
 def summarize_one(title, body):
     llm = ChatOpenAI(model=MODEL, timeout=60, max_retries=2, max_tokens=1000)
     s = llm_call(lambda: (PROMPT | llm.with_structured_output(DisclosureSummary)).invoke(
         {"title": _strip_tag(title), "body": _strip_tag(body[:MAX_CHARS])}))
-    wrong = [y for y in re.findall(r"(?<!\d)((?:19|20)\d\d)년", s.summary + s.reason) if y not in title + body[:MAX_CHARS]]
+    source = title + body[:MAX_CHARS]
+    wrong = [y for y in re.findall(r"(?<!\d)((?:19|20)\d\d)년", s.summary + s.reason) if y not in source]
     if wrong:
         raise ValueError(f"공시에 없는 연도: {wrong}")
+    # 숫자 검사(step8.unknown_numbers)는 공시에 안 씀 (11/11 시험: 최근 10건 중 3건을 맞는 요약인데 거부).
+    # 공시 숫자는 표에 있어 단위가 표 머리("단위: 백만원")에 따로 있고, 날짜(2026-07-01 → 2026.07.01)·반올림(29,120,699,771원 → 291억)을
+    # LLM 이 바르게 바꿔 쓰므로 값 그대로 맞추는 규칙과 안 맞음
     return s
 
 
@@ -326,7 +345,9 @@ def summarize_disclosures(engine=None, limit=50, key=None):
     key = key or os.environ.get("DART_API_KEY")
     if not key:
         return 0
-    if not breaker.allow("DART"):  # 원문 받기도 같은 키·한도를 씀 → 쉬는 중이면 다음에
+    # 원문 받기도 같은 키·한도를 씀 → 쉬는 중이면 다음에. allow() 를 쓰면 쉬는 시간이 막 끝났을 때 시험 1번을 여기서 가져가는데
+    # 이 함수는 결과를 기록하지 않아 DART 가 "시험 중"으로 굳었음 (2026-11-10) → 읽기만 하고, 시험은 collect_disclosures 가
+    if breaker.paused("DART"):
         return 0
     engine = engine or get_engine()
     since = datetime.now(KST).date() - timedelta(days=1)
@@ -383,6 +404,9 @@ def hold_context_dependent(engine=None):
 if __name__ == "__main__":
     import sys
 
+    if "--clear-unjudged" in sys.argv:
+        print("요약 안 된 공시 감성 비움:", clear_unjudged())
+        sys.exit()
     if "--hold-context" in sys.argv:  # python -m hk_llm.steps.dart --hold-context
         print(hold_context_dependent())
         sys.exit(0)

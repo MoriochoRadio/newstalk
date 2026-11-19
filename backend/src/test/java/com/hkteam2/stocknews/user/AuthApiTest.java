@@ -1,5 +1,6 @@
 package com.hkteam2.stocknews.user;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -106,5 +107,33 @@ class AuthApiTest extends ApiTestSupport {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/articles"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void 내_정보에_가입시각과_활동수가_있고_비밀번호를_맞혀야_탈퇴된다() throws Exception {
+        String token = tokenOf("zzauth20");
+
+        mvc.perform(get("/api/auth/me").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.watchlistCount").value(0))
+                .andExpect(jsonPath("$.postCount").value(0));
+
+        // 틀린 비밀번호는 400 (401 이면 화면이 로그아웃됨)
+        mvc.perform(delete("/api/auth/me").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"wrongpassword\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WRONG_PASSWORD"));
+
+        mvc.perform(delete("/api/auth/me").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // 지운 회원: 로그인 안 되고, 남은 토큰으로 내 정보도 401
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson("zzauth20", PASSWORD)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").header("Authorization", bearer(token)))
+                .andExpect(status().isUnauthorized());
     }
 }

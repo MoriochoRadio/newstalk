@@ -47,17 +47,29 @@ def gap_issue(last_success, now):
     return None
 
 
+def _failed_feeds_part(error):
+    """error 칸(run.py 가 " / " 로 이음)에서 '실패한 피드: ...' 부분만. 점검 경고('점검: 피드 N번 연속 실패: <url>')도
+    같은 칸에 기록되므로 칸 전체에서 주소를 찾으면 피드가 살아나도 경고가 스스로 다시 울렸음 (2026-11-17)"""
+    return next((p for p in (error or "").split(" / ") if p.startswith("실패한 피드:")), "")
+
+
 def feed_issues(recent_errors, feeds):
     """recent_errors: 최근 실행의 error 칸 (새 것부터). 최근 FEED_STREAK 번 모두에서 실패한 피드"""
-    window = recent_errors[:FEED_STREAK]
+    window = [_failed_feeds_part(e) for e in recent_errors[:FEED_STREAK]]
     if len(window) < FEED_STREAK:
         return []
-    return [f"피드 {FEED_STREAK}번 연속 실패: {url}" for url in feeds if all(url in (e or "") for e in window)]
+    return [f"피드 {FEED_STREAK}번 연속 실패: {url}" for url in feeds if all(url in e for e in window)]
+
+
+def weekday_window(now):
+    """최근 24시간이 전부 평일인가. 주말 기사는 평일의 1/4~1/40 이라(팀 데이터 11/07 5건, 11/08 50건 vs 평일 약 200건)
+    주말이 낀 24시간을 평일 평균과 비교하면 모든 언론사에 "수집량 급감" 헛경보가 감 (2026-11-10 지승현 검토)"""
+    return now.weekday() < 5 and (now - timedelta(days=1)).weekday() < 5
 
 
 def volume_issues(recent, daily_avg, active=None):
     """recent: {언론사: 최근 24시간 수}, daily_avg: {언론사: 지난 7일 하루 평균}, active: 지금 받는 언론사 (None 이면 전부)
-    일부러 뺀 언론사(EXCLUDED, 피드 목록에 없음)는 0건이 정상 → 빼지 않으면 뺀 뒤 7일 동안 매번 헛경보 (11/18 아주경제)"""
+    일부러 뺀 언론사(EXCLUDED, 피드 목록에 없음)는 0건이 정상 → 빼지 않으면 뺀 뒤 7일 동안 매번 헛경보 (팀 main 11/18 아주경제)"""
     out = []
     for press, avg in sorted(daily_avg.items()):
         if active is not None and press not in active:
@@ -97,13 +109,15 @@ def check(engine=None, now=None):
         recent = dict(conn.execute(text("""SELECT press, COUNT(*) FROM article WHERE source_type = 'NEWS' AND channel = 'RSS'
                                            AND published_at >= :t AND published_at < :now GROUP BY press"""),
                                    {"t": now - timedelta(days=1), "now": now}).all())
+        # 평균도 평일만 (DAYOFWEEK 1 = 일요일, 7 = 토요일). 주말이 낀 24시간은 비교하지 않음 (weekday_window)
         week = dict(conn.execute(text("""SELECT press, COUNT(*) FROM article WHERE source_type = 'NEWS' AND channel = 'RSS'
-                                         AND published_at >= :a AND published_at < :b GROUP BY press"""),
+                                         AND published_at >= :a AND published_at < :b AND DAYOFWEEK(published_at) NOT IN (1, 7)
+                                         GROUP BY press"""),
                                  {"a": now - timedelta(days=8), "b": now - timedelta(days=1)}).all())
         days = conn.execute(text("""SELECT COUNT(DISTINCT DATE(published_at)) FROM article WHERE source_type = 'NEWS' AND channel = 'RSS'
-                                    AND published_at >= :a AND published_at < :b"""),
+                                    AND published_at >= :a AND published_at < :b AND DAYOFWEEK(published_at) NOT IN (1, 7)"""),
                             {"a": now - timedelta(days=8), "b": now - timedelta(days=1)}).scalar() or 0
-        if days:
+        if days and weekday_window(now):
             issues += volume_issues(recent, {p: n / days for p, n in week.items()}, set(FEEDS) - set(excluded_presses()))
 
         broken = conn.execute(text("""SELECT COUNT(*) FROM article WHERE status = 'FAILED' AND last_error LIKE :m

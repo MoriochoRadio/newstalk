@@ -1,9 +1,11 @@
 package com.hkteam2.stocknews.common.config;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -34,6 +36,7 @@ public class SecurityConfig {
             "/api/stocks/*/summary",   // 종합 요약 다시 생성 (LLM 비용이 나가서 로그인한 사람만)
             "/api/posts/*/comments",
             "/api/posts/*/like",
+            "/api/articles/*/stocks/*/feedback",   // 연결이 틀렸어요 (2026-11-13)
     };
     private static final String[] AUTHENTICATED_DELETE_PATHS = {
             "/api/posts/*",
@@ -41,9 +44,13 @@ public class SecurityConfig {
     };
 
     private final HandlerExceptionResolver exceptionResolver;
+    /** false 면 백엔드 확인용 demo.html 을 막음 (Swagger 는 application.yml 의 springdoc 설정이 끔). 11/19 QA */
+    private final boolean apiDocsEnabled;
 
-    public SecurityConfig(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+    public SecurityConfig(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
+                          @Value("${API_DOCS_ENABLED:true}") boolean apiDocsEnabled) {
         this.exceptionResolver = exceptionResolver;
+        this.apiDocsEnabled = apiDocsEnabled;
     }
 
     @Bean
@@ -57,6 +64,7 @@ public class SecurityConfig {
                 // WebConfig의 CORS 허용 명단을 Security에서도 사용
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/demo.html").access((a, ctx) -> new AuthorizationDecision(apiDocsEnabled))
                         .requestMatchers(AUTHENTICATED_PATHS).authenticated()
                         .requestMatchers(HttpMethod.POST, AUTHENTICATED_POST_PATHS).authenticated()
                         .requestMatchers(HttpMethod.DELETE, AUTHENTICATED_DELETE_PATHS).authenticated()

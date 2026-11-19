@@ -1,6 +1,7 @@
 package com.hkteam2.stocknews.article;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,8 @@ public class ArticleService {
 
     private static final Set<String> SOURCE_TYPES = Set.of("NEWS", "SNS");
     private static final Set<String> SORTS = Set.of("latest", "relevance");
-    private static final Set<String> SENTIMENTS = Set.of("POSITIVE", "NEGATIVE", "NEUTRAL");
+    private static final Set<String> SENTIMENTS = Set.of("POSITIVE", "NEGATIVE", "NEUTRAL", "NONE");  // NONE = 판단 보류(감성 NULL)
+    private static final Set<String> CHANNELS = Set.of("NEWS", "DISCLOSURE", "MAJOR");  // 뉴스(공시 아님)·공시(DART)·뉴스+주요 공시
     /** 뉴스 상세에 붙일 SNS: 작성 시각 앞뒤 24시간 안에서 최대 5개 (F-11) */
     private static final int NEARBY_SNS_HOURS = 24;
     private static final int NEARBY_SNS_LIMIT = 5;
@@ -40,7 +42,8 @@ public class ArticleService {
 
     /** 기사 목록 거르기 조건 묶음. 모두 선택 (null이면 안 거름). SQL listCondition과 한 칸씩 짝 */
     private record Filter(String sourceType, String stockCode, BigDecimal minRelevance, Long watchUserId,
-                          String likeKeyword, LocalDateTime from, String sentiment, String market, String theme) {
+                          String likeKeyword, LocalDateTime from, String sentiment, String channel,
+                          String market, String theme) {
     }
 
     /**
@@ -50,15 +53,15 @@ public class ArticleService {
     @Transactional(readOnly = true)
     public ListResponse<ArticleResponse> getArticles(String source, String sort, Integer minRelevance,
                                                      String stockCode, String q, String period,
-                                                     String sentiment, PageQuery pageQuery) {
-        return getArticles(source, sort, minRelevance, stockCode, q, period, sentiment, null, null, pageQuery);
+                                                     String sentiment, String channel, PageQuery pageQuery) {
+        return getArticles(source, sort, minRelevance, stockCode, q, period, sentiment, channel, null, null, pageQuery);
     }
 
-    /** market·theme: 분류별 보기 (2026-11-18). 시장은 KOSPI·KOSDAQ, 테마는 stock_theme 이름 (없는 테마면 0건) */
+    /** market·theme: 분류별 보기 (팀 main 2026-11-18). 시장은 KOSPI·KOSDAQ, 테마는 stock_theme 이름 (없는 테마면 0건) */
     @Transactional(readOnly = true)
     public ListResponse<ArticleResponse> getArticles(String source, String sort, Integer minRelevance,
                                                      String stockCode, String q, String period,
-                                                     String sentiment, String market, String theme,
+                                                     String sentiment, String channel, String market, String theme,
                                                      PageQuery pageQuery) {
         String sourceType = toSourceType(source);
         checkSort(sort);
@@ -68,7 +71,7 @@ public class ArticleService {
         }
         String likeKeyword = SearchKeyword.escapeLike(SearchKeyword.normalize(q));
         return findPage(new Filter(sourceType, stockCode, minRelevanceDecimal, null, likeKeyword, toFrom(period),
-                        toSentiment(sentiment), StockCategory.market(market), StockCategory.theme(theme)),
+                        toSentiment(sentiment), toChannel(channel), StockCategory.market(market), StockCategory.theme(theme)),
                 sort, pageQuery);
     }
 
@@ -79,21 +82,23 @@ public class ArticleService {
     @Transactional(readOnly = true)
     public ListResponse<ArticleResponse> getWatchlistArticles(Long userId, String source, String sort,
                                                               Integer minRelevance, String sentiment,
-                                                              String period, PageQuery pageQuery) {
+                                                              String period, String channel, PageQuery pageQuery) {
         String sourceType = toSourceType(source);
         checkSort(sort);
         return findPage(new Filter(sourceType, null, toMinRelevance(minRelevance), userId, null, toFrom(period),
-                        toSentiment(sentiment), null, null),
+                        toSentiment(sentiment), toChannel(channel), null, null),
                 sort, pageQuery);
     }
 
     /** 조건에 맞는 기사 한 페이지 + 관련 종목 칩 (목록·관심 종목 글·검색이 같이 씀) */
     private ListResponse<ArticleResponse> findPage(Filter f, String sort, PageQuery pageQuery) {
+        // 요약을 기다리는 주요 공시 범위 = dart.py summarize_disclosures 와 같게 어제 0시부터. 날짜는 DB CURDATE() 대신 앱에서 KST 로 (docs/decisions.md)
+        LocalDateTime pendingSince = LocalDate.now(TimeUtils.KST).minusDays(1).atStartOfDay();
         long totalCount = articleMapper.countArticles(f.sourceType(), f.stockCode(), f.minRelevance(),
-                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), f.market(), f.theme());
+                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), f.channel(), pendingSince, f.market(), f.theme());
         List<ArticleRow> rows = articleMapper.findArticles(f.sourceType(), f.stockCode(), f.minRelevance(),
-                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), f.market(), f.theme(), sort,
-                pageQuery.limit(), pageQuery.offset());
+                f.watchUserId(), f.likeKeyword(), f.from(), f.sentiment(), f.channel(), pendingSince, f.market(), f.theme(),
+                sort, pageQuery.limit(), pageQuery.offset());
         if (rows.isEmpty()) {
             return new ListResponse<>(List.of(), totalCount);
         }
@@ -134,6 +139,15 @@ public class ArticleService {
     private static String toSentiment(String sentiment) {
         String value = sentiment == null || sentiment.isBlank() ? null : sentiment.toUpperCase();
         if (value != null && !SENTIMENTS.contains(value)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        return value;
+    }
+
+    /** 종류 조건: 없으면 null(둘 다), 대소문자 상관없이 NEWS/DISCLOSURE만. 그 밖은 400 */
+    private static String toChannel(String channel) {
+        String value = channel == null || channel.isBlank() ? null : channel.toUpperCase();
+        if (value != null && !CHANNELS.contains(value)) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         return value;

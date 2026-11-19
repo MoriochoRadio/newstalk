@@ -8,7 +8,7 @@
 - 화면: 제목 + 원문 링크 + 연결 종목. 요약·키워드·감성은 비움 (감성 비율 집계에서도 빠짐, sentiment NULL)
 - 제목은 짧고 문맥이 없어서 **보수적으로**: 띄어쓰기·문장부호로 자른 낱말이 사전 이름과 딱 맞을 때만 (조사 하나는 떼고 봄).
   부분 일치는 안 함 ("태양광"에서 '태양', "RISK"에서 'SK' 를 찾지 않게).
-  헷갈리는 이름(AMBIGUOUS 별칭과 같은 글자), 일반 단어 종목명(sns.COMMON_NAMES), 그룹 이름과 같은 지주사(SK·LG·한화…)는 뺌
+  헷갈리는 이름(AMBIGUOUS 별칭과 같은 글자), 일반 단어 종목명(COMMON_NAMES), 그룹 이름과 같은 지주사(SK·LG·한화…)는 뺌
   → "잘못 연결 < 못 찾음" (팀 원칙)
 """
 import re
@@ -16,12 +16,15 @@ import re
 from sqlalchemy import bindparam, text
 
 from hk_llm.core.db import get_engine
-from hk_llm.core.press_policy import title_only_presses
+from hk_llm.core.press_policy import FULL, POLICY, TITLE_ONLY, title_only_presses
 from hk_llm.core.util import get_logger
-from hk_llm.steps.sns import COMMON_NAMES
 from hk_llm.steps.step6_match import MARKET_WORDS, TYPE_WORDS, load_dictionary, norm
 
 log = get_logger(__name__)
+
+# 일반 단어와 같은 종목명: 제목에 있어도 그 회사 이야기인지 알 수 없어 뺌 (SNS 도 여기서 가져다 씀. 11/13 sns.py 에서 옮김)
+# ponytail: 손으로 고른 목록, 잘못 걸리는 종목이 보이면 추가
+COMMON_NAMES = ["대상", "동서", "고려", "대성", "동양", "서연", "일진", "세방", "삼양"]
 
 SEP = re.compile(r"[\s·ㆍ,，、.…\"'“”‘’\[\]()<>〈〉《》「」『』|/!?:;~=+&↑↓→▲▼]+")  # 마침표: "결렬에...대우건설"
 JOSA = ("에서", "으로", "에게", "까지", "부터", "이", "가", "은", "는", "을", "를", "의", "에", "와", "과", "도", "로", "만")
@@ -80,14 +83,30 @@ def decide(title, names, blocked):
 
 def purge_ai_results(engine, presses):
     """정책이 바뀌기 전에 만든 본문·AI 결과를 지우고 다시 처리하게 LISTED 로 되돌림. 지운 건수
-    RSS 뿐 아니라 지난 기사 받기(SITEMAP, 11/02 한경 사이트맵)로 모은 기사도 같은 언론사면 같이 (11/12)"""
-    sql = text("""UPDATE article SET body = NULL, summary = NULL, keywords = NULL, sentiment = NULL, companies = NULL,
-                         model = NULL, summarized_at = NULL, status = 'LISTED', last_error = NULL, retry_count = 0
-                  WHERE channel IN ('RSS', 'SITEMAP') AND press IN :p
-                    AND (body IS NOT NULL OR summary IS NOT NULL OR companies IS NOT NULL OR model IS NOT NULL
-                         OR status IN ('FETCHED', 'SUMMARIZED'))""").bindparams(bindparam("p", expanding=True))
+
+    - 사람이 정한 방침(press_policy.POLICY 가 FULL 이 아님): 그 언론사 기사 전체의 본문·AI 결과를 지움 (예전과 같음)
+    - 자동으로 바뀐 방침(rights.py 가 고지·표시를 보고 바꿈, 사람 확인 전): 본문은 지우되, 끝난 기사(DONE·NO_STOCK)의 요약은 남기고
+      처리 중인 기사(FETCHED·SUMMARIZED)만 제목만으로 되돌림. 자동 판단이 틀려도 지난 요약이 지워지지 않게 (지우면 복구 못 함,
+      다시 요약은 어제 이후만 됨). Slack 수집 점검 알림이 사람 확인을 요청하고, 사람이 POLICY 에 반영하면 그때 전체를 지움 (2026-11-10 지승현 검토)
+    RSS 뿐 아니라 지난 기사 받기(SITEMAP, 11/02 한경 사이트맵)로 모은 기사도 같은 언론사면 같이 (11/12)
+    """
+    confirmed = [p for p in presses if POLICY.get(p, (TITLE_ONLY, ""))[0] != FULL]
+    auto = [p for p in presses if p not in confirmed]
+    reset = """UPDATE article SET body = NULL, summary = NULL, keywords = NULL, sentiment = NULL, companies = NULL,
+                      model = NULL, summarized_at = NULL, status = 'LISTED', last_error = NULL, retry_count = 0
+               WHERE channel IN ('RSS', 'SITEMAP') AND press IN :p AND {cond}"""
+    n = 0
     with engine.begin() as conn:
-        return conn.execute(sql, {"p": presses}).rowcount
+        if confirmed:
+            n += conn.execute(text(reset.format(cond="""(body IS NOT NULL OR summary IS NOT NULL OR companies IS NOT NULL
+                                                         OR model IS NOT NULL OR status IN ('FETCHED', 'SUMMARIZED'))"""))
+                              .bindparams(bindparam("p", expanding=True)), {"p": confirmed}).rowcount
+        if auto:
+            n += conn.execute(text(reset.format(cond="status IN ('FETCHED', 'SUMMARIZED')"))
+                              .bindparams(bindparam("p", expanding=True)), {"p": auto}).rowcount
+            conn.execute(text("""UPDATE article SET body = NULL WHERE channel IN ('RSS', 'SITEMAP') AND press IN :p AND body IS NOT NULL""")
+                         .bindparams(bindparam("p", expanding=True)), {"p": auto})
+    return n
 
 
 def link_title_only(engine=None, redo=False):
@@ -97,6 +116,8 @@ def link_title_only(engine=None, redo=False):
     purged = purge_ai_results(engine, presses)
     names, _, _ = load_dictionary(engine)
     blocked = blocked_names(engine)
+    from hk_llm.steps.step7_group import has_column as has_group  # V13 같은 소식 묶음 칸
+    group_col = has_group(engine)
     sql = text("""SELECT article_id, title FROM article WHERE channel IN ('RSS', 'SITEMAP') AND press IN :p
                   AND status IN :st""").bindparams(bindparam("p", expanding=True), bindparam("st", expanding=True))
     statuses = ["LISTED", "SKIPPED", "FAILED"] + (["DONE", "NO_STOCK"] if redo else [])
@@ -106,12 +127,16 @@ def link_title_only(engine=None, redo=False):
     for r in rows:
         links = decide(r.title, names, blocked)
         with engine.begin() as conn:
+            # 다시 연결(--redo)해도 같은 소식 묶음은 이어 씀 (step6_match 와 같은 이유, 2026-11-10)
+            groups = dict(conn.execute(text("SELECT stock_code, group_article_id FROM article_stock WHERE article_id = :id"),
+                                       {"id": r.article_id}).all()) if group_col else {}
             conn.execute(text("DELETE FROM article_stock WHERE article_id = :id"), {"id": r.article_id})
             for code, name, main, rel in links:
-                conn.execute(text("""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason,
-                                         match_type, relevance, evidence, matched_keywords)
-                                     VALUES (:id, :code, :main, NULL, :reason, 'DIRECT', :rel, NULL, :kw)"""),
-                             {"id": r.article_id, "code": code, "main": main, "reason": REASON, "rel": rel, "kw": name[:300]})
+                conn.execute(text(f"""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason,
+                                         match_type, relevance, evidence, matched_keywords{', group_article_id' if group_col else ''})
+                                     VALUES (:id, :code, :main, NULL, :reason, 'DIRECT', :rel, NULL, :kw{', :grp' if group_col else ''})"""),
+                             {"id": r.article_id, "code": code, "main": main, "reason": REASON, "rel": rel, "kw": name[:300],
+                              "grp": groups.get(code)})
             conn.execute(text("UPDATE article SET status = :st, last_error = NULL WHERE article_id = :id"),
                          {"st": "DONE" if links else "NO_STOCK", "id": r.article_id})
         done += bool(links)

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hkteam2.stocknews.feedback.LinkFeedbackMapper">
+
+    <select id="linkExists" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM article_stock WHERE article_id = #{articleId} AND stock_code = #{stockCode})
+    </select>
+
+    <insert id="insert">
+        INSERT IGNORE INTO link_feedback (article_id, stock_code, user_id, kind)
+        VALUES (#{articleId}, #{stockCode}, #{userId}, #{kind})
+    </insert>
+</mapper>

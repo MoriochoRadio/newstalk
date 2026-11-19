@@ -27,6 +27,7 @@ from hk_llm.core.db import get_engine, to_db
 from hk_llm.core.util import get_logger
 from hk_llm.steps.step2_dedup import url_key
 from hk_llm.steps.step5_summary import MAX_TRIES, MODEL, STOP_ERRORS, _strip_tag, llm_call
+from hk_llm.steps.title_only import COMMON_NAMES  # 일반 단어와 같은 종목명은 SNS 에서도 뺌 (11/13 title_only 로 옮김)
 
 API = "https://naverapihub.apigw.ntruss.com/search/v1/"
 CHANNELS = {"cafearticle": "NAVER_CAFE", "blog": "NAVER_BLOG"}
@@ -35,9 +36,7 @@ DISPLAY = 20
 MAX_POSTS = 20  # 종목당 LLM 1번에 넣는 글 수 (비용 상한)
 SNS_RELEVANCE = 0.50  # 측정값이 아니라 규칙: 확인되지 않은 개인 글이라 뉴스(최대 1.00)보다 낮게 (요구사항 F-05)
 KEEP_DAYS = 7  # 네이버 검색 결과를 별도 DB 로 쌓아 두지 않으려고 (약관 7.3) 모은 지 7일 지나면 글을 지움. 하루 요약(sns_summary)은 남음
-# 일반 단어와 같은 종목명: 제목에 있어도 그 회사 이야기인지 알 수 없어 SNS 에서 뺌. ponytail: 손으로 고른 목록, 잘못 걸리는 종목이 보이면 추가
-COMMON_NAMES = ["대상", "동서", "고려", "대성", "동양", "서연", "일진", "세방", "삼양"]
-BLOG_PRESS = "네이버 블로그"  # 블로거 이름은 저장하지 않음
+BLOG_PRESS = "네이버 블로그"  # 블로거 이름은 저장하지 않음. 단 원문 링크(blog.naver.com/{아이디}/{번호})에 블로그 아이디가 들어감 — 링크가 필요해서 남기고 7일 뒤 글과 같이 지움
 WORD = re.compile("주가|주식|매수|매도|종목|증시|실적|목표가|배당|급등|급락|투자")
 AD = re.compile(r"리딩|문의|모집|상담")  # 글에만 씀. 리딩뱅크·공모주 모집처럼 금융 표현일 수 있어 LLM 답에는 안 씀
 BRIEF = re.compile(r"마감|시황|브리핑|뉴스|상한가|\[일간|\[검색|정리|일정|TOP")
