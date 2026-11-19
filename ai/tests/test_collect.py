@@ -350,7 +350,8 @@ def test_body_redirect_and_crawl_delay():
         with mock.patch.object(s4.requests, "get", side_effect=[hop("/article/2"), ok]) as get:
             assert s4._get("https://www.hankyung.com/article/1") is ok, "같은 사이트 안 리다이렉트는 따라감"
             assert get.call_args.args[0] == "https://www.hankyung.com/article/2"
-        for bad in ("https://evil.example.com/x", "http://www.hankyung.com/article/2"):
+        # www.yna.co.kr: 정한 언론사지만 다른 사이트(제목만 쓰는 곳) → 11/19 부터 같은 사이트 안에서만 따라감
+        for bad in ("https://evil.example.com/x", "http://www.hankyung.com/article/2", "https://www.yna.co.kr/view/1"):
             with mock.patch.object(s4.requests, "get", side_effect=[hop(bad)]) as get:
                 try:
                     s4._get("https://www.hankyung.com/article/1")

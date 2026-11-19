@@ -60,6 +60,10 @@ def test_step5_answer_checks():
     got = check(ask(sentiment="NEGATIVE", reason="기술료 수입 감소 우려가 제기된 가운데 주가가 16.01% 하락해 거래를 마쳤다."), "삼성전자", body)
     assert got.companies[0].sentiment == "UNCERTAIN"
     assert not price_only("저PBR 기업 공표 제도 시행 첫날 11.61% 상승하며 강세를 보였다.")
+    # 11/19 PR #131 검토 반례: 원인(판매·가격·지급·부양·수혜)이 있는 이유를 주가 움직임뿐으로 잘못 봤던 것
+    for reason in ("주가 부양책을 내놓았다.", "판매량이 20% 상승했다.", "D램 가격 10% 상승으로 수혜가 예상된다.",
+                   "주당 1,000원을 지급한다.", "금값 상승세로 수혜를 봤다."):
+        assert not price_only(reason), reason
 
     # 공시 요약은 숫자 검사를 안 함: 표 머리 단위("단위: 백만원")를 붙여 쓴 맞는 요약을 거부했음 (11/11 실제 공시 3/10)
     from hk_llm.steps import dart
