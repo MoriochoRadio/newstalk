@@ -20,6 +20,12 @@ public interface UserMapper {
 
     Optional<User> findById(Long userId);
 
+    int countWatchlist(Long userId);
+
+    int countPosts(Long userId);
+
+    int countComments(Long userId);
+
     void updatePassword(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
 
     void updateRecovery(@Param("userId") Long userId, @Param("question") String question,

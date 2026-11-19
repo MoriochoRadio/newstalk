@@ -9,7 +9,7 @@
   사이트맵 채우기(새 주소만)로는 안 잡힘 → 상태를 LISTED 로 돌려 4단계(본문)부터 다시. 유료 기사(SKIPPED)는 그대로
 
 - 대상: AI 수집 제한이 없는 한국경제만 (2026-11-03 robots.txt 확인. 조사표 docs/조사/robots_조사.md)
-  연합뉴스·서울경제·비즈워치는 AI 봇을 사이트 전체에서 막았고 연합인포맥스는 기사 끝에 AI 활용 금지
+  연합뉴스·서울경제·비즈워치는 robots.txt 에서 AI 봇(GPTBot 등)을 막았고(비즈워치는 Content-Signal ai-train=no, 학습만 금지) 연합인포맥스는 기사 끝에 AI 활용 금지
   → 실시간 RSS(요약 + 링크)만 하고 몇 달치를 모으는 과거분에서는 뺌
 - 같은 규칙: robots.txt, 사이트별 요청 간격, 유료 기사 건너뜀, 본문 7일 뒤 삭제 (collected_at 기준)
 - LLM 전에 코드로 거름: 매칭(on_topic)은 제목이나 본문 앞부분에 회사 이름이 있어야 연결하므로,
@@ -28,12 +28,12 @@ from sqlalchemy import bindparam, text
 
 from hk_llm.core.config import KST
 from hk_llm.core.db import get_engine, to_db
-from hk_llm.core.press_policy import FULL, TITLE_ONLY, policy, restrict
+from hk_llm.core.press_policy import FULL, TITLE_ONLY, policy, report_page_notice, restrict
 from hk_llm.core.util import get_logger
 from hk_llm.steps.rights import page_reservation, site_reservation
 from hk_llm.steps.robots import allowed, crawl_delay
 from hk_llm.steps.step2_dedup import url_key
-from hk_llm.steps.step4_body import MAX_DELAY, MIN_LEN, PAYWALL, _get, extract
+from hk_llm.steps.step4_body import MAX_DELAY, MIN_LEN, PAYWALL, _get, decode, extract, purge_old_bodies
 from hk_llm.steps.step5_summary import summarize_articles
 from hk_llm.steps.step6_match import LEAD_CHARS, load_dictionary, match_articles, norm
 
@@ -79,10 +79,15 @@ def pipeline_lock(engine, wait=600):
 
 
 def backfill_day(engine, press, day, names, count_only=False):
-    """(사이트맵 기사 수, 이름 있는 기사 수, 새로 저장 수)"""
-    # 11/17 QA: 지난 기사 받기도 실시간 수집과 같은 언론사 방침·AI 거부 표시를 따름 (예전엔 건너뜀)
-    if policy(press) != FULL:
-        log.warning("지난 기사 %s: 언론사 방침이 %s 라 본문을 받지 않음", press, policy(press))
+    """(사이트맵 기사 수, 이름 있는 기사 수, 새로 저장 수)
+    AI 이용 거부 표시는 실시간 수집(step4)과 같게 확인 (2026-11-12 보안 검토: 전에는 이 경로만 빠져 있었음)"""
+    if policy(press) != FULL:  # 이미 제목만·제외 → 바꿀 것 없음 (11/18: 여기서 restrict 를 부르면 방침을 가짜로 바꾼 시험이 진짜 방침 파일에 남았음)
+        log.warning("지난 기사 %s %s: 언론사 방침이 %s 라 본문 안 받음", press, day, policy(press))
+        return 0, 0, 0
+    why = site_reservation(SITEMAPS[press].format(day))
+    if why:
+        restrict(press, TITLE_ONLY, why)  # 이미 더 조심스러우면 아무것도 안 함
+        log.warning("지난 기사 %s %s: 본문 안 받음 (%s)", press, day, why)
         return 0, 0, 0
     res = _get(SITEMAPS[press].format(day))
     rows = sitemap_urls(res.text)
@@ -98,22 +103,27 @@ def backfill_day(engine, press, day, names, count_only=False):
     for key, (url, lastmod) in keys.items():
         if key in have or not allowed(url):
             continue
-        why = site_reservation(url)
-        if why:
-            restrict(press, TITLE_ONLY, why)
-            log.warning("지난 기사 %s: 사이트 AI 거부 표시 → 제목만으로 바꾸고 멈춤: %s", press, why)
+        delay = crawl_delay(url)
+        if delay > MAX_DELAY:  # 줄여서 지키면 robots.txt 위반 → 이 날은 그만 (step4 와 같은 규칙)
+            log.warning("지난 기사 %s: robots.txt Crawl-delay %s초 > %s초, 본문 안 받음", press, delay, MAX_DELAY)
             break
-        wait = last + min(crawl_delay(url), MAX_DELAY) - time.monotonic()
+        wait = last + delay - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         last = time.monotonic()
         try:
-            res_page = _get(url)
-            html = res_page.content
-        except Exception as e:  # 한 건 실패는 건너뜀
+            page = _get(url)
+        except Exception as e:  # 한 건 실패는 건너뜀 (리다이렉트가 범위 밖인 것 포함)
             log.warning("가져오기 실패 %s: %s", url, e)
             continue
-        if PAYWALL in html or page_reservation(html, res_page.headers):  # 유료 기사, 기사 끝 AI 이용 금지 고지
+        html = page.content
+        why = page_reservation(decode(html), page.headers)
+        if why:  # 이 기사는 저장 안 함. 서로 다른 기사 2건이면 언론사가 제목만으로 바뀌고 다음 날부터 위에서 멈춤
+            if report_page_notice(press, key, why):
+                log.warning("지난 기사 %s: AI 이용 거부 고지 → 중단 (%s)", press, why)
+                break
+            continue
+        if PAYWALL in html:
             continue
         body = extract(html, url)
         if not body or len(body) < MIN_LEN:
@@ -237,10 +247,11 @@ def backfill(start, end, engine=None, count_only=False, summarize_limit=200):
         day += timedelta(days=1)
     log.info("지난 기사 합계 %s~%s: 사이트맵 %d건, 이름 있음 %d건, 새로 저장 %d건", start, end, *total)
     if not count_only:
-        with pipeline_lock(engine):
+        with pipeline_lock(engine):  # 11/17 QA: 실시간 수집과 동시에 돌지 않게
             while summarize_articles(engine, summarize_limit, since=start):
                 pass
             match_articles(engine)
+            purge_old_bodies(engine)  # 요약·연결 끝난 본문은 바로 지움 (실시간 수집과 같게)
     return total
 
 

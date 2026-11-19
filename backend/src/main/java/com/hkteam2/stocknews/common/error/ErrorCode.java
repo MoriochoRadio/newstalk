@@ -30,21 +30,22 @@ public enum ErrorCode {
 
     // 기사
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "글을 찾을 수 없습니다."),
+    LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "이 글에 연결된 종목이 아닙니다."),
 
     // 회원
     DUPLICATE_LOGIN_ID(HttpStatus.CONFLICT, "이미 사용 중인 아이디입니다."),
     // 아이디가 틀렸는지 비밀번호가 틀렸는지 알려 주지 않음 (아이디 존재 여부를 숨김)
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
-    // 10분 안에 5번 틀리면 10분 동안 (LoginAttemptLimiter)
-    TOO_MANY_LOGIN_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "로그인을 여러 번 실패했습니다. 10분 뒤에 다시 시도해 주세요."),
+    // 10분 안에 5번 틀리면 1분 동안, 또 틀리면 2·4·8분… (LoginAttemptLimiter)
+    TOO_MANY_LOGIN_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "로그인을 여러 번 실패했습니다. 1분 뒤에 다시 시도해 주세요 (계속 틀리면 기다리는 시간이 늘어납니다)."),
     // 계정 관리 (2026-11-18). 401 은 화면이 '로그인이 풀림'으로 받으므로, 로그인한 채로 비밀번호를 잘못 넣은 것은 400
     WRONG_PASSWORD(HttpStatus.BAD_REQUEST, "비밀번호가 맞지 않습니다."),
     SAME_PASSWORD(HttpStatus.BAD_REQUEST, "지금 비밀번호와 다른 비밀번호를 입력해 주세요."),
     RECOVERY_NOT_SET(HttpStatus.NOT_FOUND, "확인 질문을 정하지 않았거나 없는 아이디입니다."),
     RECOVERY_ANSWER_MISMATCH(HttpStatus.BAD_REQUEST, "확인 질문의 답이 맞지 않습니다."),
     ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "입력한 질문·답·비밀번호와 맞는 계정이 없습니다."),
-    // 확인 질문·비밀번호 확인을 10분 안에 5번 틀리면 10분 동안 (LoginAttemptLimiter 를 다른 이름표로 같이 씀)
-    TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "여러 번 틀렸습니다. 10분 뒤에 다시 시도해 주세요."),
+    // 비밀번호 확인·확인 질문 답 (LoginAttemptLimiter 를 다른 이름표로). 계정당·전체 하루 제한은 더 길게 막힘 (AccountService)
+    TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "여러 번 틀려 잠시 막혔습니다. 시간이 지난 뒤 다시 시도해 주세요."),
 
     // 관심 종목
     ALREADY_IN_WATCHLIST(HttpStatus.CONFLICT, "이미 관심 종목에 있습니다."),

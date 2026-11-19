@@ -66,6 +66,8 @@
         - from: 이 시각 이후 작성된 기사만 (기간 today/7d/30d)
         - market·theme: 이 시장(KOSPI/KOSDAQ)·테마(stock_theme) 종목이 하나라도 연결된 기사만 (2026-11-18 분류별 보기)
         - sentiment: 이 감성인 기사만. 종목을 골랐으면 그 종목에 대한 감성, 아니면 주인공(is_main) 종목의 감성
+        - sentiment: 이 감성인 기사만. 종목을 골랐으면 그 종목에 대한 감성, 아니면 주인공(is_main) 종목의 감성. NONE = 판단 보류(감성 NULL)
+        - channel: NEWS = 공시가 아닌 글, DISCLOSURE = 공시(DART) (2026-11-11), MAJOR = 뉴스 + 주요 공시 (2026-11-17)
           (목록 카드에 보이는 감성과 같은 뜻)
     -->
     <sql id="listCondition">
@@ -114,7 +116,25 @@
                                   <when test="stockCode != null">AND x.stock_code = #{stockCode}</when>
                                   <otherwise>AND x.is_main = TRUE</otherwise>
                               </choose>
-                              AND x.sentiment = #{sentiment})
+                              <choose>
+                                  <when test="sentiment == 'NONE'">AND x.sentiment IS NULL</when>
+                                  <otherwise>AND x.sentiment = #{sentiment}</otherwise>
+                              </choose>)
+            </if>
+            <if test="channel == 'DISCLOSURE'">
+                AND a.channel = 'DART'
+            </if>
+            <if test="channel == 'NEWS'">
+                AND a.channel &lt;&gt; 'DART'
+            </if>
+            <if test="channel == 'MAJOR'">
+                <!-- 뉴스 + 주요 공시 (11/17: 공시를 전부 넣으면서 홈 '전체'가 일반 공시에 묻히지 않게).
+                     주요/일반은 수집할 때 dart.py important() 가 이미 가름 → 일반 공시는 last_error 에 ROUTINE 표시가 남음.
+                     11/18: 예전엔 제목을 REGEXP 로 다시 검사해서 홈을 열 때마다 DONE 글 전부에 정규식이 돌았음 -->
+                <![CDATA[AND NOT (a.channel = 'DART' AND a.last_error <=> '일반 공시: LLM 요약 대상 아님')]]>
+                <!-- 요약을 기다리는 주요 공시(dart.py summarize_disclosures 가 집을 범위: 어제 이후·요약 전·3번 미만 실패)는 홈 '전체'에서 뺌.
+                     11/18: 장 마감 뒤 공시가 몰리면 홈 첫 쪽이 '원문 확인 전' 공시로 덮였음. 요약되거나 3번 실패하면 다시 보임. '공시' 버튼에는 그대로 -->
+                <![CDATA[AND NOT (a.channel = 'DART' AND a.summarized_at IS NULL AND a.retry_count < 3 AND a.published_at >= ]]>#{pendingSince}<![CDATA[)]]>
             </if>
         </where>
     </sql>
@@ -157,36 +177,36 @@
     <select id="findStocksByArticleIds" resultMap="articleStockRow">
         SELECT s.article_id, s.stock_code, i.stock_name, s.is_main, s.sentiment, s.match_type, s.relevance,
                s.reason, s.evidence, s.matched_keywords, s.fact_type,
-               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
-                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE')
-               END AS same_news_count,
-               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
-                   (SELECT ga.article_id FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE'
-                    ORDER BY ga.published_at, ga.article_id LIMIT 1)
-               END AS first_article_id,
-               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
-                   (SELECT ga.press FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE'
-                    ORDER BY ga.published_at, ga.article_id LIMIT 1)
-               END AS first_press,
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE COALESCE(grp.same_news_count, 0) END AS same_news_count,
+               grp.first_article_id, grp.first_press,
                <!-- 같은 소식 묶음의 AI 판단 수 (11/17): 제목만 받은 기사(판단 없음)라도 같은 소식의 다른 기사가 받은 판단으로 화면이 링을 그림.
                     화면이 받은 한 쪽(20건) 안에 같은 소식 기사가 없어도 되게 서버가 셈. 묶이지 않았으면 NULL -->
-               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
-                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE' AND g.sentiment = 'POSITIVE')
-               END AS group_positive,
-               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
-                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE' AND g.sentiment = 'NEGATIVE')
-               END AS group_negative,
-               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE
-                   (SELECT COUNT(*) FROM article_stock g JOIN article ga ON ga.article_id = g.article_id
-                    WHERE g.stock_code = s.stock_code AND g.group_article_id = s.group_article_id AND ga.status = 'DONE' AND g.sentiment = 'NEUTRAL')
-               END AS group_neutral
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE COALESCE(grp.group_positive, 0) END AS group_positive,
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE COALESCE(grp.group_negative, 0) END AS group_negative,
+               CASE WHEN s.group_article_id IS NULL THEN NULL ELSE COALESCE(grp.group_neutral, 0) END AS group_neutral
         FROM article_stock s
         JOIN stock_info i ON i.stock_code = s.stock_code
+        <!-- 11/18: 예전엔 줄마다 하위 쿼리 3개(수·첫 기사·첫 언론사)를 따로 돌렸음 → 필요한 묶음만 한 번에 모아 붙임 -->
+        LEFT JOIN (
+            SELECT stock_code, group_article_id, same_news_count, article_id AS first_article_id, press AS first_press,
+                   group_positive, group_negative, group_neutral
+            FROM (
+                SELECT g.stock_code, g.group_article_id, ga.article_id, ga.press,
+                       COUNT(*) OVER (PARTITION BY g.stock_code, g.group_article_id) AS same_news_count,
+                       SUM(g.sentiment = 'POSITIVE') OVER (PARTITION BY g.stock_code, g.group_article_id) AS group_positive,
+                       SUM(g.sentiment = 'NEGATIVE') OVER (PARTITION BY g.stock_code, g.group_article_id) AS group_negative,
+                       SUM(g.sentiment = 'NEUTRAL') OVER (PARTITION BY g.stock_code, g.group_article_id) AS group_neutral,
+                       ROW_NUMBER() OVER (PARTITION BY g.stock_code, g.group_article_id
+                                          ORDER BY ga.published_at, ga.article_id) AS rn
+                FROM article_stock g
+                JOIN article ga ON ga.article_id = g.article_id AND ga.status = 'DONE'
+                WHERE g.group_article_id IN (
+                    SELECT w.group_article_id FROM article_stock w
+                    WHERE w.group_article_id IS NOT NULL AND w.article_id IN
+                    <foreach collection="articleIds" item="id" open="(" separator="," close=")">#{id}</foreach>)
+            ) t
+            WHERE t.rn = 1
+        ) grp ON grp.stock_code = s.stock_code AND grp.group_article_id = s.group_article_id
         WHERE s.article_id IN
         <foreach collection="articleIds" item="id" open="(" separator="," close=")">
             #{id}

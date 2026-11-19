@@ -243,3 +243,86 @@ def test_body_fetch_pauses_site_after_repeated_failures():
     assert [u.get("tries") for u in updates[3:]] == [None, None], "쉬는 동안의 기사는 재시도 횟수를 안 올림"
     assert all("차단기" in u["error"] for u in updates[3:])
     assert not b.allow("www.hankyung.com")
+
+
+# ---- 2026-11-10 지승현 검토: 시험 요청(half-open)이 결과 없이 끝나 차단기가 "시험 중"으로 굳던 문제 ----
+
+def test_breaker_probe_without_result_expires():
+    """시험 요청을 받고 success/failure 없이 끝나도 PROBE_TIMEOUT 뒤엔 다시 시험 (예전엔 영영 막힘)"""
+    from hk_llm.core.resilience import BASE_OPEN, PROBE_TIMEOUT
+
+    b, t = _breaker(), 1_000_000.0
+    b.failure("DART", "점검(800)", now=t, immediate=True)
+    assert b.allow("DART", now=t + BASE_OPEN), "시험 1번"
+    assert not b.allow("DART", now=t + BASE_OPEN + PROBE_TIMEOUT - 1), "결과를 기다리는 동안은 1번만"
+    assert b.allow("DART", now=t + BASE_OPEN + PROBE_TIMEOUT), "결과가 안 오면 다시 시험"
+
+
+def test_breaker_old_stuck_state_recovers():
+    """이 수정 전에 '시험 중'으로 굳은 상태 파일(probe_at 없음)도 다음 allow 에서 풀림"""
+    b = _breaker()
+    b._save({"DART": {"fails": 0, "opens": 1, "until": 1_000.0, "probing": True, "reason": "점검(800)"}})
+    assert b.allow("DART", now=2_000_000.0)
+
+
+def test_summarize_disclosures_does_not_take_probe():
+    """공시 요약은 쉬는 중인지 읽기만 → 시험 1번은 결과를 기록하는 공시 수집이 가져감"""
+    from hk_llm.core.resilience import BASE_OPEN
+    from hk_llm.steps import dart
+
+    b, t = _breaker(), 1_000_000.0
+    b.failure("DART", "점검(800)", now=t, immediate=True)
+    assert b.paused("DART", now=t + 1)
+    with mock.patch.object(dart, "breaker", b), mock.patch("time.time", return_value=t + 1), \
+            mock.patch.object(dart, "get_engine") as engine:
+        assert dart.summarize_disclosures(key="키") == 0, "쉬는 중이면 요약 안 함"
+    engine.assert_not_called()
+    assert not b.paused("DART", now=t + BASE_OPEN), "쉬는 시간이 지남"
+    assert b.allow("DART", now=t + BASE_OPEN), "시험은 아직 남아 있어 공시 수집이 가져감"
+
+
+def _body_rows(n):
+    return [mock.Mock(article_id=i, url=f"https://www.hankyung.com/article/{i}", retry_count=0, press="한국경제") for i in range(n)]
+
+
+def test_body_fetch_paywall_probe_closes_breaker():
+    """쉬는 시간이 끝나고 시험으로 뽑힌 기사가 유료 기사(결제 안내만 옴)여도 사이트는 정상 → 차단기가 닫히고 다음 기사도 요청"""
+    from hk_llm.steps import step4_body as s4
+
+    b = _breaker()
+    b._save({"www.hankyung.com": {"fails": 0, "opens": 1, "until": 1.0, "reason": "HTTP 403"}})  # 쉬는 시간이 이미 끝남
+    paywall = _response(200)
+    paywall._content = b"<html><div class='paywall-popup__body'>pay</div></html>"
+    page = _response(200)
+    page._content = b"<html>ok</html>"
+    engine = mock.MagicMock()
+    engine.connect.return_value.__enter__.return_value.execute.return_value.all.return_value = _body_rows(2)
+    updates = []
+    with mock.patch.object(s4, "breaker", b), mock.patch.object(s4, "reachable", return_value=True), \
+            mock.patch.object(s4, "allowed", return_value=True), mock.patch.object(s4, "crawl_delay", return_value=0), \
+            mock.patch.object(s4, "title_only_presses", return_value=[]), mock.patch.object(s4, "site_reservation", return_value=None), \
+            mock.patch.object(s4, "page_reservation", return_value=None), \
+            mock.patch.object(s4, "extract", side_effect=[None, "본문 " * 60]), \
+            mock.patch.object(s4, "_get", side_effect=[paywall, page]) as get, \
+            mock.patch.object(s4, "_update", side_effect=lambda *a, **k: updates.append(k)):
+        s4.fetch_bodies(engine)
+    assert get.call_count == 2, "유료 기사 뒤 다음 기사도 요청 (예전엔 '시험 중'으로 굳어 0번)"
+    assert updates[0]["status"] == "SKIPPED" and updates[1]["status"] == "FETCHED"
+    assert not b.issues(), "차단기 닫힘"
+
+
+def test_body_fetch_site_signal_does_not_take_probe():
+    """사이트 전체 AI 거부 표시로 건너뛰는 기사는 차단기 시험을 가져가지 않음 (요청 자체를 안 하므로)"""
+    from hk_llm.steps import step4_body as s4
+
+    b = _breaker()
+    b._save({"www.hankyung.com": {"fails": 0, "opens": 1, "until": 1.0, "reason": "HTTP 403"}})
+    engine = mock.MagicMock()
+    engine.connect.return_value.__enter__.return_value.execute.return_value.all.return_value = _body_rows(1)
+    with mock.patch.object(s4, "breaker", b), mock.patch.object(s4, "reachable", return_value=True), \
+            mock.patch.object(s4, "allowed", return_value=True), mock.patch.object(s4, "restrict"), \
+            mock.patch.object(s4, "title_only_presses", return_value=[]), \
+            mock.patch.object(s4, "site_reservation", return_value="robots.txt Content-Signal ai-input=no"), \
+            mock.patch.object(s4, "_update"):
+        s4.fetch_bodies(engine)
+    assert not b._load()["www.hankyung.com"].get("probing"), "시험은 남아 있음"

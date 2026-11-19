@@ -9,7 +9,9 @@
 - 점수 (match_setting 가중치 사용): 이름이 맞으면 기본 통과, 테마가 맞으면 점수만 올림 🧪 (2026-11-02)
   키워드가 테마와 안 맞아도 깎지 않음: 삼성전자 '3분기 실적' 기사가 테마 때문에 탈락하면 안 되므로
 - 주제 확인 (on_topic) 🧪 (2026-11-03): 시황·전망·지표 기사와 명단 기사는 연결 안 함, 그 밖에는 제목이나 본문 앞부분에 이름이 있거나 본문에 2번 이상 나와야 연결 (2번 조건 2026-11-03 추가)
-- 근거 문장 (evidence, F-06) 🧪 (2026-11-04): 그 종목 이름이 나온 본문 문장 중 LLM 이유와 단어가 가장 많이 겹치는 문장. LLM 비용 0
+- 근거 문장 (evidence, F-06): LLM 이 고른 문장 번호(11/06~)를 먼저 쓰고, 그 문장에 종목 이름이 없거나 번호가 이상하면
+  그 종목 이름이 나온 본문 문장 중 LLM 이유와 단어가 가장 많이 겹치는 문장 (2026-11-04 방식). 추가 LLM 비용 0
+- 이유(reason): LLM 답 그대로. 예전 답의 "(장기: 호재)" 꼬리는 붙이지 않음 (2026-11-10 화면에서 없앰)
 - 관련도 (relevance) 🧪 (2026-11-03): 제목 0.40 / 첫 부분 0.20 + 주인공 0.25 + 언급 횟수 최대 0.25 + 테마 0.10. 연결 여부와 별개로 화면 순서용
 - 결과: article_stock 에 기사 1 : 종목 N. 다시 매칭하면 그 기사의 연결을 지우고 새로 넣음
 """
@@ -81,12 +83,6 @@ def score(is_main, code, keywords, themes, s):
     return round(min(1.0, base + (s["theme_weight"] if hit else 0.0)), 2)
 
 
-def reason_text(c):
-    """화면에 나가는 이유. sentiment 는 그날 기준이고 장기 판단은 이유 뒤에 붙인다 (이전 요약에는 long_term 없음)"""
-    long_term = {"POSITIVE": "호재", "NEGATIVE": "악재", "NEUTRAL": "중립"}.get(c.get("long_term"))
-    return f"{c['reason']} (장기: {long_term})" if long_term else c["reason"]
-
-
 PAREN = re.compile(r"^(.+?)\s*\((.+)\)$")
 DIVISION = re.compile(r"^(.+?)\s+\S*(?:부문|사업부)$")  # "한화 건설부문", "삼성물산 패션부문", "삼성전자 DS부문" (05-2a)
 
@@ -139,7 +135,7 @@ def match_one(companies, keywords, dictionary, missing=None):
     return list(best.values())
 
 
-TAG_LINE = re.compile(r"^관련종목.*(?:\n|$)", re.M)
+TAG_LINE = re.compile(r"^관련종목.*\(\w{6}\).*(?:\n|$)", re.M)  # 종목코드가 붙은 목록 줄만. "관련종목 수가 늘었다" 같은 본문 문장은 남김
 
 
 def article_text(body):
@@ -352,19 +348,24 @@ def has_fact_type(engine):
         return bool(conn.execute(sql).scalar())
 
 
-def match_articles(engine=None, statuses=("SUMMARIZED",)):
+def match_articles(engine=None, statuses=("SUMMARIZED",), article_ids=None):
+    """article_ids: 이 기사들만 (시험이 자기 줄만 건드리게. 없으면 statuses 전체)"""
     engine = engine or get_engine()
     dictionary = load_dictionary(engine)
     fact_col = has_fact_type(engine)  # V14: 근거 문장의 사실 종류(FACT/PLAN/FORECAST/RUMOR)를 화면에 보여 주려고 저장
+    from hk_llm.steps.step7_group import has_column as has_group  # V13 같은 소식 묶음 칸
+    group_col = has_group(engine)
     # 이미 매칭한 기사(DONE·NO_STOCK)를 규칙을 바꾼 뒤 다시 매칭할 때, 본문이 7일 지나 지워진 기사는 빼고 예전 결과를 그대로 둠.
     # 본문이 없으면 on_topic 의 본문 검사(앞 200자·2번 이상 등장)를 못 해서 예전에 걸러진 종목이 되살아남
     # (2026-11-10 지승현 지적. 로컬 DB 로 재 보니 본문을 지운 채 다시 매칭하면 연결 +423개, NO_STOCK 131건이 화면에 다시 나옴)
     sql = text("""SELECT article_id, title, body, keywords, companies, published_at FROM article
                   WHERE status IN :st AND companies IS NOT NULL
                     AND (status = 'SUMMARIZED' OR (body IS NOT NULL AND body <> ''))"""
-               ).bindparams(bindparam("st", expanding=True))
+               + (" AND article_id IN :ids" if article_ids else "")).bindparams(bindparam("st", expanding=True))
+    if article_ids:
+        sql = sql.bindparams(bindparam("ids", expanding=True))
     with engine.connect() as conn:
-        rows = conn.execute(sql, {"st": list(statuses)}).all()
+        rows = conn.execute(sql, {"st": list(statuses), **({"ids": list(article_ids)} if article_ids else {})}).all()
     done = no_stock = 0
     missing = Counter()  # 사전에 없는 회사 이름 → 별칭 추가 후보
     for r in rows:
@@ -372,20 +373,23 @@ def match_articles(engine=None, statuses=("SUMMARIZED",)):
         found = match_one(json.loads(r.companies), keywords, dictionary, missing)
         found = on_topic(r.title, r.body, found, dictionary[0], r.published_at.year if r.published_at else None)
         with engine.begin() as conn:  # 한 기사의 연결 지우기·넣기·상태 바꾸기를 한 번에
-            # 본문이 7일 지나 지워진 기사는 근거를 다시 뽑을 수 없으므로 예전 근거를 이어 씀
-            old = dict(conn.execute(text("SELECT stock_code, evidence FROM article_stock WHERE article_id = :id"),
-                                    {"id": r.article_id}).all())
+            # 본문이 7일 지나 지워진 기사는 근거를 다시 뽑을 수 없으므로 예전 근거를 이어 씀.
+            # 같은 소식 묶음(group_article_id)도 이어 씀: 지우고 다시 넣으면 비워지는데 묶기(step7)는 최근 72시간만 다시 묶어서
+            # 규칙을 바꾼 뒤 전체 다시 매칭하면 지난 날짜의 "같은 소식 n건"·eventCount 가 사라졌음 (2026-11-10 지승현 검토)
+            old = {row[0]: row[1:] for row in conn.execute(
+                text(f"SELECT stock_code, evidence{', group_article_id' if group_col else ', NULL'} FROM article_stock WHERE article_id = :id"),
+                {"id": r.article_id}).all()}
             conn.execute(text("DELETE FROM article_stock WHERE article_id = :id"), {"id": r.article_id})
             for item in found:
                 code, c, sc, name = item
                 fact = c.get("fact_type") if c.get("fact_type") in FACT_TYPES else None
                 conn.execute(text(f"""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason,
-                                         match_type, relevance, evidence, matched_keywords{', fact_type' if fact_col else ''})
-                                     VALUES (:id, :code, :main, :sent, :reason, 'DIRECT', :rel, :ev, :kw{', :fact' if fact_col else ''})"""),
+                                         match_type, relevance, evidence, matched_keywords{', fact_type' if fact_col else ''}{', group_article_id' if group_col else ''})
+                                     VALUES (:id, :code, :main, :sent, :reason, 'DIRECT', :rel, :ev, :kw{', :fact' if fact_col else ''}{', :grp' if group_col else ''})"""),
                              {"id": r.article_id, "code": code, "main": c["is_main"], "sent": c["sentiment"],
-                              "reason": reason_text(c)[:500], "rel": relevance(r.title, r.body, item, keywords, dictionary),
-                              "ev": evidence(r.body, item, dictionary[0], r.title) if r.body else old.get(code),
-                              "kw": name[:300], "fact": fact})
+                              "reason": c["reason"][:500], "rel": relevance(r.title, r.body, item, keywords, dictionary),
+                              "ev": evidence(r.body, item, dictionary[0], r.title) if r.body else old.get(code, (None,))[0],
+                              "kw": name[:300], "fact": fact, "grp": old.get(code, (None, None))[1]})
             conn.execute(text("UPDATE article SET status = :st WHERE article_id = :id"),
                          {"st": "DONE" if found else "NO_STOCK", "id": r.article_id})
         done, no_stock = done + bool(found), no_stock + (not found)

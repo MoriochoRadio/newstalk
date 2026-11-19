@@ -456,6 +456,10 @@ def test_api_rules():
         assert client.post(url, headers={"X-Internal-Token": "wrong"}).status_code == 401
         assert client.post("/summaries/5930", headers=head).status_code == 422
         make.assert_not_called()
+    with mock.patch.dict(os.environ, {"AI_INTERNAL_TOKEN": "   "}), mock.patch.object(api, "regenerate") as make:
+        assert client.post(url, headers={"X-Internal-Token": "   "}).status_code == 401, "공백 토큰은 설정 안 된 것"
+        make.assert_not_called()
+    with mock.patch.dict(os.environ, {"AI_INTERNAL_TOKEN": "secret"}), mock.patch.object(api, "get_engine"),             mock.patch.object(api, "regenerate", return_value="새 요약") as make, mock.patch.object(api, "stored") as stored:
 
         stored.return_value = ("옛 요약", now - timedelta(minutes=1))
         got = client.post(url, headers=head).json()
@@ -475,3 +479,38 @@ def test_api_rules():
     with mock.patch.dict(os.environ, {"AI_INTERNAL_TOKEN": ""}), mock.patch.object(api, "regenerate") as make:
         assert client.post(url).status_code == 401, "서버에 토큰이 없으면 전부 거부"
         make.assert_not_called()
+
+
+def test_run_continues_when_all_rss_fail():
+    """RSS 가 전부 실패해도(인터넷 끊김·차단기) 공시·본문·요약·묶기는 계속하고, 실행 기록은 FAILED (2026-11-10 지승현 검토)"""
+    from hk_llm import run as r
+
+    engine = mock.MagicMock()
+    finish = []
+    engine.begin.return_value.__enter__.return_value.execute.side_effect = \
+        lambda sql, params=None: finish.append(params) or mock.Mock(lastrowid=7)
+    with mock.patch.object(r, "collect", side_effect=r.RssDown("RSS 전부 실패")), \
+            mock.patch.object(r, "health_check", return_value=[]), mock.patch.object(r, "report_health"), \
+            mock.patch.object(r, "collect_disclosures", return_value=2) as dart, mock.patch.object(r, "link_title_only"), \
+            mock.patch.object(r, "fetch_bodies", return_value={"bad_hosts": []}) as bodies, \
+            mock.patch.object(r, "summarize_articles", return_value=3) as summ, mock.patch.object(r, "match_articles"), \
+            mock.patch.object(r, "summarize_disclosures"), mock.patch.object(r, "save_groups") as groups, \
+            mock.patch.object(r, "purge_old_bodies"), mock.patch.object(r, "purge_old_sns"):
+        r._run(engine, 1, False)
+    assert dart.called and bodies.called and summ.called and groups.called, "나머지 단계는 계속"
+    last = finish[-1]
+    assert last["status"] == "FAILED" and "RSS 전부 실패" in last["err"] and last["c"] == 2 and last["s"] == 3, last
+
+
+def test_collect_counts_only_requested_feeds():
+    """제외(EXCLUDED) 언론사는 요청을 안 하므로 '전부 실패' 계산에서 뺌"""
+    from hk_llm import run as r
+
+    pressed = [u for p, urls in r.FEEDS.items() if p != "연합뉴스" for u in urls]
+    with mock.patch.object(r, "excluded_presses", return_value=["연합뉴스"]), \
+            mock.patch.object(r, "fetch_all", return_value=([], pressed)):
+        try:
+            r.collect(mock.MagicMock())
+            raise AssertionError("요청한 피드가 전부 실패면 RssDown")
+        except r.RssDown:
+            pass

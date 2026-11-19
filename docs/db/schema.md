@@ -25,6 +25,7 @@
 | `collect_run` | 수집·요약 실행 기록 | AI | 백엔드 | V5 | ✅ |
 | `stock_daily_summary` | 종목별 하루 종합 요약 | AI | 백엔드 | V5 | ✅ (AI가 나중에 채움) |
 | `llm_usage_daily` | LLM 하루 비용 (하루 상한을 모든 실행이 같이 셈) | AI | - | V16 | ✅ |
+| `link_feedback` | 사용자가 알려 준 틀린 기사-종목 연결 | 백엔드 | AI (`eval/feedback.py`) | V17 | ✅ |
 | `quote_snapshot` | 실시간 현재가 (종목당 1줄) — 확장 ①② | 백엔드 | 백엔드 | V10 | ✅ (KIS를 켠 서버만 채움) |
 | `quote_tick` | 실시간 체결 이력 (녹화본) — 확장 ①② | 백엔드 | 백엔드 | V10 | ✅ (KIS를 켠 서버만 채움) |
 | `quote_quarantine` | 해석하지 못한 실시간 메시지 원문 — 확장 ①② | 백엔드 | 백엔드 | V10 | ✅ |
@@ -288,7 +289,7 @@ erDiagram
 | 7 | created_at | DATETIME | | Y | CURRENT_TIMESTAMP | 가입 시각 |
 
 - UK `uk_users_login_id (login_id)`: 아이디 중복 금지
-- IDX `idx_users_recovery (recovery_question, recovery_answer_hmac)`: 아이디 찾기 (V17)
+- IDX `idx_users_recovery (recovery_question, recovery_answer_hmac)`: 아이디 찾기 (V17. 11/19 합치며 팀 번호로 맞춤, link_feedback 은 V18)
 - 탈퇴: 앱이 board_like → board_comment → board_post → watchlist → users 순서로 지움 (외래 키가 CASCADE 가 아니라서, 한 트랜잭션)
 - CHECK `ck_users_role`: `role IN ('USER', 'ADMIN')`
 
@@ -466,6 +467,20 @@ erDiagram
 - AI 의 모든 LLM 호출(`llm_call`)이 끝날 때마다 `INSERT … ON DUPLICATE KEY UPDATE` 로 **더하기만** 함 → 수집기 컨테이너·내 PC 실행이 동시에 써도 빠지지 않음
 - 하루 상한(`LLM_DAILY_USD`, 기본 $2)은 이 표의 오늘 `usd` 로 판단. DB 에 못 닿으면 그 실행만 예전처럼 `ai/logs/llm_usage.json` 파일로 셈
 
+### link_feedback · 사용자가 알려 준 틀린 연결 (V17)
+
+| # | Column Name | Data Type | Key | Not Null | Default | Comments |
+|---|---|---|---|---|---|---|
+| 1 | feedback_id | BIGINT | PK | Y | AUTO_INCREMENT | |
+| 2 | article_id | BIGINT | FK, UQ | Y | | 기사 (기사가 지워지면 같이 지움) |
+| 3 | stock_code | CHAR(6) | UQ | Y | | 틀렸다는 연결의 종목 |
+| 4 | user_id | BIGINT | FK, UQ | Y | | 알려 준 회원 (탈퇴하면 같이 지움) |
+| 5 | kind | VARCHAR(20) | UQ | Y | | `WRONG_STOCK` / `WRONG_SENTIMENT` (CHECK) |
+| 6 | created_at | DATETIME | | Y | CURRENT_TIMESTAMP | |
+
+- `article_stock` 이 아니라 (article_id, stock_code) 로 저장: AI 가 다시 연결해 `article_stock` 줄이 지워졌다 생겨도 기록이 남음
+- UNIQUE (article_id, stock_code, user_id, kind): 한 사람이 여러 번 눌러도 1건 → "몇 명이 알렸나"를 셀 수 있음
+
 ### quote_snapshot · 실시간 현재가 (V10, 확장 ①②)
 
 KIS 웹소켓 실시간 체결(H0STCNT0)로 종목마다 "지금 상태" 1줄을 덮어씀. `KIS_ENABLED=true`인 서버만 채움.
@@ -542,3 +557,4 @@ KIS 시세는 재배포 금지라 이 표의 데이터는 Git·외부에 내보�
 | 2026-11-10 | V14 | article_stock.fact_type + CHECK: 근거 문장의 사실 종류 (FACT/PLAN/FORECAST/RUMOR) |
 | 2026-11-10 | V15 | 공시 연결(`channel` DART)의 article_stock.relevance 를 NULL 로 (데이터만, 구조 변경 없음). 관련도는 기사용 점수라 공시는 비움 |
 | 2026-11-13 | V16 | llm_usage_daily: LLM 하루 비용을 DB 에서 셈 (전에는 수집기·내 PC 가 각자 파일에 적어 $2 상한이 따로 걸림) |
+| 2026-11-13 | V17 | link_feedback: 사용자가 알려 준 틀린 연결 ("연결이 틀렸어요" 버튼, AI 정답지 후보·규칙 점검용) |

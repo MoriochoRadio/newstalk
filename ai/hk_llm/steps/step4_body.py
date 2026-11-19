@@ -2,7 +2,7 @@
 
     from hk_llm.steps.step4_body import fetch_bodies, purge_old_bodies
     fetch_bodies()      # 어제 이후 LISTED 를 새 기사부터 처리. 결과 건수를 dict 로 돌려줌
-    purge_old_bodies()  # 7일 지난 본문 지우기 (요약은 남음)
+    purge_old_bodies()  # 요약·연결 끝난 본문 바로 지우기 (요약은 남음)
 
 - robots.txt 가 막은 주소, 유료 기사 → SKIPPED (다시 안 함)
 - robots.txt 를 확인하지 못한 사이트 → LISTED 그대로, 재시도 횟수에 안 넣음 (금지와 구별)
@@ -13,7 +13,7 @@ import re
 import time
 from collections import Counter
 from datetime import datetime, timedelta
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import lxml.html
 import requests
@@ -24,6 +24,7 @@ from hk_llm.core.db import get_engine
 from hk_llm.core.press_policy import TITLE_ONLY, report_page_notice, restrict, title_only_presses
 from hk_llm.steps.rights import is_wire, notice_holder, page_reservation, site_reservation
 from hk_llm.steps.robots import allowed, crawl_delay, reachable
+from hk_llm.steps.step6_match import TAG_LINE
 from hk_llm.core.resilience import breaker
 from hk_llm.core.util import get_logger, retry
 
@@ -40,7 +41,6 @@ BODY_XPATH = {
     "www.sisajournal-e.com": '//*[@id="article-view-content-div"]',  # 2026-11-12 기사 1건 확인 (2,148자)
     "www.insightkorea.co.kr": '//*[@id="article-view-content-div"]',  # 2026-11-12 기사 1건 확인 (1,682자)
     "biz.heraldcorp.com": '//article[@id="articleText"]',  # 2026-11-12 기사 2건 확인 (1,824·1,798자)
-    "www.newsis.com": '//*[@itemprop="articleBody"]',  # 2026-11-12 기사 2건 확인 (1,491·2,554자)
 }
 DROP = ".//figure | .//figcaption | .//aside | .//script | .//style | .//table"  # 사진 설명·광고·표는 요약에 방해
 TABLES_DROPPED = Counter()  # 사이트별 버린 표 수 (07: 표 손실 감시)
@@ -49,8 +49,9 @@ MIN_LEN = 100  # 이보다 짧으면 본문 없는 기사([속보] 등) → SKIP
 MAX_TRIES = 3
 BAD_HOST_FAILS = 3  # 한 실행에서 이만큼 실패하고 성공이 0건이면 사이트 구조 변경 등으로 보고 알림
 BATCH = 200  # ponytail: 1번 실행에 최대 200건 (사이트당 1초 → 최대 약 3분). 밀리면 다음 실행에서 이어감
-KEEP_DAYS = 7
-MAX_DELAY = 10  # robots.txt Crawl-delay 가 터무니없이 커도 1건당 최대 10초만 기다림
+KEEP_DAYS = 7  # 끝나지 않은 기사의 본문도 이만큼 지나면 지움
+FINISHED = ("DONE", "NO_STOCK", "FAILED", "SKIPPED")  # 종목 연결까지 끝났거나 포기한 기사: 본문을 다시 안 씀
+MAX_DELAY = 10  # robots.txt Crawl-delay 가 이보다 크면 그 사이트 본문은 받지 않음 (줄여서 지키면 위반. 전에는 10초로 잘랐음)
 
 log = get_logger(__name__)
 
@@ -109,15 +110,29 @@ def clean(text_):
         line = re.sub(r"\s+", " ", line).strip()
         # 기자 이메일·저작권·제보 안내 줄은 요약에 쓸모없음
         # "관련종목하림지주(003380), 팬오션(028670)": 파이낸셜뉴스가 본문 첫 줄에 붙이는 목록 (기사 글이 아님, 지주사·증권사가 섞임, 04-4a)
-        if (not line or re.search(r"\S+@\S+\.\S+|무단\s*전재", line) or line.startswith(("ⓒ", "©", "<저작권자", "제보는", "관련종목"))
+        if (not line or re.search(r"\S+@\S+\.\S+|무단\s*전재", line) or line.startswith(("ⓒ", "©", "<저작권자", "제보는"))
+                or TAG_LINE.match(line)
                 or line.endswith(" 송고")):  # 연합 "2026/11/02 10:30 송고"
             continue
         lines.append(line)
     return "\n".join(lines)
 
 
-def _get(url):
-    return retry(lambda: requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=15))
+class RedirectBlocked(Exception):
+    """리다이렉트 대상이 정한 언론사·https·robots.txt 허용 밖 → 요청하지 않음 (실패가 아니라 SKIPPED)"""
+
+
+def _get(url, hops=3):
+    """리다이렉트를 직접 따라가며 대상마다 확인 (2026-11-12 보안 검토: requests 는 확인 없이 따라감)"""
+    for _ in range(hops + 1):
+        res = retry(lambda: requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=15, allow_redirects=False))
+        if not res.is_redirect:
+            return res
+        url = urljoin(url, res.headers["Location"])
+        p = urlsplit(url)
+        if p.scheme != "https" or p.netloc not in BODY_XPATH or not allowed(url):
+            raise RedirectBlocked(f"리다이렉트 대상이 수집 범위 밖: {url[:200]}")
+    raise RedirectBlocked("리다이렉트가 너무 많음")
 
 
 def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
@@ -152,32 +167,35 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
             _update(engine, r.article_id, status="SKIPPED", error="robots.txt 금지")
             done["SKIPPED"] += 1
             continue
-        host = urlsplit(r.url).netloc
-        # 사이트 전체 AI 입력 거부 표시 (robots Content-Signal·tdmrep.json, 하루 1번) → 언론사를 제목만으로.
-        # 11/17 QA: 차단기 시험 허용(allow) 뒤에 이 검사로 건너뛰면 시험 결과가 안 남아 그 사이트가 영영 "시험 중"이었음 → 먼저 봄
-        why = site_reservation(r.url)
+        # 차단기보다 먼저: 기사를 요청하지 않고 건너뛰는 길이 차단기의 시험 요청을 가져가 결과 없이 끝나지 않게 (2026-11-10)
+        why = site_reservation(r.url)  # 사이트 전체 AI 입력 거부 표시 (robots Content-Signal·tdmrep.json, 하루 1번) → 언론사를 제목만으로
         if why:
             restrict(r.press, TITLE_ONLY, why)
             _update(engine, r.article_id, status="SKIPPED", error=f"AI 이용 거부 표시 → 제목만: {why}")
             done["SKIPPED"] += 1
             continue
+        host = urlsplit(r.url).netloc
         if not breaker.allow(host):  # 이 사이트가 계속 실패해서 쉬는 중 (resilience.py). 재시도 횟수는 안 올림
             _update(engine, r.article_id, status="LISTED", error="사이트가 잠시 쉬는 중 (차단기, 다음 실행에서 다시)")
             done["RETRY"] += 1
             continue
-        wait = last_hit.get(host, 0) + min(crawl_delay(r.url), MAX_DELAY) - time.monotonic()
+        delay = crawl_delay(r.url)
+        if delay > MAX_DELAY:  # 줄여서 지키면 robots.txt 위반 → 이 사이트는 본문을 받지 않음 (2026-11-12 보안 검토)
+            _update(engine, r.article_id, status="SKIPPED", error=f"robots.txt Crawl-delay {delay}초 > {MAX_DELAY}초")
+            done["SKIPPED"] += 1
+            continue
+        wait = last_hit.get(host, 0) + delay - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         try:
             last_hit[host] = time.monotonic()
             res = _get(r.url)
             html = res.content
-            why = page_reservation(html, res.headers)  # 기사 끝 "AI 학습·활용 금지" 고지·TDMRep 표시 (rights.py)
-            body = None if why else extract(html, r.url)
-            if why or (body is None and PAYWALL in html):
-                breaker.success(host)  # 페이지는 정상으로 받음 → 차단기 시험 성공 (11/17: 안 부르면 "시험 중"에서 안 풀림)
+            # decode: EUC-KR 사이트도 고지 글자를 읽게 (전에는 UTF-8 로만 읽음, 2026-11-12 보안 검토)
+            why = page_reservation(decode(html), res.headers)  # 기사 끝 "AI 학습·활용 금지" 고지·TDMRep 표시 (rights.py)
             if why:  # 이 기사는 본문을 저장하지 않음. 그 언론사 자신의 고지가 서로 다른 기사 2건이면 언론사 전체를 제목만으로
-                holder = notice_holder(html)
+                breaker.success(host)  # 페이지는 정상으로 옴 → 사이트 문제 아님. 안 하면 시험 요청이 결과 없이 끝나 차단기가 굳음 (2026-11-10)
+                holder = notice_holder(decode(html))  # EUC-KR 사이트도
                 if is_wire(r.press, holder):  # 다른 곳 기사를 실은 것(예: 연합 전재) → 이 기사만 건너뜀, 언론사 방침엔 안 셈
                     why = f"{holder} 전재 기사 고지: {why}"
                 else:
@@ -185,7 +203,9 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
                 _update(engine, r.article_id, status="SKIPPED", error=f"AI 이용 거부 고지 → 본문 안 씀: {why}")
                 done["SKIPPED"] += 1
                 continue
+            body = extract(html, res.url or r.url)  # 리다이렉트로 다른 언론사 주소가 되면 그 사이트의 본문 칸
             if body is None and PAYWALL in html:
+                breaker.success(host)  # 유료 안내 페이지도 정상 응답 (한경 기사 약 1/3). 위와 같은 이유
                 _update(engine, r.article_id, status="SKIPPED", error="유료 기사 (본문 안 줌)")
                 done["SKIPPED"] += 1
                 continue
@@ -196,6 +216,10 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
                 _update(engine, r.article_id, status="SKIPPED", error=f"본문 없음 ({len(body)}자)")
                 done["SKIPPED"] += 1
                 continue
+        except RedirectBlocked as e:  # 사이트 문제가 아니라 우리가 안 따라간 것 → 차단기·재시도 횟수 안 씀
+            _update(engine, r.article_id, status="SKIPPED", error=str(e))
+            done["SKIPPED"] += 1
+            continue
         except Exception as e:
             breaker.failure_from(host, e)  # 429·503 은 바로, 그 밖(403·구조 변경 등)은 연속 3번이면 이 사이트를 쉼
             tries = r.retry_count + 1
@@ -231,12 +255,14 @@ def _update(engine, article_id, status, body=None, error=None, tries=None):
 
 
 def purge_old_bodies(engine=None):
-    """수집한 지 7일 지난 본문을 지움 (결정사항: 언론사 AI 정책). 지운 건수를 돌려줌"""
-    sql = text("UPDATE article SET body = NULL WHERE body IS NOT NULL AND collected_at < NOW() - INTERVAL :d DAY")
+    """요약·종목 연결이 끝난 기사의 본문을 바로 지움 (2026-11-12 사용자: 요약만 남김). 지운 건수를 돌려줌
+    끝나지 않은 기사(요약 대기 FETCHED, 연결 대기 SUMMARIZED)는 다음 단계가 본문을 써서 남기고, 그래도 7일 지나면 지움"""
+    sql = text("UPDATE article SET body = NULL WHERE body IS NOT NULL "
+               "AND (status IN :done OR collected_at < NOW() - INTERVAL :d DAY)").bindparams(bindparam("done", expanding=True))
     with (engine or get_engine()).begin() as conn:
-        n = conn.execute(sql, {"d": KEEP_DAYS}).rowcount
+        n = conn.execute(sql, {"done": list(FINISHED), "d": KEEP_DAYS}).rowcount
     if n:
-        log.info("7일 지난 본문 %d건 삭제", n)
+        log.info("본문 %d건 삭제 (요약·연결 끝남 또는 7일 지남)", n)
     return n
 
 

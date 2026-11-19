@@ -703,7 +703,7 @@ async function renderArticle(id) {
     return '<div class="stock-row"><div class="stock-row-head">'
       + '<a href="#/stock/' + encodeURIComponent(s.stockCode) + '">' + esc(s.stockName) + '</a>'
       + (matchLabel(s.matchType) ? '<span class="tag">' + matchLabel(s.matchType) + '</span>' : '')
-      + (s.isMain ? '<span class="tag">주인공</span>' : '')
+      + (s.isMain ? '<span class="tag">중심</span>' : '')
       + sentiHtml(s.sentiment)
       + (rel === null ? '' : '<span class="bar" aria-hidden="true"><i style="width:' + rel + '%"></i></span><b>' + rel + '%</b>')
       + '</div>'

@@ -64,6 +64,16 @@ class ApiRateLimitFilterTest {
     }
 
     @Test
+    void 주소_글자를_인코딩해도_같은_API_로_센다() throws Exception {
+        // 11/19 보안 검토: /%61pi/... 는 디코드하면 /api/... 인데 세지 않아 제한을 지나갔음
+        var filter = ApiRateLimitFilterAccess.create(2, clock);
+        assertThat(call(filter, "1.1.1.1", "/api/articles")).isEqualTo(200);
+        assertThat(call(filter, "1.1.1.1", "/%61pi/articles")).isEqualTo(200);
+        assertThat(call(filter, "1.1.1.1", "/%61pi/articles")).isEqualTo(429);
+        assertThat(call(filter, "1.1.1.1", "/api;x=1/articles")).isEqualTo(429);
+    }
+
+    @Test
     void api_가_아닌_주소와_0_은_세지_않는다() throws Exception {
         var filter = ApiRateLimitFilterAccess.create(1, clock);
         for (int i = 0; i < 5; i++) {

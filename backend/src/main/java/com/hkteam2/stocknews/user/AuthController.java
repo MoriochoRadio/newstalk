@@ -44,10 +44,11 @@ public class AuthController {
     }
 
     @Operation(summary = "로그인", description = "성공하면 JWT를 발급합니다. 아이디나 비밀번호가 틀리면 401 INVALID_CREDENTIALS. "
-            + "같은 아이디·같은 곳에서 10분 안에 5번 틀리면 10분 동안 429 TOO_MANY_LOGIN_ATTEMPTS")
+            + "같은 아이디·같은 곳에서 10분 안에 5번 틀리면 1분 동안 429 TOO_MANY_LOGIN_ATTEMPTS")
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
-        // 프록시 없이 바로 받으므로 접속한 주소를 그대로 씀 (X-Forwarded-For 는 누구나 꾸밀 수 있어 믿지 않음)
+        // 접속한 사람의 IP. 화면은 nginx(frontend 컨테이너)를 거쳐 오므로, 내부망에서 온 요청일 때만 Tomcat 이 X-Forwarded-For 를 읽어 바꿔 줌
+        // (application.yml server.forward-headers-strategy). 밖에서 바로 온 요청의 X-Forwarded-For 는 믿지 않음 (2026-11-16)
         return userService.login(request, http.getRemoteAddr());
     }
 
@@ -95,14 +96,16 @@ public class AuthController {
         return accountService.questions();
     }
 
-    @Operation(summary = "비밀번호 찾기 1단계: 내 질문 보기", description = "없는 아이디이거나 질문을 정하지 않았으면 404 RECOVERY_NOT_SET")
+    @Operation(summary = "비밀번호 찾기 1단계: 내 질문 보기", description = "없는 아이디이거나 질문을 정하지 않았으면 404 RECOVERY_NOT_SET."
+            + " 같은 곳에서 10분 안에 404 가 20번이면 10분 동안 429 TOO_MANY_ATTEMPTS (가입자 목록 모으기 막기)")
     @PostMapping("/recovery/question")
-    public AccountResponses.Question questionOf(@Valid @RequestBody AccountRequests.AskQuestion request) {
-        return accountService.questionOf(request.loginId());
+    public AccountResponses.Question questionOf(@Valid @RequestBody AccountRequests.AskQuestion request,
+                                                HttpServletRequest http) {
+        return accountService.questionOf(request.loginId(), http.getRemoteAddr());
     }
 
     @Operation(summary = "비밀번호 찾기 2단계: 새 비밀번호로", description = "답이 맞으면 새 비밀번호로 바꿉니다 (204)."
-            + " 답이 틀리면 400 RECOVERY_ANSWER_MISMATCH, 10분 안에 5번 틀리면 429 TOO_MANY_ATTEMPTS")
+            + " 답이 틀리면 400 RECOVERY_ANSWER_MISMATCH, 같은 곳에서 10분 안에 5번 또는 어디서든 하루 10번 틀리면 429 TOO_MANY_ATTEMPTS")
     @PostMapping("/recovery/reset")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@Valid @RequestBody AccountRequests.ResetPassword request, HttpServletRequest http) {
@@ -110,7 +113,8 @@ public class AuthController {
     }
 
     @Operation(summary = "아이디 찾기", description = "확인 질문·답과 비밀번호가 모두 맞는 계정의 아이디."
-            + " 없으면 404 ACCOUNT_NOT_FOUND, 10분 안에 5번 틀리면 429 TOO_MANY_ATTEMPTS")
+            + " 없으면 404 ACCOUNT_NOT_FOUND, 같은 곳에서 10분 안에 5번 틀리면 429 TOO_MANY_ATTEMPTS."
+            + " 서비스 전체에서 하루 20번 틀린 뒤로는 틀릴 때마다 1시간 동안 429")
     @PostMapping("/recovery/find-id")
     public AccountResponses.FoundLoginId findLoginId(@Valid @RequestBody AccountRequests.FindLoginId request,
                                                      HttpServletRequest http) {

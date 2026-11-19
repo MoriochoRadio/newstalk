@@ -5,7 +5,8 @@
     why = site_reservation(url)             # 사이트 전체 (하루 1번 캐시): 이유 문장 또는 None
     python -m hk_llm.steps.rights           본문을 쓰는 언론사의 지금 상태 확인 (요청: 사이트마다 robots.txt·tdmrep.json·기사 1건)
 
-찾으면 press_policy.restrict(언론사, TITLE_ONLY, 이유) → 다음 실행부터 본문·LLM 안 씀, 예전 AI 결과는 title_only 가 지움, Slack 알림
+찾으면 press_policy.restrict(언론사, TITLE_ONLY, 이유) → 다음 실행부터 본문·LLM 안 씀, Slack 알림.
+끝난 기사의 지난 요약은 사람이 확인하고 POLICY 에 반영할 때까지 남김 (자동 판단이 틀릴 수 있어서, title_only.purge_ai_results)
 
 왜 (원문 확인. 백엔드1 로컬 기록 ai-improve/24):
 - 11/05 까지 연합뉴스·서울경제·연합인포맥스 기사 끝 "AI 학습 및 활용 금지"를 사람이 놓쳐 본문을 요약했음 (ai-improve/02)

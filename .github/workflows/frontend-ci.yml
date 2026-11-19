@@ -1,6 +1,6 @@
 # 프론트엔드 자동 검사 (CI)
 # frontend/ 를 바꾼 PR을 열거나 push가 더 생기면, 그리고 main에 merge되면
-# GitHub가 빈 컴퓨터를 빌려 npm ci → 코드 검사(lint) → 빌드를 돌린다. 결과는 PR 화면에 ✅/❌
+# GitHub가 빈 컴퓨터를 빌려 npm ci → 코드 검사(lint) → 시험(npm test) → 빌드를 돌린다. 결과는 PR 화면에 ✅/❌
 # 빌드가 되면 화면이 최소한 열린다는 뜻 (API 연결이 맞는지는 브라우저로 눌러 봐야 함: frontend/src/api/README.md)
 
 name: frontend-ci
@@ -46,6 +46,10 @@ jobs:
 
       - name: 코드 검사
         run: npm run lint
+
+      # 변환 함수 시험 + 가짜 API 로 앱 전체를 띄워 홈·종목 탭·로그인·관심 종목이 깨지지 않는지 (src/**/*.test.js(x))
+      - name: 시험
+        run: npm test
 
       - name: 빌드
         run: npm run build

@@ -128,6 +128,58 @@ class StockApiTest extends ApiTestSupport {
     }
 
     @Test
+    void 오늘_글이_없으면_이슈_순위는_글이_있는_가장_최근_날로() throws Exception {
+        // 이른 아침·주말·수집 멈춤: 오늘 0건이면 빈 화면 대신 어제(글이 있는 가장 최근 날) 순위와 그 날짜
+        link(insertArticle("네이버 어제", "NEWS", "DONE", yesterday()), NAVER, 0.9);
+        link(insertArticle("기아 그저께", "NEWS", "DONE", yesterday().minusDays(1)), KIA, 0.9);   // 그 전날은 안 섞음
+
+        mvc.perform(get("/api/stocks/issues"))
+                .andExpect(jsonPath("$.date").value(yesterday().toLocalDate().toString()))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].stockCode").value(NAVER));
+    }
+
+    @Test
+    void 오늘_글이_있으면_이슈_순위는_오늘_날짜() throws Exception {
+        // 한 테스트 안에서 같은 조회를 두 번 하면 MyBatis 가 첫 결과를 다시 줌(같은 트랜잭션 캐시) → 따로 나눔
+        link(insertArticle("네이버 어제", "NEWS", "DONE", yesterday()), NAVER, 0.9);
+        link(insertArticle("기아 오늘", "NEWS", "DONE", today(1)), KIA, 0.9);
+        mvc.perform(get("/api/stocks/issues"))
+                .andExpect(jsonPath("$.date").value(today(0).toLocalDate().toString()))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].stockCode").value(KIA));
+    }
+
+    @Test
+    void 오늘_요약도_글도_없으면_가장_최근_요약_날의_요약과_감성_비율() throws Exception {
+        jdbc.update("""
+                INSERT INTO stock_daily_summary (stock_code, summary_date, news_summary, sns_summary, generated_at)
+                VALUES (?, ?, '기아 어제 요약', NULL, ?)
+                """, KIA, yesterday().toLocalDate(), yesterday());
+        link(insertArticle("어제 좋은 소식", "NEWS", "DONE", yesterday()), KIA, "POSITIVE", null, true);
+
+        mvc.perform(get("/api/stocks/{code}/summary", KIA))
+                .andExpect(jsonPath("$.date").value(yesterday().toLocalDate().toString()))
+                .andExpect(jsonPath("$.newsSummary").value("기아 어제 요약"))
+                .andExpect(jsonPath("$.sentiment.articleCount").value(1))
+                .andExpect(jsonPath("$.sentiment.positive").value(100));
+    }
+
+    @Test
+    void 오늘_글이_있으면_어제_요약이_있어도_오늘_기준() throws Exception {
+        // 오늘 요약은 아직 없음 → null (어제 요약을 오늘 것처럼 보이지 않음), 감성은 오늘 글만
+        jdbc.update("""
+                INSERT INTO stock_daily_summary (stock_code, summary_date, news_summary, sns_summary, generated_at)
+                VALUES (?, ?, '기아 어제 요약', NULL, ?)
+                """, KIA, yesterday().toLocalDate(), yesterday());
+        link(insertArticle("오늘 나쁜 소식", "NEWS", "DONE", today(1)), KIA, "NEGATIVE", null, true);
+        mvc.perform(get("/api/stocks/{code}/summary", KIA))
+                .andExpect(jsonPath("$.date").value(today(0).toLocalDate().toString()))
+                .andExpect(jsonPath("$.newsSummary").value(nullValue()))
+                .andExpect(jsonPath("$.sentiment.negative").value(100));
+    }
+
+    @Test
     void 이슈_순위는_기본이_뉴스만_SNS는_따로() throws Exception {
         link(insertArticle("기아 뉴스", "NEWS", "DONE", today(1)), KIA, 0.9);
         for (int i = 1; i <= 3; i++) {   // SNS가 더 많아도 기본 순위에는 안 들어감

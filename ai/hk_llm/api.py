@@ -64,7 +64,7 @@ def health():
 def regenerate_summary(stock_code: Annotated[str, Path(pattern=r"^[0-9A-Z]{6}$")],
                        x_internal_token: Annotated[str, Header()] = ""):
     """오늘 종합 요약을 새로 만듦. 10분 안에 또 부르면 저장된 것을 그대로 돌려줌 (regenerated=false)"""
-    token = os.environ.get("AI_INTERNAL_TOKEN")
+    token = (os.environ.get("AI_INTERNAL_TOKEN") or "").strip()  # 공백만 있으면 없는 것 (백엔드 isBlank 와 같게)
     if not token or not secrets.compare_digest(x_internal_token.encode(), token.encode()):
         raise HTTPException(401, "내부 토큰이 맞지 않음")
     engine, now = get_engine(), datetime.now(KST)

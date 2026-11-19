@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.hkteam2.stocknews.support.ApiTestSupport;
 
@@ -112,6 +113,93 @@ class AccountApiTest extends ApiTestSupport {
                         .content("{\"loginId\":\"zzacc05\",\"answer\":\"초코\",\"newPassword\":\"resetpass1\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("TOO_MANY_ATTEMPTS"));
+    }
+
+    /** 다른 곳(IP)에서 보낸 요청 */
+    private static RequestPostProcessor from(String ip) {
+        return req -> {
+            req.setRemoteAddr(ip);
+            return req;
+        };
+    }
+
+    @Test
+    void 비밀번호_찾기는_접속_주소를_바꿔도_계정당_하루_10번까지() throws Exception {
+        // 11/19 보안 검토: 주소별 제한만 있어 주소를 바꿔 가며 답을 맞혀 볼 수 있었음
+        String token = tokenOf("zzacc10");
+        setRecovery(token, "FIRST_PET", "초코");
+        String wrong = "{\"loginId\":\"zzacc10\",\"answer\":\"보리\",\"newPassword\":\"resetpass1\"}";
+        for (int i = 0; i < 10; i++) {
+            mvc.perform(post("/api/auth/recovery/reset").with(from("10.9.0." + i)).contentType(JSON).content(wrong))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(post("/api/auth/recovery/reset").with(from("10.9.1.1")).contentType(JSON)
+                        .content("{\"loginId\":\"zzacc10\",\"answer\":\"초코\",\"newPassword\":\"resetpass1\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_ATTEMPTS"));
+        // 로그인은 막히지 않음
+        mvc.perform(post("/api/auth/login").contentType(JSON).content(loginJson("zzacc10", PASSWORD)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 질문_보기에서_없는_아이디를_계속_넣으면_429() throws Exception {
+        // 11/19 QA: 제한 없이 아이디를 넣어 가입자 목록을 모을 수 있었음
+        for (int i = 0; i < 20; i++) {
+            mvc.perform(post("/api/auth/recovery/question").with(from("10.8.0.1")).contentType(JSON)
+                            .content("{\"loginId\":\"zznobody" + i + "\"}"))
+                    .andExpect(status().isNotFound());
+        }
+        mvc.perform(post("/api/auth/recovery/question").with(from("10.8.0.1")).contentType(JSON)
+                        .content("{\"loginId\":\"zznobody99\"}"))
+                .andExpect(status().isTooManyRequests());
+        // 다른 곳은 그대로
+        mvc.perform(post("/api/auth/recovery/question").with(from("10.8.0.2")).contentType(JSON)
+                        .content("{\"loginId\":\"zznobody99\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 비밀번호_찾기_2단계로도_없는_아이디를_계속_넣으면_429() throws Exception {
+        // 11/19 보안 검토: 아이디마다 새로 세는 제한이라 2단계로 가입자 목록을 모을 수 있었음
+        for (int i = 0; i < 20; i++) {
+            mvc.perform(post("/api/auth/recovery/reset").with(from("10.8.1.1")).contentType(JSON)
+                            .content("{\"loginId\":\"zzghost" + i + "\",\"answer\":\"x\",\"newPassword\":\"resetpass1\"}"))
+                    .andExpect(status().isNotFound());
+        }
+        mvc.perform(post("/api/auth/recovery/reset").with(from("10.8.1.1")).contentType(JSON)
+                        .content("{\"loginId\":\"zzghost99\",\"answer\":\"x\",\"newPassword\":\"resetpass1\"}"))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void 아이디_찾기는_성공해도_틀린_횟수를_지우지_않는다() throws Exception {
+        // 11/19 보안 검토: 자기 계정으로 한 번 성공해 횟수를 0 으로 돌릴 수 있었음
+        String token = tokenOf("zzacc12");
+        setRecovery(token, "CHILDHOOD_FRIEND", "철수");
+        String wrong = "{\"question\":\"CHILDHOOD_FRIEND\",\"answer\":\"철수\",\"password\":\"wrongpass1\"}";
+        String right = "{\"question\":\"CHILDHOOD_FRIEND\",\"answer\":\"철수\",\"password\":\"" + PASSWORD + "\"}";
+        for (int i = 0; i < 4; i++) {
+            mvc.perform(post("/api/auth/recovery/find-id").with(from("10.8.2.1")).contentType(JSON).content(wrong))
+                    .andExpect(status().isNotFound());
+        }
+        mvc.perform(post("/api/auth/recovery/find-id").with(from("10.8.2.1")).contentType(JSON).content(right))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/auth/recovery/find-id").with(from("10.8.2.1")).contentType(JSON).content(wrong))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/auth/recovery/find-id").with(from("10.8.2.1")).contentType(JSON).content(right))
+                .andExpect(status().isTooManyRequests()); // 5번째 틀린 뒤라 맞아도 429
+    }
+
+    @Test
+    void 휴대폰_번호_질문은_더_고를_수_없다() throws Exception {
+        // 답이 숫자 4자리라 맞혀 보기 쉬움 (11/19)
+        String token = tokenOf("zzacc11");
+        mvc.perform(get("/api/auth/recovery/questions"))
+                .andExpect(jsonPath("$[?(@.code == 'FIRST_PHONE')]").isEmpty());
+        mvc.perform(put("/api/auth/me/recovery").header("Authorization", bearer(token)).contentType(JSON)
+                        .content("{\"password\":\"" + PASSWORD + "\",\"question\":\"FIRST_PHONE\",\"answer\":\"1234\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

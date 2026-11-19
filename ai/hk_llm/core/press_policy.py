@@ -14,7 +14,7 @@ import json
 from datetime import datetime
 
 from hk_llm.core.config import KST, LOG_DIR
-from hk_llm.core.util import get_logger
+from hk_llm.core.util import get_logger, write_json
 
 FULL = "FULL"
 TITLE_ONLY = "TITLE_ONLY"
@@ -28,6 +28,7 @@ POLICY = {
     "연합인포맥스": (TITLE_ONLY, "기사 끝 '<저작권자 (c) 연합인포맥스, 무단전재 및 재배포 금지, AI 학습 및 활용 금지>'"),
     # 규약에 'AI 및 대량 크롤링 방지' 조항을 따로 둠 → 제외
     "아주경제": (EXCLUDED, "규약 '인공지능(AI)및 대량 크롤링 방지 … 자동화 도구(로봇, 매크로, 스파이더, 스크래퍼 등)를 활용하는 행위를 허용치 않는다'"),
+    "뉴시스": (EXCLUDED, "이용약관 제4장 AI 학습 및 크롤링 제한: 자동화 도구로 수집 금지, AI 학습·크롤링은 '영리·비영리·공익 목적에 관계없이' 사전 서면 합의 (11/13 확인, 11/16 FULL → 제외)"),
     # 기사 끝 AI 고지 없음 → 본문 요약. 규약의 일반 조항은 알고 허용 (11/12 팀 결정)
     "한국경제": (FULL, "기사 끝 AI 고지 없음, robots 허용. 참고: 이용약관 19조 자동 수집·AI 학습 데이터 이용은 사전 동의 (우리는 학습 안 함)"),
     "파이낸셜뉴스": (FULL, "기사 끝 AI 고지 없음, robots 허용. 참고: 저작권 규약 '비영리라도 정보서비스 사용은 사전허가'"),
@@ -37,7 +38,6 @@ POLICY = {
     "시사저널e": (FULL, "저작권보호정책 2조 '승낙 없이 복제, 출판, 전송, 배포, 판매, 변형 … 금지'뿐, 크롤링·AI·정보서비스 조항 없음. 기사 끝 AI 문구 없음 (11/12)"),
     "인사이트코리아": (FULL, "저작권보호정책은 시사저널e 와 같음. '생성형 AI 활용 준칙'은 자사 기자의 AI 사용 지침(외부 이용 제한 아님). robots 는 GPTBot 만 차단 (11/12)"),
     "헤럴드경제": (FULL, "기사 끝 AI 고지 없음('Copyright Herald Corporation'), robots 는 GPTBot·ChatGPT 만 차단. 참고: 저작권규약 '비영리 사용만, 그 밖은 사전 서면 허가'"),
-    "뉴시스": (FULL, "기사 끝 'Copyright © NEWSIS.COM, 무단 전재 및 재배포 금지' — AI 문구 없음, AI 봇 규칙 없음. 참고: 저작권 규약 '비영리 정보서비스도 사전 서면 허가'"),
 }
 
 
@@ -62,8 +62,7 @@ def _load():
 
 def _save(data):
     try:
-        OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        OVERRIDE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_json(OVERRIDE_FILE, data, indent=1)
     except OSError:
         log.exception("언론사 방침 바꿈 저장 실패")
 
@@ -110,20 +109,25 @@ def issues():
     out = []
     for press, o in sorted(_load().get("override", {}).items()):
         if STRICT[o["rule"]] > STRICT[POLICY.get(press, (TITLE_ONLY, ""))[0]]:
-            out.append(f"언론사 방침 바뀜 {press} → {o['rule']} ({o['reason']}) — 확인 후 press_policy.py POLICY 에 반영")
+            out.append(f"언론사 방침 바뀜 {press} → {o['rule']} ({o['reason']}) — 확인 후 press_policy.py POLICY 에 반영(그때 지난 AI 요약도 지움) 또는 틀렸으면 reset")
     return out
 
 
+def _known():
+    """방침을 따져야 할 언론사 전부: POLICY + 자동 바꿈 + RSS 피드에 있는 곳
+    피드만 추가하고 POLICY 를 빠뜨려도 그 언론사가 TITLE_ONLY 로 잡히게 (11/13: 전에는 POLICY 에 있는 곳만 돌려줘 LLM 으로 감)"""
+    from hk_llm.steps.step1_rss import FEEDS  # step1_rss 가 이 파일을 import (순환 방지)
+    return set(POLICY) | set(_load().get("override", {})) | set(FEEDS)
+
+
 def title_only_presses():
-    """본문을 받지 않고 LLM 에 넣지 않는 언론사 (TITLE_ONLY + EXCLUDED, 자동 바꿈 포함)"""
-    names = set(POLICY) | set(_load().get("override", {}))
-    return sorted(p for p in names if policy(p) != FULL)
+    """본문을 받지 않고 LLM 에 넣지 않는 언론사 (TITLE_ONLY + EXCLUDED, 자동 바꿈·목록에 없는 피드 포함)"""
+    return sorted(p for p in _known() if policy(p) != FULL)
 
 
 def excluded_presses():
     """RSS 도 받지 않는 언론사"""
-    names = set(POLICY) | set(_load().get("override", {}))
-    return sorted(p for p in names if policy(p) == EXCLUDED)
+    return sorted(p for p in _known() if policy(p) == EXCLUDED)
 
 
 if __name__ == "__main__":
@@ -136,7 +140,7 @@ if __name__ == "__main__":
         restrict(args[1], TITLE_ONLY, " ".join(args[2:]) or "사람이 직접 제목만")
     elif args[:1] == ["reset"] and len(args) == 2:
         reset(args[1])
-    for p in sorted(set(POLICY) | set(_load().get("override", {}))):
+    for p in sorted(_known()):
         print(f"{p}: {policy(p)}")
     for line in issues():
         print(line)

@@ -35,14 +35,16 @@ from email.utils import parsedate_to_datetime
 import requests
 
 from hk_llm.core.config import KST, LOG_DIR
-from hk_llm.core.util import get_logger
+from hk_llm.core.util import get_logger, write_json
 
 STATE_FILE = LOG_DIR / "breaker_state.json"
 FAIL_THRESHOLD = 3  # 연속 실패 이만큼이면 쉼 (잠깐 실패 1~2번으로 쉬지 않게)
 BASE_OPEN = 10 * 60  # 처음 쉬는 시간(초) = 수집 2번
 MAX_OPEN = 60 * 60  # 가장 긴 쉬는 시간(초). RSS 가 담는 시간(최소 약 1.4시간)보다 짧게
-PROBE_TIMEOUT = 30 * 60  # 시험 요청 결과가 이만큼 안 남으면 다시 시험 (결과를 안 알린 경로가 있어도 영영 막히지 않게)
 SLOW_DOWN = {429, 503}  # "나중에 다시" 라는 응답 → 연속 실패를 기다리지 않고 바로 쉼 (Azure: accelerated circuit breaking)
+# 시험 요청(half-open)이 이 시간 안에 success/failure 로 끝나지 않으면 결과를 못 받은 것으로 보고 다시 시험을 허용.
+# 시험을 받은 쪽이 결과 없이 넘어가면(유료 기사·AI 고지로 건너뜀, 프로세스 종료 등) "시험 중"으로 영영 막히던 것 (2026-11-10 지승현 검토)
+PROBE_TIMEOUT = 15 * 60
 
 log = get_logger(__name__)
 
@@ -90,8 +92,7 @@ class Breaker:
 
     def _save(self, state):
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
+            write_json(self.path, state, indent=1)
         except OSError:
             log.exception("차단기 상태 저장 실패 (수집은 계속)")
 
@@ -113,6 +114,13 @@ class Breaker:
             self._save(state)
             log.info("차단기 시험 요청 %s (%s 뒤)", key, s.get("reason"))
             return True
+
+    def paused(self, key, now=None):
+        """쉬는 중인가 (읽기만, 시험 요청을 가져가지 않음). 같은 출처를 쓰는 뒤 단계가 쓸 때:
+        시험 1번은 결과를 기록하는 단계(DART 는 collect_disclosures)가 가져가야 차단기가 닫히거나 다시 열림"""
+        now = now or time.time()
+        s = self._load().get(key)
+        return bool(s and s.get("until") and (now < s["until"] or s.get("probing")))
 
     def success(self, key):
         with self._lock:

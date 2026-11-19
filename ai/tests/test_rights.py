@@ -182,7 +182,7 @@ def test_body_fetch_site_signal_switches_press():
     from hk_llm.core.resilience import Breaker
     from hk_llm.steps import step4_body as s4
 
-    row = mock.Mock(article_id=7, url="https://news.bizwatch.co.kr/7", press="비즈워치", retry_count=0)
+    row = mock.Mock(article_id=7, url="https://www.etnews.com/7", press="전자신문", retry_count=0)
     engine = mock.MagicMock()
     engine.connect.return_value.__enter__.return_value.execute.return_value.all.return_value = [row]
     with _policy_file(), mock.patch.object(s4, "breaker", Breaker(pathlib.Path(tempfile.mkdtemp()) / "b.json")), \
@@ -190,10 +190,81 @@ def test_body_fetch_site_signal_switches_press():
             mock.patch.object(s4, "site_reservation", return_value="robots.txt Content-Signal ai-input=no"), \
             mock.patch.object(s4, "_get") as get, mock.patch.object(s4, "_update"):
         s4.fetch_bodies(engine)
-        assert pp.policy("비즈워치") == pp.TITLE_ONLY
+        assert pp.policy("전자신문") == pp.TITLE_ONLY
     get.assert_not_called(), "사이트가 AI 입력을 거부하면 기사 페이지도 요청 안 함"
 
 
+def test_feed_without_policy_is_title_only():
+    """피드만 추가하고 POLICY 를 빠뜨린 언론사도 본문·LLM 대상에서 빠짐 (11/13: 전에는 POLICY 에 있는 곳만 돌려줌)"""
+    from hk_llm.core import press_policy as pp
+    from hk_llm.steps import step1_rss
+
+    with _policy_file(), mock.patch.dict(step1_rss.FEEDS, {"새언론사": ["https://new.example/rss"]}):
+        assert "새언론사" in pp.title_only_presses() and "한국경제" not in pp.title_only_presses()
+
+
+def test_state_files_written_atomically():
+    """상태 파일은 임시 파일에 쓰고 바꿔치기 → 쓰다 실패해도 이전 내용이 남고 임시 파일도 안 남음"""
+    from hk_llm.core.util import write_json
+
+    path = pathlib.Path(tempfile.mkdtemp()) / "s.json"
+    write_json(path, {"a": 1})
+    with mock.patch.object(pathlib.Path, "replace", side_effect=OSError("디스크 가득")):
+        try:
+            write_json(path, {"a": 2})
+            raise AssertionError("실패를 알려야 함")
+        except OSError:
+            pass
+    assert path.read_text(encoding="utf-8") == '{"a": 1}' and list(path.parent.iterdir()) == [path]
+
+
+def _backfill_engine():
+    engine = mock.MagicMock()
+    engine.connect.return_value.__enter__.return_value.execute.return_value.scalars.return_value = []  # 저장된 기사 없음
+    engine.begin.return_value.__enter__.return_value.execute.return_value.rowcount = 1
+    return engine
+
+
+def _page(html):
+    res = requests.Response()
+    res.status_code, res._content = 200, ("<meta charset=\"utf-8\">" + html).encode()
+    return res
+
+
+SITEMAP = ("<url><loc>https://www.hankyung.com/article/1</loc><lastmod>2026-11-01T09:00:00+09:00</lastmod></url>"
+           "<url><loc>https://www.hankyung.com/article/2</loc><lastmod>2026-11-01T10:00:00+09:00</lastmod></url>")
+
+
+def test_backfill_saves_only_named_articles():
+    from hk_llm.steps import backfill as bf
+
+    pages = {"https://www.hankyung.com/article/1": '<meta property="og:title" content="삼성전자 3분기 실적">',
+             "https://www.hankyung.com/article/2": '<meta property="og:title" content="날씨 맑음">'}
+    get = lambda url: _page(SITEMAP) if "sitemap" in url else _page(pages[url])  # noqa: E731
+    with _policy_file(), mock.patch.object(bf, "_get", side_effect=get), mock.patch.object(bf, "allowed", return_value=True), \
+            mock.patch.object(bf, "crawl_delay", return_value=0), mock.patch.object(bf, "site_reservation", return_value=None), \
+            mock.patch.object(bf, "extract", side_effect=lambda html, url: "본문 문장. " * 100):
+        got = bf.backfill_day(_backfill_engine(), "한국경제", __import__("datetime").date(2026, 11, 1), {"삼성전자"})
+    assert got == (2, 1, 1), "사이트맵 2건 중 종목 이름 있는 1건만 저장"
+
+
+def test_backfill_respects_policy_and_page_notice():
+    from hk_llm.core import press_policy as pp
+    from hk_llm.steps import backfill as bf
+
+    day = __import__("datetime").date(2026, 11, 1)
+    with _policy_file(), mock.patch.object(bf, "_get") as get:
+        pp.restrict("한국경제", pp.TITLE_ONLY, "시험")
+        assert bf.backfill_day(_backfill_engine(), "한국경제", day, {"삼성전자"}) == (0, 0, 0)
+    get.assert_not_called(), "제목만 언론사는 사이트맵도 요청 안 함"
+
+    notice = '<meta property="og:title" content="삼성전자 실적"><p>ⓒ 한국경제, 무단 전재-재배포, AI 학습 및 활용 금지</p>'
+    get = lambda url: _page(SITEMAP) if "sitemap" in url else _page(notice)  # noqa: E731
+    with _policy_file(), mock.patch.object(bf, "_get", side_effect=get), mock.patch.object(bf, "allowed", return_value=True), \
+            mock.patch.object(bf, "crawl_delay", return_value=0), mock.patch.object(bf, "site_reservation", return_value=None), \
+            mock.patch.object(bf, "extract", side_effect=lambda html, url: "본문 문장. " * 100):
+        got = bf.backfill_day(_backfill_engine(), "한국경제", day, {"삼성전자"})
+        assert got[2] == 0 and pp.policy("한국경제") == pp.TITLE_ONLY, "고지가 있으면 저장 안 하고, 2건째에 언론사를 제목만으로"
 def test_new_presses_have_policy_and_body_xpath():
     """11/12 팀 기준: AI 를 직접 금지한 곳(기사 끝 AI 고지, 규약의 AI·크롤링 조항)만 막고 나머지는 본문 요약.
     모든 RSS 언론사에 방침이 적혀 있고(없으면 기본 TITLE_ONLY), FULL 언론사는 기사 주소의 본문 칸이 있고, 옮겨 적은 고지가 금지로 걸리지 않음"""
@@ -203,11 +274,12 @@ def test_new_presses_have_policy_and_body_xpath():
     from hk_llm.steps.step4_body import BODY_XPATH
 
     assert set(FEEDS) <= set(POLICY)
-    assert POLICY["아주경제"][0] == EXCLUDED and "아주경제" not in FEEDS
-    assert title_only_presses() == ["서울경제", "아주경제", "연합뉴스", "연합인포맥스"]
+    for press in ["아주경제", "뉴시스"]:
+        assert POLICY[press][0] == EXCLUDED and press not in FEEDS, press
+    assert title_only_presses() == ["뉴시스", "서울경제", "아주경제", "연합뉴스", "연합인포맥스"]
     hosts = {"한국경제": "www.hankyung.com", "파이낸셜뉴스": "www.fnnews.com", "전자신문": "www.etnews.com",
              "비즈워치": "news.bizwatch.co.kr", "블로터": "www.bloter.net", "시사저널e": "www.sisajournal-e.com",
-             "인사이트코리아": "www.insightkorea.co.kr", "헤럴드경제": "biz.heraldcorp.com", "뉴시스": "www.newsis.com"}
+             "인사이트코리아": "www.insightkorea.co.kr", "헤럴드경제": "biz.heraldcorp.com"}
     for press, host in hosts.items():
         assert POLICY[press][0] == FULL and press in FEEDS and host in BODY_XPATH, press
     for press in ["블로터", "시사저널e"]:

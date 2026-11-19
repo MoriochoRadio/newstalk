@@ -13,7 +13,7 @@ from sqlalchemy import text
 from hk_llm.core.config import KST
 from hk_llm.steps.dart import collect_disclosures, summarize_disclosures
 from hk_llm.core.notify import report_health
-from hk_llm.core.press_policy import issues as policy_issues
+from hk_llm.core.press_policy import excluded_presses, issues as policy_issues
 from hk_llm.core.resilience import breaker
 from hk_llm.steps.health import check as health_check
 from hk_llm.core.db import get_engine, to_db
@@ -32,11 +32,16 @@ from hk_llm.core.util import get_logger
 log = get_logger(__name__)
 
 
+class RssDown(RuntimeError):
+    """요청한 RSS 피드가 전부 실패 (인터넷 끊김·차단기로 모든 사이트가 쉬는 중 등)"""
+
+
 def collect(engine):
-    """1~3단계. (새로 저장한 수, 실패한 피드 목록). RSS 가 전부 실패하면 예외"""
+    """1~3단계. (새로 저장한 수, 실패한 피드 목록). RSS 가 전부 실패하면 RssDown"""
     articles, failed = fetch_all()
-    if len(failed) == sum(len(urls) for urls in FEEDS.values()):
-        raise RuntimeError("RSS 전부 실패")
+    tried = sum(len(urls) for press, urls in FEEDS.items() if press not in excluded_presses())  # 제외 언론사는 요청 안 함
+    if tried and len(failed) >= tried:
+        raise RssDown("RSS 전부 실패")
     new = save_listed(dedup_by_url(articles), engine)
     log.info("RSS 수집 끝: 받은 %d건, 새로 저장 %d건, 실패 피드 %d개", len(articles), new, len(failed))
     return new, failed
@@ -77,8 +82,18 @@ def _run(engine, limit, daily):
         if issues:
             log.warning("수집 점검: %s", " / ".join(issues))
         report_health(issues)  # Slack 알림: 새로 생긴·사라진 문제만 (웹훅이 없으면 아무것도 안 함)
-        new, failed = collect(engine)
+        # RSS 가 전부 실패해도 나머지(공시 수집·밀린 본문·요약·묶기·하루 요약)는 계속. 예전엔 여기서 실행 전체가 멈춰서
+        # 인터넷이 잠깐 끊긴 뒤 차단기가 모든 사이트를 쉬게 한 동안(최대 60분) 공시·요약도 같이 멈췄음 (2026-11-10 지승현 검토).
+        # 실행 기록은 FAILED 로 남겨 '마지막 성공 시각'이 RSS 가 멈춘 것을 그대로 보여 줌
+        rss_down = None
+        try:
+            new, failed = collect(engine)
+        except RssDown as e:
+            log.error("%s: 나머지 단계는 계속", e)
+            rss_down, new, failed = str(e), 0, []
         errors = ["실패한 피드: " + ", ".join(failed)] if failed else []
+        if rss_down:
+            errors.append(rss_down)
         if issues:
             errors.append("점검: " + "; ".join(issues))
         try:  # 공시가 실패해도 뉴스는 계속
@@ -115,11 +130,11 @@ def _run(engine, limit, daily):
                                   "err": str(e), "id": run_id})
         raise
     finally:
-        purge_old_bodies(engine)  # 실패해도 7일 지난 본문은 반드시 지움
+        purge_old_bodies(engine)  # 실패해도 요약·연결 끝난 본문은 반드시 지움
         purge_old_sns(engine)  # 7일 지난 SNS 글도 (네이버 키가 없어도)
         log.info("오늘 LLM 추정 비용 $%.4f", spent_today())
     with engine.begin() as conn:
-        conn.execute(finish, {"t": to_db(datetime.now(KST)), "status": "SUCCESS", "c": new, "s": summarized,
+        conn.execute(finish, {"t": to_db(datetime.now(KST)), "status": "FAILED" if rss_down else "SUCCESS", "c": new, "s": summarized,
                               "err": " / ".join(errors) or None, "id": run_id})
 
 

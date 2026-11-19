@@ -19,7 +19,7 @@ import time
 import requests
 
 from hk_llm.core.config import LOG_DIR
-from hk_llm.core.util import get_logger
+from hk_llm.core.util import get_logger, write_json
 
 STATE_FILE = LOG_DIR / "health_state.json"
 REMIND_HOURS = 12
@@ -84,8 +84,7 @@ def report_health(issues, now=None):
         return 0
     if send(TITLE + "\n" + "\n".join(lines)):
         try:
-            LOG_DIR.mkdir(exist_ok=True)
-            STATE_FILE.write_text(json.dumps(new_state, ensure_ascii=False), encoding="utf-8")
+            write_json(STATE_FILE, new_state)
         except OSError as e:
             log.warning("알림 상태 저장 실패: %s", e)
         return len(lines)

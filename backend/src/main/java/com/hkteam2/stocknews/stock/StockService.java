@@ -27,10 +27,13 @@ public class StockService {
 
     private final StockMapper stockMapper;
     private final AiSummaryClient aiSummaryClient;
+    private final SummaryRegenerateLimiter regenerateLimiter;
 
-    public StockService(StockMapper stockMapper, AiSummaryClient aiSummaryClient) {
+    public StockService(StockMapper stockMapper, AiSummaryClient aiSummaryClient,
+                        SummaryRegenerateLimiter regenerateLimiter) {
         this.stockMapper = stockMapper;
         this.aiSummaryClient = aiSummaryClient;
+        this.regenerateLimiter = regenerateLimiter;
     }
 
     /** 종목 검색. q가 비어 있으면 전체를 이름순으로. 같은 순위끼리는 최근 7일 많이 언급된 종목 먼저 */
@@ -53,29 +56,38 @@ public class StockService {
 
     /**
      * 오늘의 이슈 종목 순위. 오늘 = 한국 시간 0시부터 지금까지 작성된 글.
+     * 오늘 글이 없으면(이른 아침·주말·수집 멈춤) 글이 있는 가장 최근 날 하루로 셈 → 응답 date 로 어느 날인지 알림
      * 세고 정렬하는 일은 SQL(GROUP BY·COUNT)이 하고, 여기서는 오늘 0시 계산·조건 검사·순위 번호만
      * 출처가 없으면 뉴스만 셈: AI가 SNS를 "뉴스 많은 종목"만 골라 모으므로 섞으면 같은 종목을 두 번 세게 됨
      */
-    public ListResponse<StockIssueResponse> getIssues(String source, int limit) {
+    public StockIssuesResponse getIssues(String source, int limit) {
         return getIssues(source, null, null, limit);
     }
 
-    /** market·theme: 분류별 보기 (2026-11-18). 순위는 거른 뒤 1부터 다시 매김 */
-    public ListResponse<StockIssueResponse> getIssues(String source, String market, String theme, int limit) {
+    /** market·theme: 분류별 보기 (팀 main 2026-11-18). 순위는 거른 뒤 1부터 다시 매김 */
+    public StockIssuesResponse getIssues(String source, String market, String theme, int limit) {
         String sourceType = source == null ? "NEWS" : toSourceType(source);
         if (limit < 1 || limit > MAX_ISSUE_LIMIT) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         // DB의 CURDATE()는 DB 시간대 설정에 따라 달라질 수 있어서 앱에서 한국 시간으로 계산해 넘김
-        LocalDateTime todayStart = LocalDate.now(TimeUtils.KST).atStartOfDay();
-
-        List<StockIssueRow> rows = stockMapper.findIssues(todayStart, sourceType, StockCategory.market(market),
-                StockCategory.theme(theme), limit);
+        String m = StockCategory.market(market);
+        String t = StockCategory.theme(theme);
+        LocalDate date = LocalDate.now(TimeUtils.KST);
+        List<StockIssueRow> rows = stockMapper.findIssues(date.atStartOfDay(), null, sourceType, m, t, limit);
+        if (rows.isEmpty()) {
+            LocalDate latest = stockMapper.findLatestIssueDate(date.atStartOfDay(), sourceType, m, t);
+            if (latest != null) {
+                date = latest;
+                rows = stockMapper.findIssues(latest.atStartOfDay(), latest.plusDays(1).atStartOfDay(), sourceType, m, t, limit);
+            }
+        }
         // 순위는 1부터 차례로 (글 수가 같아도 SQL 정렬 순서대로 1, 2, 3)
-        List<StockIssueResponse> items = IntStream.range(0, rows.size())
-                .mapToObj(i -> StockIssueResponse.of(i + 1, rows.get(i)))
+        List<StockIssueRow> ranked = rows;
+        List<StockIssueResponse> items = IntStream.range(0, ranked.size())
+                .mapToObj(i -> StockIssueResponse.of(i + 1, ranked.get(i)))
                 .toList();
-        return ListResponse.of(items);
+        return new StockIssuesResponse(date, items, items.size());
     }
 
     /** 테마 목록 + 기간 안 기사 수 (분류별 보기 고르기용). period: today(기본)·7d·30d */
@@ -89,21 +101,31 @@ public class StockService {
      * - 요약 문장: AI가 저장한 stock_daily_summary (없으면 null → 화면은 "요약 준비 중")
      * - 감성 비율: 오늘 이 종목이 나온 글을 지금 직접 셈 (AI 요약이 없어도, 1시간을 기다리지 않아도 최신)
      *   source가 없으면 뉴스·SNS 합계 (요구사항 기본), NEWS/SNS면 그 출처만
+     * 오늘 요약도 오늘 글도 없으면 뉴스 요약이 있는 가장 최근 날의 요약·감성 비율 → 응답 date 로 어느 날인지 알림
      */
     public StockSummaryResponse getSummary(String stockCode, String source) {
         String sourceType = toSourceType(source);
         StockResponse stock = getStock(stockCode);   // 없는 종목이면 404
-        LocalDate today = LocalDate.now(TimeUtils.KST);
+        LocalDate date = LocalDate.now(TimeUtils.KST);
 
-        StockDailySummaryRow summary = stockMapper.findDailySummary(stockCode, today).orElse(null);
-        List<SentimentCountRow> rows = stockMapper.countSentiments(stockCode, today.atStartOfDay(), sourceType);
+        StockDailySummaryRow summary = stockMapper.findDailySummary(stockCode, date).orElse(null);
+        List<SentimentCountRow> rows = stockMapper.countSentiments(stockCode, date.atStartOfDay(), null, sourceType);
+        if ((summary == null || summary.newsSummary() == null) && rows.isEmpty()) {
+            LocalDate latest = stockMapper.findLatestSummaryDate(stockCode, date);
+            if (latest != null) {
+                date = latest;
+                summary = stockMapper.findDailySummary(stockCode, latest).orElse(null);
+                rows = stockMapper.countSentiments(stockCode, latest.atStartOfDay(),
+                        latest.plusDays(1).atStartOfDay(), sourceType);
+            }
+        }
         Map<String, Long> counts = rows.stream()
                 .collect(Collectors.toMap(SentimentCountRow::sentiment, SentimentCountRow::articleCount));
         // 같은 소식 묶음을 1표로 (V13). 같은 호재 소식을 여러 언론사가 써서 비율이 치우치는 것을 같이 보여 줌
         Map<String, Long> eventCounts = rows.stream()
                 .collect(Collectors.toMap(SentimentCountRow::sentiment, SentimentCountRow::eventCount));
 
-        return StockSummaryResponse.of(stock, today, summary, SentimentRatioResponse.from(counts),
+        return StockSummaryResponse.of(stock, date, summary, SentimentRatioResponse.from(counts),
                 SentimentRatioResponse.from(eventCounts));
     }
 
@@ -111,8 +133,11 @@ public class StockService {
      * 종합 요약 다시 생성 (F-08): AI 서버에 오늘 요약을 새로 만들게 하고, 저장된 요약을 다시 읽어 돌려줌
      * 없는 종목은 AI 서버를 부르기 전에 404 (LLM 비용을 쓰지 않게)
      */
-    public SummaryRegenerateResponse regenerateSummary(String stockCode) {
+    public SummaryRegenerateResponse regenerateSummary(Long userId, String stockCode) {
         getStock(stockCode);   // 없는 종목이면 404
+        if (!regenerateLimiter.tryAcquire(userId)) {
+            throw new BusinessException(ErrorCode.AI_BUSY);   // 한 사람이 10분에 5번 넘게 부르면 429
+        }
         boolean regenerated = aiSummaryClient.regenerate(stockCode);
         return new SummaryRegenerateResponse(regenerated, getSummary(stockCode, null));
     }

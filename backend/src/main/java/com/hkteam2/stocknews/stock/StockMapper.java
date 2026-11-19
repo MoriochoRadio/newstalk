@@ -27,13 +27,17 @@ public interface StockMapper {
 
     boolean existsByCode(String stockCode);
 
-    /** from 이후 글에 많이 나온 종목 순 limit개. sourceType이 null이면 뉴스·SNS 모두 (API 기본은 서비스가 NEWS로 넘김) */
+    /** from 이상 to 미만(to가 null이면 지금까지) 글에 많이 나온 종목 순 limit개. sourceType이 null이면 뉴스·SNS 모두 (API 기본은 서비스가 NEWS로 넘김) */
     List<StockIssueRow> findIssues(@Param("from") LocalDateTime from,
+                                   @Param("to") LocalDateTime to,
                                    @Param("sourceType") String sourceType,
                                    @Param("market") String market,
                                    @Param("theme") String theme,
                                    @Param("limit") int limit);
 
+    /** before 전에 이슈 순위에 들 글이 있는 가장 최근 날 (market·theme 로 거른 종목만). 없으면 null */
+    LocalDate findLatestIssueDate(@Param("before") LocalDateTime before, @Param("sourceType") String sourceType,
+                                @Param("market") String market, @Param("theme") String theme);
     /** 테마마다 종목 수와 from 이후 뉴스 기사 수 (기사 많은 순). 분류별 보기 고르기용 */
     List<StockThemeResponse> findThemes(@Param("from") LocalDateTime from);
 
@@ -41,9 +45,13 @@ public interface StockMapper {
     Optional<StockDailySummaryRow> findDailySummary(@Param("stockCode") String stockCode,
                                                     @Param("date") LocalDate date);
 
-    /** from 이후 이 종목이 나온 글의 감성별 개수. sourceType이 null이면 뉴스·SNS 모두. 0건인 감성은 결과에 없음 */
+    /** before 전에 뉴스 요약이 있는 가장 최근 날. 없으면 null */
+    LocalDate findLatestSummaryDate(@Param("stockCode") String stockCode, @Param("before") LocalDate before);
+
+    /** from 이상 to 미만(to가 null이면 지금까지) 이 종목이 나온 글의 감성별 개수. sourceType이 null이면 뉴스·SNS 모두. 0건인 감성은 결과에 없음 */
     List<SentimentCountRow> countSentiments(@Param("stockCode") String stockCode,
                                             @Param("from") LocalDateTime from,
+                                            @Param("to") LocalDateTime to,
                                             @Param("sourceType") String sourceType);
 
     /** from 이상 to 미만, 시간 칸(unit: HOUR/DAY)별 뉴스·SNS 글 수. 글이 있는 칸만, 시각 순 */

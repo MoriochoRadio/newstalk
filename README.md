@@ -8,6 +8,15 @@
 
 > **V1 프로토타입 (2026-11-10):** 처음 보는 분은 **[docs/v1-prototype.md](docs/v1-prototype.md)** 에서 켜는 법과 데이터 흐름(수집 → AI → DB → API → 화면)을 따라가 보세요. 1차에서는 SNS를 빼고 뉴스·공시만 다룹니다.
 
+## 1차 범위 (발표 2026-11-20)
+
+| 구분 | 내용 | 켜는 법 |
+|---|---|---|
+| **1차 서비스** | 뉴스 RSS 7곳 + DART 공시 수집 → AI 요약·종목 연결·근거 문장 → 같은 소식 묶기 → 이슈 종목·종목별 요약·검색·관심 종목·토론 | 기본으로 켜짐 |
+| 확장: 실시간 시세 | KIS 현재가·차트·실시간 체결 (`backend/.../quote`) | `KIS_ENABLED=true` + 각자 KIS 키 ([setup.md](docs/setup.md) 13절). 꺼져 있으면 화면에 "시세 연동 전" |
+| 확장: SNS | 네이버 블로그·카페 (`ai/hk_llm/steps/sns.py`) | `SNS_ENABLED=true`. 1차에서 뺀 이유는 [decisions.md](docs/decisions.md) 2026-11-09 |
+| 실험만 | 이름 없는 간접 연결(유가 급등 → 정유주, `step6b_indirect.py`) | 자동 실행에 연결 안 됨. Precision 16.7% 라 뺌 |
+
 ## 구조
 
 | 폴더 | 내용 |

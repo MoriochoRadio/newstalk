@@ -21,10 +21,10 @@ AI 에이전트는 작업 전에 이 문서를 읽어 주세요.
 |---|---|---|
 | `backend/` | Spring Boot 서버 (종목 사전, 화면용 API, 회원·관심 종목·토론 게시판, 확장: KIS 시세 조회·웹소켓·SSE) | Java 21, Spring Boot 4.1, Gradle, MyBatis, MariaDB 11.8 |
 | `ai/` | 뉴스·공시 수집, 기사-종목 연결, LLM 요약 | Python, FastAPI, LangChain |
-| `frontend/` | 사용자 대시보드 | React |
+| `frontend/` | 사용자 대시보드 | React, Vite |
 | `docs/` | 팀 공용 문서 (API 명세, DB 스키마, 결정 기록) | Markdown |
 
-- backend 기본 패키지: `com.hkteam2.stocknews` (하위 `common`, `stock`, `article`, `search`, `status`, `user`, `watchlist`, `board`, `quote`)
+- backend 기본 패키지: `com.hkteam2.stocknews` (하위 `article`, `board`, `common`, `feedback`, `quote`, `search`, `status`, `stock`, `user`, `watchlist`)
 - 백엔드 2명은 패키지 단위로 담당을 나눕니다.
 
 ## 3. 꼭 지킬 것

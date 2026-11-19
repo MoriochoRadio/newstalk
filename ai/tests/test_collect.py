@@ -86,6 +86,32 @@ def test_step3_save():
             conn.execute(text("DELETE FROM article WHERE url_key = :k"), {"k": key})
 
 
+def test_purge_bodies_after_match():
+    # DB 가 켜져 있어야 함. 주의: 실제 DB 의 끝난 기사 본문도 함께 지워짐 (운영에서 하는 일과 같음)
+    from sqlalchemy import text
+    from hk_llm.core.db import get_engine
+    from hk_llm.steps.step4_body import purge_old_bodies
+
+    engine = get_engine()
+    cases = {"DONE": ("DONE", 0), "NO_STOCK": ("NO_STOCK", 0), "FETCHED": ("FETCHED", 0),
+             "SUMMARIZED": ("SUMMARIZED", 0), "OLD": ("FETCHED", 8)}
+    insert = text("""INSERT INTO article (url_key, url, press, title, body, published_at, status, source_type, channel,
+                                          collected_at) VALUES (:k, :k, '테스트', '제목', '본문', NOW(), :s, 'NEWS', 'RSS',
+                                          NOW() - INTERVAL :d DAY)""")
+    try:
+        with engine.begin() as conn:
+            for name, (status, days) in cases.items():
+                conn.execute(insert, {"k": f"test://hk_llm/purge/{name}", "s": status, "d": days})
+        purge_old_bodies(engine)
+        with engine.connect() as conn:
+            left = dict(conn.execute(text("SELECT url_key, body FROM article WHERE url_key LIKE 'test://hk_llm/purge/%'")).all())
+        kept = {k.rsplit("/", 1)[1] for k, b in left.items() if b}
+        assert kept == {"FETCHED", "SUMMARIZED"}, "연결까지 끝난 본문은 바로, 끝나지 않은 본문은 7일 지나면 지움"
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM article WHERE url_key LIKE 'test://hk_llm/purge/%'"))
+
+
 def test_sns_db():
     # DB 가 켜져 있어야 함. 가짜 검색으로 시험용 글을 넣었다가 지움 (네이버·LLM 안 부름)
     from datetime import date, datetime
@@ -204,6 +230,9 @@ def test_step4_extract():
     tagged = ('<div class="article-view__body"><div>관련종목하림지주(003380), 팬오션(028670)</div>'
               '팬오션이 선박을 자사선으로 전환한다.</div>')
     assert extract(tagged, "https://www.fnnews.com/news/3") == "팬오션이 선박을 자사선으로 전환한다.", "관련종목 꼬리표는 뺌"
+    from hk_llm.steps.step4_body import clean
+    assert clean("현대모비스가 수주했다.\n관련종목현대모비스(012330), 모비스(250060)\n관련종목 수가 늘었다는 분석이다.") == \
+        "현대모비스가 수주했다.\n관련종목 수가 늘었다는 분석이다.", "종목코드 목록 줄만 빼고 본문 문장은 남김"
     from hk_llm.steps.step4_body import TABLES_DROPPED
     before = TABLES_DROPPED["www.fnnews.com"]
     withtable = '<div class="article-view__body">실적이 늘었다.<table><tr><td>매출</td><td>1조</td></tr></table></div>'
@@ -227,6 +256,10 @@ def test_health_rules():
     assert health.feed_issues(errs, [feed, "https://other"]) == [f"피드 {health.FEED_STREAK}번 연속 실패: {feed}"]
     assert health.feed_issues(errs[:-1] + [None], [feed]) == [], "한 번이라도 성공하면 연속 아님"
     assert health.feed_issues(errs[:3], [feed]) == [], "기록이 모자라면 판단 안 함"
+    warned = [f"점검: 피드 {health.FEED_STREAK}번 연속 실패: {feed}"] * health.FEED_STREAK
+    assert health.feed_issues(warned, [feed]) == [], "점검 경고 문구 속 주소는 실패로 세지 않음 (피드가 살아난 뒤 경고가 계속 울리던 문제)"
+    mixed = [f"실패한 피드: {feed} (x) / 점검: 수집 공백 20분"] * health.FEED_STREAK
+    assert health.feed_issues(mixed, [feed]), "실패한 피드 부분이 있으면 그대로 셈"
     got = health.volume_issues({"전자신문": 0, "한국경제": 50}, {"전자신문": 13, "한국경제": 54, "작은곳": 4})
     assert got == ["수집량 급감 전자신문: 최근 24시간 0건 (지난 7일 하루 평균 13건)"], "평균 절반 아래만, 평균이 작은 곳은 빼고"
     got = health.volume_issues({}, {"전자신문": 13, "아주경제": 16}, active={"전자신문"})
@@ -303,6 +336,46 @@ def test_robots_failure_not_cached():
         robots._down.clear()
 
 
+def test_body_redirect_and_crawl_delay():
+    """2026-11-12 보안 검토: 리다이렉트 대상도 수집 범위 확인, Crawl-delay 가 상한보다 크면 줄이지 않고 안 받음"""
+    from types import SimpleNamespace
+
+    from hk_llm.steps import step4_body as s4
+
+    def hop(to):
+        return SimpleNamespace(is_redirect=True, headers={"Location": to})
+
+    ok = SimpleNamespace(is_redirect=False)
+    with mock.patch.object(s4, "allowed", return_value=True), mock.patch.object(s4, "retry", side_effect=lambda fn: fn()):
+        with mock.patch.object(s4.requests, "get", side_effect=[hop("/article/2"), ok]) as get:
+            assert s4._get("https://www.hankyung.com/article/1") is ok, "같은 사이트 안 리다이렉트는 따라감"
+            assert get.call_args.args[0] == "https://www.hankyung.com/article/2"
+        for bad in ("https://evil.example.com/x", "http://www.hankyung.com/article/2"):
+            with mock.patch.object(s4.requests, "get", side_effect=[hop(bad)]) as get:
+                try:
+                    s4._get("https://www.hankyung.com/article/1")
+                    raise AssertionError(bad)
+                except s4.RedirectBlocked:
+                    assert get.call_count == 1, "범위 밖 주소엔 요청 안 함"
+    with mock.patch.object(s4, "allowed", return_value=False), mock.patch.object(s4, "retry", side_effect=lambda fn: fn()), \
+            mock.patch.object(s4.requests, "get", side_effect=[hop("/print/1")]):
+        try:
+            s4._get("https://www.hankyung.com/article/1")
+            raise AssertionError("robots 금지 경로로 리다이렉트")
+        except s4.RedirectBlocked:
+            pass
+
+    row = SimpleNamespace(article_id=1, url="https://www.hankyung.com/article/1", press="한국경제", retry_count=0)
+    engine = mock.MagicMock()
+    engine.connect.return_value.__enter__.return_value.execute.return_value.all.return_value = [row]
+    with mock.patch.object(s4, "reachable", return_value=True), mock.patch.object(s4, "allowed", return_value=True), \
+            mock.patch.object(s4, "site_reservation", return_value=None), mock.patch.object(s4, "crawl_delay", return_value=30), \
+            mock.patch.object(s4, "_get") as page, mock.patch.object(s4, "_update") as update:
+        assert s4.fetch_bodies(engine)["SKIPPED"] == 1
+    assert not page.called, "Crawl-delay 30초를 10초로 줄여 요청하지 않음"
+    assert "Crawl-delay" in update.call_args.kwargs["error"]
+
+
 def test_dart_rules():
     import requests
     from hk_llm.core.config import KST
@@ -357,6 +430,44 @@ def test_util_retry():
         assert len(calls) == 1, "404 는 다시 해도 같으니 재시도 안 함"
 
 
+def test_health_volume_skips_weekend_window():
+    """주말이 낀 24시간은 수집량 급감을 보지 않음 (주말 기사는 평일의 1/4~1/40 이라 매 주말 헛경보, 2026-11-10 지승현 검토)"""
+    from datetime import datetime
+
+    from hk_llm.steps import health
+
+    assert health.weekday_window(datetime(2026, 11, 11, 10, 0))  # 수: 화~수
+    assert health.weekday_window(datetime(2026, 11, 10, 10, 0))  # 화: 월~화
+    assert not health.weekday_window(datetime(2026, 11, 9, 10, 0)), "월 아침: 일요일이 낌"
+    assert not health.weekday_window(datetime(2026, 11, 8, 10, 0)), "일"
+    assert not health.weekday_window(datetime(2026, 11, 7, 10, 0)), "토"
+
+
+def test_export_has_no_article_text():
+    """팀 데이터 파일(공개 레포)에 기사 원문이 들어가지 않음: 본문·RSS 설명문·LLM 회사 목록·근거 문장 (11/05 저작권 결정)"""
+    from hk_llm import export_data
+
+    for col in ("body", "description", "companies", "evidence"):
+        assert col not in export_data.ARTICLE_COLS + export_data.LINK_COLS, col
+
+
+def test_notify_saves_state_only_when_sent():
+    """못 보내면 상태를 안 바꿔 다음 실행에 다시 보냄, 보냈으면 같은 문제를 또 안 보냄"""
+    import pathlib
+    import tempfile
+    from unittest import mock
+
+    from hk_llm.core import notify
+
+    with mock.patch.dict("os.environ", {"SLACK_WEBHOOK_URL": "https://hooks.example/x"}), \
+            mock.patch.object(notify, "STATE_FILE", pathlib.Path(tempfile.mkdtemp()) / "h.json"):
+        with mock.patch.object(notify, "send", return_value=False):
+            assert notify.report_health(["수집 공백 25분 (x)"], now=0) == 0 and not notify.STATE_FILE.exists()
+        with mock.patch.object(notify, "send", return_value=True) as send:
+            assert notify.report_health(["수집 공백 25분 (x)"], now=0) == 1
+            assert notify.report_health(["수집 공백 30분 (x)"], now=60) == 0, "같은 문제는 한 번만"
+            assert send.call_count == 1
+    assert notify.report_health(["무엇이든"]) == 0, "웹훅이 없으면 아무것도 안 함"
 def test_rss_skips_foreign_language_titles():
     """인사이트코리아가 같은 기사의 중국어판을 RSS 에 같이 내서 목록에 중국어 제목이 나옴 (11/12 QA) → 한글 없는 제목은 뺌"""
     from hk_llm.steps.step1_rss import parse

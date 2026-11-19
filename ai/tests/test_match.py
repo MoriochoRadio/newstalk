@@ -3,7 +3,7 @@
 
 def test_step6_match():
     from collections import Counter
-    from hk_llm.steps.step6_match import match_one, norm, on_topic, reason_text, score
+    from hk_llm.steps.step6_match import match_one, norm, on_topic, score
 
     # 점수·매칭 규칙 시험 (DB 없이)
     s = {"name_weight": 0.4, "theme_weight": 0.4, "context_weight": 0.2, "min_score": 0.7}
@@ -44,8 +44,6 @@ def test_step6_match():
     nm.update({"한화": "000880", "삼성물산": "028260"})
     assert lookup(nm, "한화 건설부문") == "000880" and lookup(nm, "삼성물산 패션부문") == "028260", "사업부 → 회사 (05-2a)"
     assert lookup(nm, "건설부문") is None and lookup(nm, "없는회사 건설부문") is None
-    assert reason_text({"reason": "수주", "long_term": "POSITIVE"}) == "수주 (장기: 호재)"
-    assert reason_text({"reason": "수주"}) == "수주"
 
     # 주제 확인: 유형·명단 기사 제외, 제목이나 앞부분에 있어야 연결
     names = {"삼성전자": "A", "삼전": "A", "두산": "B", **{f"회사{i}번": f"C{i}" for i in range(6)}}
@@ -124,6 +122,7 @@ def test_step6_match():
     # 언론사 꼬리표 줄 (04-4a): "관련종목…" 줄은 매칭에서 안 읽음
     from hk_llm.steps.step6_match import article_text
     assert article_text("관련종목SK하이닉스(000660), 삼성전자(005930)\n블룸에너지 수혜") == "블룸에너지 수혜"
+    assert article_text("관련종목 수가 늘었다는 분석이다.") == "관련종목 수가 늘었다는 분석이다.", "종목코드 목록이 아닌 본문 문장은 남김"
     hynix = ("000660", {"is_main": False}, 0.83, "SK하이닉스")
     assert not on_topic("블룸에너지 수혜 부상", "관련종목SK하이닉스(000660)\n" + "다른 내용 " * 60, [hynix], nm2), \
         "꼬리표에만 있는 종목은 앞부분에 나온 것으로 보지 않음"
@@ -221,7 +220,7 @@ def test_title_only():
     from hk_llm.core.press_policy import FULL, TITLE_ONLY, policy, title_only_presses
     from hk_llm.steps.title_only import MAX_STOCKS, decide, title_stocks
 
-    assert title_only_presses() == ["서울경제", "아주경제", "연합뉴스", "연합인포맥스"]  # 11/12 팀 기준: AI 를 직접 금지한 곳만
+    assert title_only_presses() == ["뉴시스", "서울경제", "아주경제", "연합뉴스", "연합인포맥스"]  # 11/12 팀 기준: AI 를 직접 금지한 곳만 (뉴시스 11/16 제외)
     assert policy("한국경제") == FULL and policy("비즈워치") == FULL
     assert policy("처음 보는 언론사") == TITLE_ONLY, "모르는 언론사는 보수적으로"
 
@@ -263,10 +262,147 @@ def test_rematch_skips_articles_without_body():
     engine = mock.MagicMock()
     conn = engine.connect.return_value.__enter__.return_value
     conn.execute.return_value.all.return_value = []
-    with mock.patch.object(s6, "load_dictionary", return_value=({}, {}, {})), mock.patch.object(s6, "has_fact_type", return_value=True):
+    with mock.patch.object(s6, "load_dictionary", return_value=({}, {}, {})), mock.patch.object(s6, "has_fact_type", return_value=True), \
+            mock.patch("hk_llm.steps.step7_group.has_column", return_value=True):
         s6.match_articles(engine, statuses=("SUMMARIZED", "DONE", "NO_STOCK"))
     sql = " ".join(str(conn.execute.call_args_list[0].args[0]).split())
     assert "status = 'SUMMARIZED' OR (body IS NOT NULL AND body <> '')" in sql, sql
+
+
+def test_rematch_keeps_same_news_group():
+    """다시 매칭(규칙을 바꾼 뒤 DONE 다시)과 제목만 다시 연결(--redo)해도 같은 소식 묶음(group_article_id)이 그대로 (2026-11-10 지승현 검토).
+    예전엔 연결을 지우고 다시 넣으며 비워졌고, 묶기는 최근 72시간만 다시 묶어 지난 날짜 묶음이 영영 사라졌음. DB 필요"""
+    import json
+    from datetime import datetime
+
+    from unittest import mock
+
+    from sqlalchemy import bindparam, text
+
+    from hk_llm.core.db import get_engine
+    from hk_llm.steps import title_only
+    from hk_llm.steps.step6_match import match_articles
+
+    engine = get_engine()
+    old = datetime(2026, 10, 1, 9, 0)  # 72시간보다 오래된 기사 → 묶기가 다시 묶지 않음
+    body = "삼성전자가 3분기 영업이익 12조원을 기록했다. 삼성전자는 메모리 가격 상승 덕분이라고 밝혔다. " * 3
+    companies = json.dumps([{"name": "삼성전자", "role": "SUBJECT", "sentiment": "POSITIVE", "fact_type": "FACT",
+                             "reason": "실적이 늘었다", "evidence": [1]}], ensure_ascii=False)
+    keys = ["test-regroup-1", "test-regroup-2"]
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM article WHERE url_key IN :k").bindparams(bindparam("k", expanding=True)),
+                     {"k": keys})
+        ids = []
+        for key, press in zip(keys, ("한국경제", "시험언론사")):  # 시험언론사 = 제목만 연결 대상 (진짜 언론사 기사를 안 건드리게)
+            ids.append(conn.execute(text("""INSERT INTO article (url_key, url, press, title, published_at, status, body, summary,
+                                                companies, keywords, source_type, channel)
+                                            VALUES (:k, :u, :p, '삼성전자, 3분기 영업이익 12조원', :at, 'DONE', :b, '요약', :c, '실적',
+                                                    'NEWS', 'RSS')"""),
+                                    {"k": key, "u": f"https://example.com/{key}", "p": press, "at": old, "b": body,
+                                     "c": companies}).lastrowid)
+        for i in ids:
+            conn.execute(text("""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason, match_type,
+                                     relevance, group_article_id) VALUES (:id, '005930', TRUE, 'POSITIVE', '이유', 'DIRECT', 0.9, :g)"""),
+                         {"id": i, "g": ids[0]})
+    try:
+        match_articles(engine, statuses=("DONE",), article_ids=ids)  # 시험 기사만
+        with mock.patch.object(title_only, "title_only_presses", return_value=["시험언론사"]), \
+                mock.patch.object(title_only, "purge_ai_results", return_value=0):
+            title_only.link_title_only(engine, redo=True)
+        with engine.connect() as conn:
+            got = dict(conn.execute(text("SELECT article_id, group_article_id FROM article_stock WHERE article_id IN :i AND stock_code = '005930'"
+                                         ).bindparams(bindparam("i", expanding=True)), {"i": ids}).all())
+        assert got == {ids[0]: ids[0], ids[1]: ids[0]}, got
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM article_stock WHERE article_id IN :i").bindparams(
+                bindparam("i", expanding=True)), {"i": ids})
+            conn.execute(text("DELETE FROM article WHERE article_id IN :i").bindparams(
+                bindparam("i", expanding=True)), {"i": ids})
+
+
+def test_auto_switch_keeps_finished_summaries():
+    """언론사 방침이 자동으로 '제목만'이 돼도(사람 확인 전) 끝난 기사의 지난 요약은 남기고, 처리 중인 기사만 제목만으로 되돌림.
+    사람이 정한 방침(POLICY)은 예전처럼 전체를 지움 (2026-11-10 지승현 검토: 자동 판단이 틀리면 복구 못 함). DB 필요"""
+    from datetime import datetime
+
+    from sqlalchemy import bindparam, text
+
+    from hk_llm.core.db import get_engine
+    from unittest import mock
+
+    from hk_llm.core.press_policy import FULL, TITLE_ONLY
+    from hk_llm.steps import title_only
+    from hk_llm.steps.title_only import purge_ai_results
+
+    engine = get_engine()
+    at = datetime(2026, 10, 1, 9, 0)
+    rows = [("test-purge-1", "시험언론사A", "DONE"), ("test-purge-2", "시험언론사A", "FETCHED"), ("test-purge-3", "시험언론사B", "DONE")]
+    keys = [r[0] for r in rows]
+    by_key = bindparam("k", expanding=True)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM article WHERE url_key IN :k").bindparams(by_key), {"k": keys})
+        for key, press, status in rows:
+            conn.execute(text("""INSERT INTO article (url_key, url, press, title, published_at, status, body, summary, model,
+                                     source_type, channel) VALUES (:k, :u, :p, '제목', :at, :st, '본문', '요약', 'm', 'NEWS', 'RSS')"""),
+                         {"k": key, "u": f"https://example.com/{key}", "p": press, "at": at, "st": status})
+    try:
+        # 진짜 언론사 이름을 쓰면 그 언론사 기사 전체가 대상이 되므로 시험용 이름으로 (A = 기본 FULL 인데 자동으로 바뀐 경우, B = 사람이 정한 제목만)
+        with mock.patch.dict(title_only.POLICY, {"시험언론사A": (FULL, "시험"), "시험언론사B": (TITLE_ONLY, "시험")}):
+            purge_ai_results(engine, ["시험언론사A", "시험언론사B"])
+        with engine.connect() as conn:
+            got = {k: (st, b, s) for k, st, b, s in conn.execute(
+                text("SELECT url_key, status, body, summary FROM article WHERE url_key IN :k").bindparams(by_key), {"k": keys})}
+        assert got["test-purge-1"] == ("DONE", None, "요약"), "자동 바꿈: 끝난 기사 요약은 남고 본문만 지움"
+        assert got["test-purge-2"] == ("LISTED", None, None), "자동 바꿈: 처리 중인 기사는 제목만으로 되돌림"
+        assert got["test-purge-3"] == ("LISTED", None, None), "사람이 정한 방침: 전체를 지움 (예전과 같음)"
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM article WHERE url_key IN :k").bindparams(by_key), {"k": keys})
+
+
+def test_save_groups_everything_reaches_old_articles():
+    """save_groups(everything=True) 는 72시간보다 오래된 기사도 묶음 (평소 5분마다는 최근 72시간만). DB 필요"""
+    from datetime import datetime
+
+    from sqlalchemy import bindparam, text
+
+    from hk_llm.core.db import get_engine
+    from hk_llm.steps.step7_group import save_groups
+
+    engine = get_engine()
+    old = datetime(2026, 10, 1, 9, 0)
+    keys = ["test-allgroup-1", "test-allgroup-2"]
+    titles = ["예탁원, 내년 6월 뉴욕사무소 개소…", "예탁원, 내년 6월 뉴욕사무소 연다"]
+    by_key = bindparam("k", expanding=True)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM article WHERE url_key IN :k").bindparams(by_key), {"k": keys})
+        ids = [conn.execute(text("""INSERT INTO article (url_key, url, press, title, published_at, status, source_type, channel)
+                                    VALUES (:k, :u, '한국경제', :t, :at, 'DONE', 'NEWS', 'RSS')"""),
+                            {"k": k, "u": f"https://example.com/{k}", "t": t, "at": old}).lastrowid for k, t in zip(keys, titles)]
+        for i in ids:
+            conn.execute(text("""INSERT INTO article_stock (article_id, stock_code, is_main, sentiment, reason, match_type)
+                                 VALUES (:id, '005930', TRUE, 'NEUTRAL', '이유', 'DIRECT')"""), {"id": i})
+    by_id = bindparam("i", expanding=True)
+    read = text("SELECT article_id, group_article_id FROM article_stock WHERE article_id IN :i").bindparams(by_id)
+    from unittest import mock
+
+    from hk_llm.steps import step7_group
+
+    real_load = step7_group.load_rows
+    only_mine = lambda eng, since=None: [r for r in real_load(eng, since) if r["article_id"] in ids]  # noqa: E731 시험 기사만 다시 묶음
+    try:
+        with mock.patch.object(step7_group, "load_rows", side_effect=only_mine):
+            save_groups(engine)
+            with engine.connect() as conn:
+                assert all(g is None for _, g in conn.execute(read, {"i": ids})), "평소에는 72시간 지난 기사를 안 건드림"
+            save_groups(engine, everything=True)
+        with engine.connect() as conn:
+            assert dict(conn.execute(read, {"i": ids}).all()) == {ids[0]: ids[0], ids[1]: ids[0]}
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM article_stock WHERE article_id IN :i").bindparams(by_id), {"i": ids})
+            conn.execute(text("DELETE FROM article WHERE article_id IN :i").bindparams(by_id), {"i": ids})
 
 
 def test_step7_group_uses_summary():
@@ -287,3 +423,18 @@ def test_step7_group_uses_summary():
     from hk_llm.steps.step7_group import _text, similarity
     assert _text(no_sum[0]) == a["title"], "요약이 없으면 제목만"
     assert similarity(_text(no_sum[0]), _text(no_sum[1]), "카카오") < similarity(_text(a), _text(b), "카카오")
+
+    # 한쪽만 요약이 있으면 제목끼리 비교 (11/11: 제목+요약 대 제목만은 글자 수가 달라 점수가 낮아져, 옛 규칙이 묶던 섞인 쌍 255개 중 113개를 놓침)
+    long_sum = {"article_id": 3, "stock_code": "035420", "stock_name": "네이버", "published_at": t,
+                "title": "토스, 네이버 공정위 제소…포스 연동 놓고 다시 충돌",
+                "summary": "간편결제 사업자 사이의 다툼이 다시 불거졌다. 단말기 연동 범위와 수수료 조건을 둘러싼 양측 주장이 엇갈린다. 당국의 판단에 관심이 쏠린다."}
+    title_only = {"article_id": 4, "stock_code": "035420", "stock_name": "네이버", "published_at": t,
+                  "title": "토스, 네이버 공정위에 제소", "summary": None}
+    assert group_articles([long_sum, title_only]), "한쪽이 제목만이면 제목끼리도 봄"
+    # 제목은 달라도 요약이 제목만 기사와 겹치면 지금처럼 묶음 (제목끼리로 바꾸면 이런 같은 실적 발표 50쌍을 놓쳤음)
+    earn = {"article_id": 5, "stock_code": "010130", "stock_name": "고려아연", "published_at": t,
+            "title": "수익성 곤두박질 친 고려아연…귀금속 가격·환율 하락 겹악재",
+            "summary": "고려아연 3분기 영업이익은 1천417억원으로 작년 동기 대비 48% 줄었다."}
+    earn_title = {"article_id": 6, "stock_code": "010130", "stock_name": "고려아연", "published_at": t,
+                  "title": "고려아연 3분기 영업이익 1천417억원…작년 동기 대비 48%↓", "summary": None}
+    assert group_articles([earn, earn_title]), "제목+요약 겹침으로도 묶음"
