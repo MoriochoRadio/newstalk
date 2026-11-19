@@ -23,6 +23,21 @@ class SummaryRegenerateLimiterTest {
     }
 
     @Test
+    void 새로_만들지_않은_호출은_돌려받아_횟수에_안_든다() {
+        SummaryRegenerateLimiter limiter = new SummaryRegenerateLimiter(Clock.fixed(T0, ZoneOffset.UTC));
+        // 저장본만 받은 호출 10번 (매번 돌려받음) → 그래도 5번 더 됨
+        for (int i = 0; i < 10; i++) {
+            assertThat(limiter.tryAcquire(1L)).isTrue();
+            limiter.refund(1L);
+        }
+        for (int i = 0; i < SummaryRegenerateLimiter.MAX_CALLS; i++) {
+            assertThat(limiter.tryAcquire(1L)).isTrue();
+        }
+        assertThat(limiter.tryAcquire(1L)).isFalse();
+        limiter.refund(99L); // 기록 없는 사람을 돌려줘도 아무 일 없음
+    }
+
+    @Test
     void 창이_지나면_다시_된다() {
         MutableClock clock = new MutableClock(T0);
         SummaryRegenerateLimiter limiter = new SummaryRegenerateLimiter(clock);

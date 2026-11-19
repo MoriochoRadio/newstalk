@@ -139,6 +139,9 @@ public class StockService {
             throw new BusinessException(ErrorCode.AI_BUSY);   // 한 사람이 10분에 5번 넘게 부르면 429
         }
         boolean regenerated = aiSummaryClient.regenerate(stockCode);
+        // AI 서버가 '새로 안 만듦'(10분 안에 이미 만듦·오늘 글 없음)이라고 답하면 LLM 비용이 없으므로 횟수를 돌려줌.
+        // 시간 초과 같은 오류는 AI 쪽에서 이미 만들고 있었을 수 있어 돌려주지 않음 (비용 쪽으로 보수적으로)
+        if (!regenerated) regenerateLimiter.refund(userId);
         return new SummaryRegenerateResponse(regenerated, getSummary(stockCode, null));
     }
 

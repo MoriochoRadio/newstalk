@@ -47,6 +47,14 @@ public class SummaryRegenerateLimiter {
         return w.calls() <= MAX_CALLS;
     }
 
+    /**
+     * 비용이 안 든 호출은 돌려줌 (11/19 PR #131 검토): AI 서버가 '10분 안에 이미 만듦'으로 저장본만 주거나 오류가 나면
+     * LLM 을 부르지 않았는데도 횟수만 줄어 같은 종목 버튼 몇 번에 429 가 났음
+     */
+    public void refund(Long userId) {
+        windows.computeIfPresent(userId, (k, old) -> old.calls() <= 1 ? null : new Window(old.start(), old.calls() - 1));
+    }
+
     private record Window(Instant start, int calls) {
         boolean ended(Instant now) {
             return !now.isBefore(start.plus(WINDOW));
