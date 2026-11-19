@@ -13,7 +13,7 @@ import { dirClass, fmtPrice, fmtRate, shortTime } from '../lib/format';
 import Movers from '../components/Movers';
 import HotStocks from '../components/HotStocks';
 import Sparkline from '../components/Sparkline';
-import { Empty, ErrorBox, LimitBadge, SkeletonRows } from '../components/ui';
+import { Empty, ErrorBox, LimitBadge, SkeletonRows, StaleDayNote } from '../components/ui';
 import CategoryBar, { MARKETS } from '../components/CategoryBar';
 import { useProMode } from '../lib/proMode';
 
@@ -124,6 +124,7 @@ export default function StocksPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">종목</h1>
+          <StaleDayNote date={issues.data?.date} what="화제 종목 순위" />
         </div>
         {!pro && (
         <div className="segmented sm view-toggle" role="group" aria-label="보기 방식">

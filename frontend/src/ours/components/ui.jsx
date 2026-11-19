@@ -1,7 +1,7 @@
 // 작은 화면 조각: 스켈레톤·빈 화면·오류·페이지 번호·묶음 선택·등락 표시
 import { useEffect } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Inbox, RotateCw } from 'lucide-react';
-import { dirClass, fmtPrice, fmtRate } from '../lib/format';
+import { dirClass, fmtPrice, fmtRate, staleDayLabel } from '../lib/format';
 import { errorText } from '../lib/errors';
 import { isNetworkError, markOffline } from '../lib/netStatus';
 
@@ -29,6 +29,20 @@ export function Empty({ icon: Icon = Inbox, title, desc, action }) {
       {desc && <p className="empty-desc">{desc}</p>}
       {action}
     </div>
+  );
+}
+
+/**
+ * 오늘 기사가 아직 없어 서버가 가장 최근 날 순위를 보낸 때 알림 (date 가 오늘이면 아무것도 안 그림).
+ * 아침 일찍·주말·서버를 다시 켠 직후에 '오늘'이라고 적힌 자리에 지난 날 순위가 나오던 것 (PR #131 검토)
+ */
+export function StaleDayNote({ date, what = '순위' }) {
+  const day = staleDayLabel(date);
+  if (!day) return null;
+  return (
+    <p className="stale-note" role="note">
+      오늘 기사가 아직 없어 <b>{day}</b> {what}를 보여 드려요.
+    </p>
   );
 }
 
