@@ -5103,7 +5103,8 @@ html {
 }
 .move-row {
   display: grid;
-  grid-template-columns: 9.5em 5em minmax(0, 1fr) auto;
+  /* 등락률 칸 5em → 6em: '+11.60%'처럼 앞자리가 두 자리면 %만 다음 줄로 떨어졌음 (11/19 시연 영상) */
+  grid-template-columns: 9.5em 6em minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 10px 2px;
@@ -5120,6 +5121,7 @@ html {
   font-size: var(--fs-lg);
   font-weight: 800;
   text-align: right;
+  white-space: nowrap;
 }
 .move-title {
   display: block;
@@ -6477,3 +6479,15 @@ a { text-underline-offset: 3px; }
 .ispark-down .ispark-line { stroke: var(--down-chart); }
 .ispark-down .ispark-area, .ispark-dot.ispark-down { fill: var(--down-chart); }
 .ispark-label { flex-shrink: 0; color: var(--text-3); }
+
+/* 오늘 기사가 없어 서버가 가장 최근 날 순위·요약을 보낸 때의 알림 (PR #131 의 date, 11/19) */
+.stale-note {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+}
+.stale-note b { font-weight: 700; }

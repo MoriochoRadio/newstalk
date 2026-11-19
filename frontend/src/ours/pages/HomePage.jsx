@@ -33,7 +33,7 @@ import HomeControl from '../components/HomeControl';
 import { useProMode } from '../lib/proMode';
 import LivePill from '../components/LivePill';
 import { ToneRing, leanOf } from '../components/Tone';
-import { Empty, ErrorBox, Segmented, SkeletonRows } from '../components/ui';
+import { Empty, ErrorBox, Segmented, SkeletonRows, StaleDayNote } from '../components/ui';
 import { dirClass } from '../lib/format';
 
 const MAP_LIMIT = 30; // 이슈 종목 수 (낭독기 문장 + 종목 지도 대신용)
@@ -215,6 +215,7 @@ export default function HomePage() {
             오늘의 뉴스 브리핑 <span className="title-date num">{todayLabel()}</span>
           </h1>
           {topStories.length > 0 && <p className="sr-only">{headline(newsCount, storyCount, issueItems, quotes)}</p>}
+          <StaleDayNote date={issues.data?.date} what="종목 순위" />
         </div>
         <LivePill className="mobile-pill" />
         {/* 시안 비교 (임시): 주소에 ?home= 을 붙였을 때만. 팀 회의에서 고른 뒤 뺌 */}

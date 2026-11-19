@@ -42,7 +42,7 @@
         WHERE user_id = #{userId}
     </update>
 
-    <!-- idx_users_recovery (V18) 로 찾음 -->
+    <!-- idx_users_recovery (V17) 로 찾음 -->
     <select id="findByRecovery" resultType="com.hkteam2.stocknews.user.User">
         SELECT <include refid="userColumns"/>
         FROM users

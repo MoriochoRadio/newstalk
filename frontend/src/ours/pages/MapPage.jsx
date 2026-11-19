@@ -10,7 +10,7 @@ import { todayLabel } from '../lib/format';
 import { loadTodayFeed, pickWhy } from '../lib/todayFeed';
 import MarketMap, { MapLegend } from '../components/MarketMap';
 import Movers from '../components/Movers';
-import { Empty, ErrorBox, Segmented, limitOf } from '../components/ui';
+import { Empty, ErrorBox, Segmented, StaleDayNote, limitOf } from '../components/ui';
 import CapMap, { CapLegend } from '../components/CapMap';
 import MapPro from '../components/MapPro';
 import { useProMode } from '../lib/proMode';
@@ -122,6 +122,7 @@ export default function MapPage() {
               ? `시가총액 상위 ${shownCap.length || CAP_LIMIT}종목 · 색 = 오늘 등락률 · 칸을 누르면 종목 화면`
               : '오늘 기사가 많은 종목 · 크기 = 그 종목 오늘 기사 전부(여러 소식의 합) · 색 = 오늘 등락률'}
           </p>
+          {showNews && <StaleDayNote date={issues.data?.date} what="기사 많은 종목" />}
         </div>
         {capReady && (
           <Segmented

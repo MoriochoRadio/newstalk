@@ -14,7 +14,8 @@ const CODE_TEXT = {
   NOT_COMMENT_OWNER: '내가 쓴 댓글만 지울 수 있어요.',
   DUPLICATE_LOGIN_ID: '이미 쓰고 있는 아이디예요. 다른 아이디를 넣어 주세요.',
   INVALID_CREDENTIALS: '아이디나 비밀번호가 맞지 않아요. 다시 확인해 주세요.',
-  TOO_MANY_LOGIN_ATTEMPTS: '로그인을 여러 번 실패해서 잠시 막았어요. 10분 뒤에 다시 해 주세요.',
+  // 서버 잠금: 10분 안에 5번 틀리면 1분, 또 틀리면 2·4·8분 (PR #131 LoginAttemptLimiter). 전엔 '10분 뒤'라고 적혀 실제와 달랐음
+  TOO_MANY_LOGIN_ATTEMPTS: '로그인을 여러 번 실패해서 잠시 막았어요. 1분쯤 뒤에 다시 해 주세요. 계속 틀리면 기다리는 시간이 늘어나요.',
   ALREADY_IN_WATCHLIST: '이미 관심 종목에 담겨 있어요.',
   WATCHLIST_NOT_FOUND: '관심 종목에 없는 종목이에요.',
   AI_UNAVAILABLE: '요약 서버를 지금 쓸 수 없어요. 잠시 후 다시 해 주세요.',

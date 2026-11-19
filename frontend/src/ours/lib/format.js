@@ -23,6 +23,20 @@ export function todayLabel(now = new Date()) {
   return `${p.m}월 ${p.d}일 (${WEEK[p.w]})`;
 }
 
+/**
+ * 서버가 '오늘 기사가 없어 가장 최근 날'로 넘어가 보낸 날짜면 "11월 18일 (화)", 오늘이거나 없으면 null
+ * (이슈 순위·종합 요약 응답의 date, PR #131. 화면이 '오늘'이라고 적힌 자리에 어제 것을 보여 주던 것을 막음)
+ */
+export function staleDayLabel(date, now = new Date()) {
+  if (!date) return null;
+  const p = kstParts(now);
+  if (date === `${p.y}-${pad(p.m)}-${pad(p.d)}`) return null;
+  const [y, m, d] = String(date).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const w = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${m}월 ${d}일 (${WEEK[w]})`;
+}
+
 const sameKstDay = (a, b) => {
   const x = kstParts(a);
   const y = kstParts(b);

@@ -8,7 +8,7 @@ import { useApi } from '../../hooks/useApi';
 import { useSession } from '../app/session';
 import { useQuotes } from '../lib/useQuotes';
 import { useTitle } from '../lib/hooks';
-import { dirClass, fmtAmount, fmtPrice, fmtRate, fmtVolume, marketKo, shortTime } from '../lib/format';
+import { dirClass, fmtAmount, fmtPrice, fmtRate, fmtVolume, marketKo, shortTime, staleDayLabel } from '../lib/format';
 import IntradaySpark from '../components/IntradaySpark';
 import { errorText } from '../lib/errors';
 import { StoryFeed } from '../components/ArticleRow';
@@ -223,6 +223,8 @@ function SummaryCard({ code, summary }) {
     setError('');
   }, [code]);
   const s = override || summary.data;
+  // 오늘 요약·오늘 글이 없으면 서버가 가장 최근 날 요약을 보냄 (응답 date, PR #131) → 제목에 그 날짜
+  const staleDay = staleDayLabel(s?.date);
 
   const regenerate = async () => {
     if (!user) {
@@ -254,7 +256,7 @@ function SummaryCard({ code, summary }) {
       <div className="card-head">
         <h2 className="card-title" id="sum-title">
           <Sparkles className="icon" aria-hidden="true" />
-          오늘 AI 요약
+          {staleDay ? `${staleDay} AI 요약` : '오늘 AI 요약'}
         </h2>
         {/* 11/18 사용자: '전엔 있던 AI 다시 불러오기 버튼'을 못 찾음 → 흐린 글자 버튼을 테두리 버튼 + 분명한 이름으로 */}
         {s?.newsSummary && (
@@ -275,6 +277,7 @@ function SummaryCard({ code, summary }) {
               <p className="sub">{s.snsSummary}</p>
             </>
           )}
+          {staleDay && <p className="stale-note">오늘 이 종목 기사가 아직 없어 가장 최근 날 요약을 보여 드려요.</p>}
           {s.generatedAt && <p className="card-note num">{shortTime(s.generatedAt)}에 만든 요약 · AI가 쓴 글이라 틀릴 수 있어요</p>}
         </>
       ) : (
@@ -303,11 +306,12 @@ function SentimentCard({ summary }) {
   const ratio = basis === 'event' ? s?.sentimentByEvent : s?.sentiment;
   const count = ratio?.articleCount || 0;
   const few = Boolean(s) && (s?.sentiment?.articleCount || 0) < 3;
+  const staleDay = staleDayLabel(s?.date);
   return (
     <section className={`card ${few ? 'sent-few' : ''}`} aria-labelledby="mood-title">
       <div className="card-head">
         <h2 className="card-title" id="mood-title">
-          오늘 좋은·나쁜 소식
+          {staleDay ? `${staleDay} 좋은·나쁜 소식` : '오늘 좋은·나쁜 소식'}
         </h2>
         {s?.sentimentByEvent && !few && (
           <Segmented

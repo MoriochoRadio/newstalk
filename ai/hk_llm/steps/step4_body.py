@@ -123,14 +123,17 @@ class RedirectBlocked(Exception):
 
 
 def _get(url, hops=3):
-    """리다이렉트를 직접 따라가며 대상마다 확인 (2026-11-12 보안 검토: requests 는 확인 없이 따라감)"""
+    """리다이렉트를 직접 따라가며 대상마다 확인 (2026-11-12 보안 검토: requests 는 확인 없이 따라감)
+    같은 사이트(호스트) 안에서만 따라감 (11/19 PR #131 검토): 전엔 BODY_XPATH 의 아무 호스트나 허용해서
+    제목만 쓰는 언론사(TITLE_ONLY)·403 으로 막힌 사이트로 넘어가면 그 사이트의 차단기·요청 간격을 거치지 않고 요청이 나갔음"""
+    origin = urlsplit(url).netloc
     for _ in range(hops + 1):
         res = retry(lambda: requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=15, allow_redirects=False))
         if not res.is_redirect:
             return res
         url = urljoin(url, res.headers["Location"])
         p = urlsplit(url)
-        if p.scheme != "https" or p.netloc not in BODY_XPATH or not allowed(url):
+        if p.scheme != "https" or p.netloc != origin or not allowed(url):
             raise RedirectBlocked(f"리다이렉트 대상이 수집 범위 밖: {url[:200]}")
     raise RedirectBlocked("리다이렉트가 너무 많음")
 
@@ -175,14 +178,15 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
             done["SKIPPED"] += 1
             continue
         host = urlsplit(r.url).netloc
-        if not breaker.allow(host):  # 이 사이트가 계속 실패해서 쉬는 중 (resilience.py). 재시도 횟수는 안 올림
-            _update(engine, r.article_id, status="LISTED", error="사이트가 잠시 쉬는 중 (차단기, 다음 실행에서 다시)")
-            done["RETRY"] += 1
-            continue
+        # Crawl-delay 검사도 차단기보다 먼저 (11/19 PR #131 검토): 시험 요청을 가져간 뒤 여기서 건너뛰면 결과 없이 끝났음
         delay = crawl_delay(r.url)
         if delay > MAX_DELAY:  # 줄여서 지키면 robots.txt 위반 → 이 사이트는 본문을 받지 않음 (2026-11-12 보안 검토)
             _update(engine, r.article_id, status="SKIPPED", error=f"robots.txt Crawl-delay {delay}초 > {MAX_DELAY}초")
             done["SKIPPED"] += 1
+            continue
+        if not breaker.allow(host):  # 이 사이트가 계속 실패해서 쉬는 중 (resilience.py). 재시도 횟수는 안 올림
+            _update(engine, r.article_id, status="LISTED", error="사이트가 잠시 쉬는 중 (차단기, 다음 실행에서 다시)")
+            done["RETRY"] += 1
             continue
         wait = last_hit.get(host, 0) + delay - time.monotonic()
         if wait > 0:
@@ -216,7 +220,8 @@ def fetch_bodies(engine=None, limit=BATCH, since=None, only=None):
                 _update(engine, r.article_id, status="SKIPPED", error=f"본문 없음 ({len(body)}자)")
                 done["SKIPPED"] += 1
                 continue
-        except RedirectBlocked as e:  # 사이트 문제가 아니라 우리가 안 따라간 것 → 차단기·재시도 횟수 안 씀
+        except RedirectBlocked as e:  # 사이트 문제가 아니라 우리가 안 따라간 것 → 재시도 횟수 안 씀
+            breaker.success(host)  # 리다이렉트도 정상 응답. 안 적으면 시험 요청이 결과 없이 끝나 차단기가 굳음 (11/19)
             _update(engine, r.article_id, status="SKIPPED", error=str(e))
             done["SKIPPED"] += 1
             continue

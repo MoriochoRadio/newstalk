@@ -25,7 +25,7 @@
 | `collect_run` | 수집·요약 실행 기록 | AI | 백엔드 | V5 | ✅ |
 | `stock_daily_summary` | 종목별 하루 종합 요약 | AI | 백엔드 | V5 | ✅ (AI가 나중에 채움) |
 | `llm_usage_daily` | LLM 하루 비용 (하루 상한을 모든 실행이 같이 셈) | AI | - | V16 | ✅ |
-| `link_feedback` | 사용자가 알려 준 틀린 기사-종목 연결 | 백엔드 | AI (`eval/feedback.py`) | V17 | ✅ |
+| `link_feedback` | 사용자가 알려 준 틀린 기사-종목 연결 | 백엔드 | AI (`eval/feedback.py`) | V18 | ✅ |
 | `quote_snapshot` | 실시간 현재가 (종목당 1줄) — 확장 ①② | 백엔드 | 백엔드 | V10 | ✅ (KIS를 켠 서버만 채움) |
 | `quote_tick` | 실시간 체결 이력 (녹화본) — 확장 ①② | 백엔드 | 백엔드 | V10 | ✅ (KIS를 켠 서버만 채움) |
 | `quote_quarantine` | 해석하지 못한 실시간 메시지 원문 — 확장 ①② | 백엔드 | 백엔드 | V10 | ✅ |
@@ -467,7 +467,7 @@ erDiagram
 - AI 의 모든 LLM 호출(`llm_call`)이 끝날 때마다 `INSERT … ON DUPLICATE KEY UPDATE` 로 **더하기만** 함 → 수집기 컨테이너·내 PC 실행이 동시에 써도 빠지지 않음
 - 하루 상한(`LLM_DAILY_USD`, 기본 $2)은 이 표의 오늘 `usd` 로 판단. DB 에 못 닿으면 그 실행만 예전처럼 `ai/logs/llm_usage.json` 파일로 셈
 
-### link_feedback · 사용자가 알려 준 틀린 연결 (V17)
+### link_feedback · 사용자가 알려 준 틀린 연결 (V18)
 
 | # | Column Name | Data Type | Key | Not Null | Default | Comments |
 |---|---|---|---|---|---|---|
@@ -557,4 +557,5 @@ KIS 시세는 재배포 금지라 이 표의 데이터는 Git·외부에 내보�
 | 2026-11-10 | V14 | article_stock.fact_type + CHECK: 근거 문장의 사실 종류 (FACT/PLAN/FORECAST/RUMOR) |
 | 2026-11-10 | V15 | 공시 연결(`channel` DART)의 article_stock.relevance 를 NULL 로 (데이터만, 구조 변경 없음). 관련도는 기사용 점수라 공시는 비움 |
 | 2026-11-13 | V16 | llm_usage_daily: LLM 하루 비용을 DB 에서 셈 (전에는 수집기·내 PC 가 각자 파일에 적어 $2 상한이 따로 걸림) |
-| 2026-11-13 | V17 | link_feedback: 사용자가 알려 준 틀린 연결 ("연결이 틀렸어요" 버튼, AI 정답지 후보·규칙 점검용) |
+| 2026-11-18 | V17 | users.recovery_question·recovery_answer_hmac + IDX `idx_users_recovery`: 계정 찾기 확인 질문 (답은 HMAC 만 저장) |
+| 2026-11-19 | V18 | link_feedback: 사용자가 알려 준 틀린 연결 ("연결이 틀렸어요" 버튼, AI 정답지 후보·규칙 점검용). PR #131 에서 팀 번호(V17 확인 질문) 뒤로 맞춤 |
